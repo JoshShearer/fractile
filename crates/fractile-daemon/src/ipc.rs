@@ -666,7 +666,15 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
                 .entries
                 .values()
                 .filter(|e| !e.no_display && !e.hidden && e.kind == "Application")
-                .map(|e| json!({"id": e.id, "name": e.name, "icon": e.icon, "terminal": e.terminal, "policy": cfg.apps.get(&e.id)}))
+                .map(|e| {
+                    json!({
+                        "id": e.id, "name": e.name, "icon": e.icon, "terminal": e.terminal,
+                        "policy": cfg.apps.get(&e.id),
+                        // effective value (the user's choice, else the built-in list)
+                        "manages_session": cfg.manages_session(&e.id),
+                        "manages_session_builtin": fractile_core::config::builtin_manages_session(&e.id),
+                    })
+                })
                 .collect();
             v.sort_by(|a, b| a["name"].as_str().unwrap_or("").to_lowercase().cmp(&b["name"].as_str().unwrap_or("").to_lowercase()));
             Ok(json!(v))

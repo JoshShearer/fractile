@@ -61,13 +61,37 @@ pub fn which(prog: &str) -> bool {
 
 /// Spawn detached. Returns the pid of the immediate child (systemd-run or
 /// the program itself); the process is reaped in a background thread.
+///
+/// A launch that fails at once is reported, not counted as a launch: the
+/// child is watched for `EARLY_EXIT` and a non-zero exit in that time is an
+/// error with the program's own message. If the failing program is the
+/// systemd-run wrapper (no user manager reachable on this session bus, for
+/// example), the app is started without the scope instead.
 pub fn spawn(plan: &LaunchPlan) -> Result<u32, String> {
-    let (prog, args) = plan.argv.split_first().ok_or("empty argv")?;
+    match spawn_checked(&plan.argv, plan.method) {
+        Err(e) if plan.argv.first().map(|p| Path::new(p).file_name().map(|f| f == "systemd-run").unwrap_or(false)).unwrap_or(false) => {
+            let inner: Vec<String> = plan.argv.iter().skip_while(|a| *a != "--").skip(1).cloned().collect();
+            if inner.is_empty() {
+                return Err(e);
+            }
+            spawn_checked(&inner, plan.method)
+                .map_err(|e2| format!("{e}; without the systemd scope: {e2}"))
+                .inspect(|_| eprintln!("fractile: {e}; started {} without a systemd scope", plan.desktop_id))
+        }
+        r => r,
+    }
+}
+
+const EARLY_EXIT: std::time::Duration = std::time::Duration::from_millis(500);
+
+fn spawn_checked(argv: &[String], method: &str) -> Result<u32, String> {
+    use std::io::Read;
+    let (prog, args) = argv.split_first().ok_or("empty argv")?;
     let mut cmd = Command::new(prog);
-    cmd.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    cmd.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     // Don't leak Fractile's own environment markers into apps. Fractile's
     // own UI is the exception: it must reach the same service instance.
-    if plan.method != "ui" {
+    if method != "ui" {
         cmd.env_remove("FRACTILE_RUNTIME_DIR").env_remove("FRACTILE_DATA_DIR").env_remove("FRACTILE_CONFIG").env_remove("FRACTILE_STATE_DIR");
     }
     cmd.env_remove("DESKTOP_STARTUP_ID");
@@ -80,7 +104,28 @@ pub fn spawn(plan: &LaunchPlan) -> Result<u32, String> {
     }
     let mut child = cmd.spawn().map_err(|e| format!("failed to start {}: {e}", prog))?;
     let pid = child.id();
+    let mut err_pipe = child.stderr.take();
+    let start = std::time::Instant::now();
+    while start.elapsed() < EARLY_EXIT {
+        match child.try_wait() {
+            Ok(Some(st)) if !st.success() => {
+                let mut msg = String::new();
+                if let Some(p) = err_pipe.as_mut() {
+                    let _ = p.take(4096).read_to_string(&mut msg);
+                }
+                let msg = msg.trim().lines().last().unwrap_or("").to_string();
+                return Err(format!("{prog} exited with {st}{}", if msg.is_empty() { String::new() } else { format!(": {msg}") }));
+            }
+            Ok(Some(_)) => break, // a launcher (gio) that handed over and exited: fine
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(20)),
+            Err(_) => break,
+        }
+    }
     std::thread::spawn(move || {
+        // Keep draining the app's stderr so it never blocks or gets SIGPIPE.
+        if let Some(mut p) = err_pipe {
+            let _ = std::io::copy(&mut p, &mut std::io::sink());
+        }
         let _ = child.wait();
     });
     Ok(pid)
@@ -90,6 +135,41 @@ pub fn spawn(plan: &LaunchPlan) -> Result<u32, String> {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn a_launch_that_fails_at_once_is_an_error_with_its_message() {
+        let plan = LaunchPlan { desktop_id: "x.desktop".into(), argv: vec!["sh".into(), "-c".into(), "echo no display >&2; exit 3".into()], method: "exec" };
+        let e = spawn(&plan).unwrap_err();
+        assert!(e.contains("exit status: 3") && e.contains("no display"), "{e}");
+        // a launcher that hands over and exits 0 is a launch
+        let ok = LaunchPlan { desktop_id: "x.desktop".into(), argv: vec!["true".into()], method: "exec" };
+        assert!(spawn(&ok).is_ok());
+    }
+
+    #[test]
+    fn a_failing_systemd_run_wrapper_falls_back_to_a_direct_start() {
+        let d = std::env::temp_dir().join(format!("fractile-launch-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        let fake = d.join("systemd-run");
+        std::fs::write(&fake, "#!/bin/sh\necho 'Failed to start transient scope unit: no user manager' >&2\nexit 1\n").unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let mark = d.join("started");
+        let plan = LaunchPlan {
+            desktop_id: "x.desktop".into(),
+            argv: vec![fake.to_string_lossy().into(), "--user".into(), "--scope".into(), "--".into(), "touch".into(), mark.to_string_lossy().into()],
+            method: "systemd-scope+exec",
+        };
+        assert!(spawn(&plan).is_ok());
+        for _ in 0..50 {
+            if mark.exists() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(mark.exists(), "the app was not started without the scope");
+        std::fs::remove_dir_all(d).unwrap();
+    }
 
     fn entry(exec: &str) -> DesktopEntry {
         DesktopEntry { id: "org.x.App.desktop".into(), path: PathBuf::from("/usr/share/applications/org.x.App.desktop"), name: "App".into(), exec: Some(exec.into()), kind: "Application".into(), ..Default::default() }

@@ -742,7 +742,9 @@ class SettingsWindow(QWidget):
             c.currentIndexChanged.connect(lambda _i, aid=a["id"], cb=c: self._app_edit(aid, launch=cb.currentData()))
             t.setCellWidget(r, 1, c)
             ms = QCheckBox()
-            ms.setChecked(bool(p.get("app_manages_session")))
+            ms.setChecked(bool(a.get("manages_session", p.get("app_manages_session"))))
+            if a.get("manages_session_builtin"):
+                ms.setToolTip("Known to reopen its own windows and tabs, so a restore starts it once. Untick to start it once per window instead.")
             ms.toggled.connect(lambda val, aid=a["id"]: self._app_edit(aid, app_manages_session=val))
             t.setCellWidget(r, 2, ms)
             nr = QCheckBox()
@@ -752,7 +754,7 @@ class SettingsWindow(QWidget):
 
     def _app_edit(self, aid: str, **kw):
         apps = self.cfg.setdefault("apps", {})
-        cur = apps.get(aid) or {"launch": "ask", "extra_args": [], "app_manages_session": False}
+        cur = apps.get(aid) or {"launch": "ask", "extra_args": []}
         cur.update(kw)
         apps[aid] = cur
         self._update_dirty()

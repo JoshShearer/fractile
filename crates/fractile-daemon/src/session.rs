@@ -94,12 +94,15 @@ impl RestoreHost for DaemonHost {
         self.d.adapter().activate(id, None).map_err(|e| e.to_string())
     }
     fn launch(&self, desktop_id: &str, extra: &[String]) -> Result<u32, String> {
+        // Launch what is installed now, not what was installed at login.
+        self.d.apps.lock().unwrap().refresh_if_stale(Duration::from_secs(300));
         let entry = self.d.apps.lock().unwrap().get(desktop_id).cloned().ok_or_else(|| format!("{desktop_id} is not installed"))?;
         let plan = plan_launch(&entry, extra, systemd_user_available(), which("gio"))?;
         info!(self.d.log, "launch {desktop_id} via {} argv={:?}", plan.method, plan.argv);
         spawn(&plan)
     }
     fn can_launch(&self, desktop_id: &str) -> Result<String, String> {
+        self.d.apps.lock().unwrap().refresh_if_stale(Duration::from_secs(300));
         let entry = self.d.apps.lock().unwrap().get(desktop_id).cloned().ok_or_else(|| format!("{desktop_id} is not installed"))?;
         plan_launch(&entry, &[], systemd_user_available(), which("gio")).map(|p| p.method.to_string())
     }

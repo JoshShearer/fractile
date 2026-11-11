@@ -3,6 +3,7 @@
 set -uo pipefail
 export PATH=/toolchain/bin:$PATH CARGO_HOME=/cache/cargo CARGO_TARGET_DIR=/cache/target
 cd /src && cargo build --locked -q -p fractile-daemon -p fractile-cli 2>&1 | tail -5
+[ -x /cache/target/debug/fractiled ] && [ -x /cache/target/debug/fractile ] || { echo "build failed"; exit 2; }
 export XDG_RUNTIME_DIR=/tmp/rt; mkdir -m700 -p "$XDG_RUNTIME_DIR"
 export FRACTILE_BIN_DIR=/cache/target/debug
 export FRACTILE_APPINDICATOR_DIR=/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com

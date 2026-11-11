@@ -91,7 +91,7 @@ pub fn capture(input: &CaptureInput, cfg: &Config, mode: SnapshotMode, name: Opt
             stacking: w.stacking,
             focused: w.focused,
             launch_policy: app_pol.map(|p| p.launch).unwrap_or(LaunchPolicy::Ask),
-            restore_content: if app_pol.map(|p| p.app_manages_session).unwrap_or(false) { RestoreContent::ApplicationManaged } else { RestoreContent::FrameOnly },
+            restore_content: if w.desktop_file_id.as_deref().is_some_and(|d| cfg.manages_session(d)) { RestoreContent::ApplicationManaged } else { RestoreContent::FrameOnly },
             placement_rule: None,
             identity_confidence: identity_confidence(w.desktop_file_source.as_deref()),
             diagnostics: diags,

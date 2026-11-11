@@ -1,0 +1,79 @@
+{
+  "suite": "e2e-x11-apps",
+  "when": "2026-11-11T05:35:46-0600",
+  "environment": "Xephyr nested GNOME Shell 46.0 (X11); throwaway profiles; {'firefox': 'Mozilla Firefox 159.0', 'chrome': 'Google Chrome 157.0.8103.50', 'code': '1.145.3'}",
+  "results": [
+    {
+      "id": "A01a",
+      "name": "Firefox: two windows open with a throwaway profile, identified as firefox.desktop",
+      "ok": true,
+      "detail": "[('T14 Alpha \u2014 Mozilla Firefox', 'firefox', 'firefox.desktop'), ('T14 Beta \u2014 Mozilla Firefox', 'firefox', 'firefox.desktop')]"
+    },
+    {
+      "id": "A01b",
+      "name": "Firefox: restore launches it once, it reopens its own two windows, both are placed where they were; no extra windows",
+      "ok": true,
+      "detail": "launches=1 windows=2 placed={'T14 Alpha': {'h': 1168, 'w': 767, 'x': 66, 'y': 32}, 'T14 Beta': {'h': 1168, 'w': 767, 'x': 833, 'y': 32}} want={'T14 Alpha': {'h': 1168, 'w': 767, 'x': 66, 'y': 32}, 'T14 Beta': {'h': 1168, 'w': 767, 'x': 833, 'y': 32}} state=completed windows_closed_on_sigterm=True pids_signalled=1 killed_after_15s=[]"
+    },
+    {
+      "id": "A01c",
+      "name": "Firefox: the report covers both windows and claims nothing about tabs or unsaved content",
+      "ok": true,
+      "detail": "[{\"label\": \"firefox\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}, {\"label\": \"firefox #2\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}]"
+    },
+    {
+      "id": "A01d",
+      "name": "Firefox: restoring again launches nothing and opens nothing new",
+      "ok": true,
+      "detail": "launches=0 windows=2"
+    },
+    {
+      "id": "A02a",
+      "name": "Google Chrome: two windows open with a throwaway profile, identified as google-chrome.desktop",
+      "ok": true,
+      "detail": "[('T14 Gamma - Google Chrome', 'Google-chrome', 'google-chrome.desktop'), ('T14 Delta - Google Chrome', 'Google-chrome', 'google-chrome.desktop')]"
+    },
+    {
+      "id": "A02b",
+      "name": "Google Chrome: restore launches it once, it reopens its own two windows, both are placed where they were; no extra windows",
+      "ok": true,
+      "detail": "launches=1 windows=2 placed={'T14 Gamma': {'h': 1168, 'w': 767, 'x': 66, 'y': 32}, 'T14 Delta': {'h': 1168, 'w': 767, 'x': 833, 'y': 32}} want={'T14 Gamma': {'h': 1168, 'w': 767, 'x': 66, 'y': 32}, 'T14 Delta': {'h': 1168, 'w': 767, 'x': 833, 'y': 32}} state=completed windows_closed_on_sigterm=True pids_signalled=14 killed_after_15s=[]"
+    },
+    {
+      "id": "A02c",
+      "name": "Google Chrome: the report covers both windows and claims nothing about tabs or unsaved content",
+      "ok": true,
+      "detail": "[{\"label\": \"google-chrome\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}, {\"label\": \"google-chrome #2\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}]"
+    },
+    {
+      "id": "A02d",
+      "name": "Google Chrome: restoring again launches nothing and opens nothing new",
+      "ok": true,
+      "detail": "launches=0 windows=2"
+    },
+    {
+      "id": "A03a",
+      "name": "VS Code: two windows open with a throwaway profile, identified as com.microsoft.VSCode.desktop",
+      "ok": true,
+      "detail": "[('t14-epsilon - Visual Studio Code', 'com.microsoft.VSCode', 'com.microsoft.VSCode.desktop'), ('t14-zeta - Visual Studio Code', 'com.microsoft.VSCode', 'com.microsoft.VSCode.desktop')]"
+    },
+    {
+      "id": "A03b",
+      "name": "VS Code: restore launches it once, it reopens its own two windows, both are placed where they were; no extra windows",
+      "ok": true,
+      "detail": "launches=1 windows=2 placed={'t14-epsilon': {'h': 1168, 'w': 767, 'x': 66, 'y': 32}, 't14-zeta': {'h': 1168, 'w': 767, 'x': 833, 'y': 32}} want={'t14-epsilon': {'h': 1168, 'w': 767, 'x': 66, 'y': 32}, 't14-zeta': {'h': 1168, 'w': 767, 'x': 833, 'y': 32}} state=completed windows_closed_on_sigterm=False pids_signalled=11 killed_after_15s=['2e-3ymvtbde/code-ext /tmp/fractile-e2e-3ymvtbde/t14-epsilon ', '4869169967,4 --trace-process-track-uuid=3190708997556373682 ', '4869169967,4 --trace-process-track-uuid=3190708998493415531 ', '4869169967,4 --trace-process-track-uuid=3190708999430457380 ']"
+    },
+    {
+      "id": "A03c",
+      "name": "VS Code: the report covers both windows and claims nothing about tabs or unsaved content",
+      "ok": true,
+      "detail": "[{\"label\": \"com.microsoft.VSCode\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}, {\"label\": \"com.microsoft.VSCode #2\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}]"
+    },
+    {
+      "id": "A03d",
+      "name": "VS Code: restoring again launches nothing and opens nothing new",
+      "ok": true,
+      "detail": "launches=0 windows=2"
+    }
+  ]
+}

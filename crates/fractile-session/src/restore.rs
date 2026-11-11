@@ -274,7 +274,11 @@ pub fn targets_from_snapshot(s: &Snapshot, cfg: &Config) -> Vec<Target> {
                 depends_on: vec![],
                 workspace: ws_index(&r.workspace_id),
                 state: Some(r.state),
-                app_manages_session: app.map(|a| a.app_manages_session).unwrap_or(r.restore_content == RestoreContent::ApplicationManaged),
+                // The user's own choice wins; otherwise what was recorded, or the
+                // built-in list (snapshots taken before the list existed).
+                app_manages_session: app.and_then(|a| a.app_manages_session).unwrap_or_else(|| {
+                    r.restore_content == RestoreContent::ApplicationManaged || r.desktop_file_id.as_deref().is_some_and(fractile_core::config::builtin_manages_session)
+                }),
             }
         })
         .collect()
@@ -329,7 +333,7 @@ pub fn targets_from_layout(l: &Layout, mode: ApplyMode, outputs: &[Output], cfg:
                 depends_on: launch.map(|l| l.depends_on.clone()).unwrap_or_default(),
                 workspace: e.workspace,
                 state: e.state,
-                app_manages_session: app.map(|a| a.app_manages_session).unwrap_or(false),
+                app_manages_session: launch.map(|l| cfg.manages_session(&l.desktop_id)).unwrap_or(false),
             });
         }
     }
@@ -805,7 +809,15 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                     for &i in &g.members {
                         if matches!(live[i].status, ItemStatus::Pending | ItemStatus::Launching) {
                             live[i].status = ItemStatus::TimedOut;
-                            live[i].message = Some(format!("no matching window within {}s", opts.per_app_timeout.as_secs()));
+                            live[i].message = Some(if g.manages_session {
+                                format!(
+                                    "{} restores its own windows and did not reopen this one within {}s; Fractile starts it once and does not open extra windows",
+                                    g.desktop_id.trim_end_matches(".desktop"),
+                                    opts.per_app_timeout.as_secs()
+                                )
+                            } else {
+                                format!("no matching window within {}s", opts.per_app_timeout.as_secs())
+                            });
                             emit(&live, i, "timeout");
                         }
                     }

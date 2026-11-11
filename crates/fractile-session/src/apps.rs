@@ -31,29 +31,69 @@ pub struct AppIndex {
     by_exec_name: HashMap<String, String>,
     built_at: Option<Instant>,
     dirs: Vec<PathBuf>,
+    /// Modification time of each application dir at build time (None:
+    /// missing). Installing, removing or updating an app renames files in
+    /// one of them, which changes that dir's mtime.
+    dir_mtimes: Vec<Option<std::time::SystemTime>>,
+}
+
+fn dir_mtimes(dirs: &[PathBuf]) -> Vec<Option<std::time::SystemTime>> {
+    dirs.iter().map(|d| std::fs::metadata(d).and_then(|m| m.modified()).ok()).collect()
 }
 
 impl AppIndex {
     pub fn build(dirs: &[PathBuf]) -> AppIndex {
-        let mut idx = AppIndex { dirs: dirs.to_vec(), ..Default::default() };
-        // Earlier dirs take precedence (XDG order).
-        for d in dirs {
+        let mut idx = AppIndex { dirs: dirs.to_vec(), dir_mtimes: dir_mtimes(dirs), ..Default::default() };
+        // Earlier dirs take precedence (XDG order): an id found in an earlier
+        // dir shadows the same id later on.
+        let mut rank: HashMap<String, usize> = HashMap::new();
+        for (n, d) in dirs.iter().enumerate() {
             scan(d, d, &mut idx.entries, 0);
+            for id in idx.entries.keys() {
+                rank.entry(id.clone()).or_insert(n);
+            }
         }
         idx.entries.retain(|_, e| e.kind == "Application" && !e.hidden);
-        for (id, e) in &idx.entries {
+        // Several entries can claim the same WM class or program (a browser
+        // that ships both google-chrome.desktop and com.google.Chrome.desktop,
+        // or a user's own copy of a system entry). The pick must not depend
+        // on hash order: the entry from the user's own (earlier) dir first,
+        // then the one whose id is the class itself, then a visible one, then
+        // the lowest id.
+        let mut ids: Vec<&String> = idx.entries.keys().collect();
+        ids.sort();
+        let key_for = |id: &String, class: &str| {
+            let e = &idx.entries[id];
+            let stem = id.strip_suffix(".desktop").unwrap_or(id).to_lowercase();
+            (rank.get(id).copied().unwrap_or(usize::MAX), stem != class, e.no_display)
+        };
+        let mut wm: HashMap<String, (String, (usize, bool, bool))> = HashMap::new();
+        let mut ex: HashMap<String, (String, (usize, bool, bool))> = HashMap::new();
+        for id in ids {
+            let e = &idx.entries[id];
             if let Some(c) = &e.startup_wm_class {
-                idx.by_wm_class.entry(c.to_lowercase()).or_insert_with(|| id.clone());
+                let c = c.to_lowercase();
+                let k = key_for(id, &c);
+                // ids are visited in order, so on a tie the lowest id stays
+                if wm.get(&c).map(|(_, old)| k < *old).unwrap_or(true) {
+                    wm.insert(c, (id.clone(), k));
+                }
             }
             if let Some(exec) = &e.exec {
                 if let Ok(argv) = fractile_core::desktop::exec_to_argv(exec, &e.name, None) {
                     let prog = argv.iter().find(|a| !a.contains('=') && *a != "env").cloned().unwrap_or_else(|| argv[0].clone());
                     if let Some(name) = Path::new(&prog).file_name() {
-                        idx.by_exec_name.entry(name.to_string_lossy().to_lowercase()).or_insert_with(|| id.clone());
+                        let name = name.to_string_lossy().to_lowercase();
+                        let k = key_for(id, &name);
+                        if ex.get(&name).map(|(_, old)| k < *old).unwrap_or(true) {
+                            ex.insert(name, (id.clone(), k));
+                        }
                     }
                 }
             }
         }
+        idx.by_wm_class = wm.into_iter().map(|(c, (id, _))| (c, id)).collect();
+        idx.by_exec_name = ex.into_iter().map(|(c, (id, _))| (c, id)).collect();
         idx.built_at = Some(Instant::now());
         idx
     }
@@ -62,9 +102,11 @@ impl AppIndex {
         AppIndex::build(&application_dirs())
     }
 
-    /// Rebuild if older than `max_age` (new apps installed).
+    /// Rebuild when an application dir changed (an app was installed,
+    /// removed or updated) or the index is older than `max_age`.
     pub fn refresh_if_stale(&mut self, max_age: Duration) {
-        if self.built_at.map(|t| t.elapsed() > max_age).unwrap_or(true) {
+        let changed = !self.dirs.is_empty() && dir_mtimes(&self.dirs) != self.dir_mtimes;
+        if changed || self.built_at.map(|t| t.elapsed() > max_age).unwrap_or(true) {
             let dirs = if self.dirs.is_empty() { application_dirs() } else { self.dirs.clone() };
             *self = AppIndex::build(&dirs);
         }
@@ -252,6 +294,61 @@ mod tests {
         let mut w = WindowInfo { app_id: Some("org.example.editor".into()), ..Default::default() };
         idx.enrich(&mut w);
         assert_eq!(w.desktop_file_source.as_deref(), Some("app-id"));
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn app_installed_after_build_is_found_without_waiting() {
+        let d = std::env::temp_dir().join(format!("fractile-apps-{}", uuid::Uuid::new_v4()));
+        let late = d.join("late");
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("a.desktop"), "[Desktop Entry]\nType=Application\nName=A\nExec=a\n").unwrap();
+        let mut idx = AppIndex::build(&[late.clone(), d.clone()]);
+        assert!(idx.get("b.desktop").is_none());
+        // a new entry in an existing dir, and a dir that did not exist yet
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(d.join("b.desktop"), "[Desktop Entry]\nType=Application\nName=B\nExec=b\n").unwrap();
+        idx.refresh_if_stale(Duration::from_secs(3600));
+        assert!(idx.get("b.desktop").is_some());
+        std::fs::create_dir_all(&late).unwrap();
+        std::fs::write(late.join("a.desktop"), "[Desktop Entry]\nType=Application\nName=A (user)\nExec=a --user\n").unwrap();
+        idx.refresh_if_stale(Duration::from_secs(3600));
+        assert_eq!(idx.get("a.desktop").map(|e| e.name.as_str()), Some("A (user)"));
+        // nothing changed: no rebuild needed, same result
+        idx.refresh_if_stale(Duration::from_secs(3600));
+        assert_eq!(idx.get("a.desktop").map(|e| e.name.as_str()), Some("A (user)"));
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn entries_sharing_a_wm_class_resolve_the_same_way_every_time() {
+        let d = std::env::temp_dir().join(format!("fractile-apps-{}", uuid::Uuid::new_v4()));
+        let (user, sys) = (d.join("user"), d.join("sys"));
+        std::fs::create_dir_all(&user).unwrap();
+        std::fs::create_dir_all(&sys).unwrap();
+        let entry = |name: &str, exec: &str| format!("[Desktop Entry]\nType=Application\nName={name}\nExec={exec}\nStartupWMClass=google-chrome\n");
+        // Both names Chrome ships, in the system dir; several decoys so hash
+        // order varies between builds.
+        std::fs::write(sys.join("com.google.Chrome.desktop"), entry("Chrome", "/usr/bin/google-chrome-stable %U")).unwrap();
+        std::fs::write(sys.join("google-chrome.desktop"), entry("Chrome", "/usr/bin/google-chrome-stable %U")).unwrap();
+        for i in 0..20 {
+            std::fs::write(sys.join(format!("decoy{i}.desktop")), format!("[Desktop Entry]\nType=Application\nName=D{i}\nExec=d{i}\n")).unwrap();
+        }
+        let w = || WindowInfo { wm_class: Some("Google-chrome".into()), wm_class_instance: Some("google-chrome".into()), ..Default::default() };
+        for _ in 0..30 {
+            let idx = AppIndex::build(&[user.clone(), sys.clone()]);
+            let mut x = w();
+            idx.enrich(&mut x);
+            assert_eq!(x.desktop_file_id.as_deref(), Some("google-chrome.desktop"), "the id that is the class itself wins");
+        }
+        // The user's own entry (another id, same class) beats both system ones.
+        std::fs::write(user.join("chrome-work.desktop"), entry("Chrome (work)", "/usr/bin/google-chrome-stable --profile-directory=Work")).unwrap();
+        for _ in 0..30 {
+            let idx = AppIndex::build(&[user.clone(), sys.clone()]);
+            let mut x = w();
+            idx.enrich(&mut x);
+            assert_eq!(x.desktop_file_id.as_deref(), Some("chrome-work.desktop"));
+        }
         std::fs::remove_dir_all(d).unwrap();
     }
 

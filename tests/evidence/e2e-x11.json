@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-11T04:31:52-0600",
+  "when": "2026-11-11T05:36:53-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 3401526"
+      "detail": "pid 3867656"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "114 ms incl. polling"
+      "detail": "68 ms incl. polling"
     },
     {
       "id": "X10",
@@ -97,7 +97,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1762 ms"
+      "detail": "1761 ms"
     },
     {
       "id": "X14",
@@ -223,7 +223,7 @@
       "id": "X30",
       "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
       "ok": true,
-      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 767, 'x': 66, 'y': 32} want {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; Doc 2 at {'h': 1168, 'w': 767, 'x': 833, 'y': 32} want {'h': 1168, 'w': 767, 'x': 833, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2191, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 767, \"x\": 833, \"y\": 616}, \"record_"
+      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 767, 'x': 66, 'y': 32} want {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; Doc 2 at {'h': 1168, 'w': 767, 'x': 833, 'y': 32} want {'h': 1168, 'w': 767, 'x': 833, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2182, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 767, \"x\": 833, \"y\": 616}, \"record_"
     },
     {
       "id": "X31",
@@ -235,7 +235,7 @@
       "id": "X24",
       "name": "unknown Wayland desktop reports unsupported (no fake support)",
       "ok": true,
-      "detail": "{'unsupported'}"
+      "detail": "adapter=none levels={'unsupported'}"
     }
   ]
 }

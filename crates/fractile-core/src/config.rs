@@ -255,9 +255,50 @@ pub struct AppPolicy {
     #[serde(default)]
     pub extra_args: Vec<String>,
     /// The application restores its own documents/tabs; Fractile only
-    /// launches it and places the windows it opens.
-    #[serde(default)]
-    pub app_manages_session: bool,
+    /// launches it once and places the windows it opens. `None` means the
+    /// user has not chosen, and the built-in list of well-known
+    /// session-restoring apps decides (see [`builtin_manages_session`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_manages_session: Option<bool>,
+}
+
+/// Browsers and editors that reopen their own windows and tabs when started.
+/// Launching them once per recorded window would open extra windows, so a
+/// restore starts them once and places what they open.
+pub fn builtin_manages_session(desktop_id: &str) -> bool {
+    let id = desktop_id.strip_suffix(".desktop").unwrap_or(desktop_id).to_ascii_lowercase();
+    const EXACT: &[&str] = &[
+        "firefox",
+        "firefox-esr",
+        "org.mozilla.firefox",
+        "firefoxdeveloperedition",
+        "librewolf",
+        "io.gitlab.librewolf-community",
+        "google-chrome",
+        "google-chrome-beta",
+        "google-chrome-unstable",
+        "com.google.chrome",
+        "chromium",
+        "chromium-browser",
+        "org.chromium.chromium",
+        "brave-browser",
+        "com.brave.browser",
+        "microsoft-edge",
+        "com.microsoft.edge",
+        "vivaldi-stable",
+        "com.vivaldi.vivaldi",
+        "org.gnome.epiphany",
+        "code",
+        "code-insiders",
+        "com.microsoft.vscode",
+        "com.microsoft.vscodeinsiders",
+        "code-oss",
+        "com.visualstudio.code",
+        "codium",
+        "com.vscodium.codium",
+        "dev.zed.zed",
+    ];
+    EXACT.contains(&id.as_str()) || id.starts_with("jetbrains-") || id.starts_with("com.jetbrains.")
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -369,6 +410,12 @@ pub fn is_panel_reserved(a: &Accelerator) -> bool {
 pub const PANEL_SHORTCUT_CANDIDATES: [&str; 5] = ["Super+Alt+G", "Ctrl+Alt+G", "Super+Alt+Space", "Ctrl+Alt+Shift+G", "Super+Ctrl+G"];
 
 impl Config {
+    /// Whether `desktop_id` restores its own windows: the user's per-app
+    /// setting if there is one, else the built-in list.
+    pub fn manages_session(&self, desktop_id: &str) -> bool {
+        self.apps.get(desktop_id).and_then(|a| a.app_manages_session).unwrap_or_else(|| builtin_manages_session(desktop_id))
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version > CONFIG_SCHEMA_VERSION {
             return Err(format!("config schema {} is newer than supported {}", self.schema_version, CONFIG_SCHEMA_VERSION));
@@ -544,6 +591,36 @@ pub fn atomic_write(path: &Path, data: &[u8], keep_backup: bool) -> Result<(), S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn well_known_browsers_and_editors_restore_their_own_windows() {
+        for id in ["firefox.desktop", "org.mozilla.firefox.desktop", "google-chrome.desktop", "code.desktop", "com.visualstudio.code.desktop", "com.microsoft.VSCode.desktop", "jetbrains-idea.desktop", "Chromium.desktop"] {
+            assert!(builtin_manages_session(id), "{id}");
+        }
+        for id in ["org.gnome.TextEditor.desktop", "xterm.desktop", "firefoxish.desktop", "codex.desktop"] {
+            assert!(!builtin_manages_session(id), "{id}");
+        }
+    }
+
+    #[test]
+    fn the_users_choice_overrides_the_builtin_list() {
+        let mut c = Config::default();
+        assert!(c.manages_session("firefox.desktop"));
+        assert!(!c.manages_session("gedit.desktop"));
+        c.apps.insert("firefox.desktop".into(), AppPolicy { app_manages_session: Some(false), ..Default::default() });
+        c.apps.insert("gedit.desktop".into(), AppPolicy { app_manages_session: Some(true), ..Default::default() });
+        assert!(!c.manages_session("firefox.desktop"));
+        assert!(c.manages_session("gedit.desktop"));
+        // A policy that only sets the launch mode keeps the built-in default.
+        c.apps.insert("code.desktop".into(), AppPolicy { launch: LaunchPolicy::Always, ..Default::default() });
+        assert!(c.manages_session("code.desktop"));
+        // Old configs wrote a plain bool; it still reads as the user's choice.
+        let p: AppPolicy = serde_json::from_str(r#"{"launch":"ask","app_manages_session":false}"#).unwrap();
+        assert_eq!(p.app_manages_session, Some(false));
+        let p: AppPolicy = serde_json::from_str(r#"{"launch":"ask"}"#).unwrap();
+        assert_eq!(p.app_manages_session, None);
+        assert!(!serde_json::to_string(&p).unwrap().contains("app_manages_session"));
+    }
 
     #[test]
     fn panel_reserved_keys_parse_and_block_local_shortcuts() {

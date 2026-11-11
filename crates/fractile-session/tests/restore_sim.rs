@@ -289,7 +289,7 @@ fn session_managing_app_launched_once() {
     let sim = Sim::new(outs.clone()).app("browser.desktop", 3, 100, false, &["w1", "w2", "w3"]);
     let recs = (0..3).map(|i| rec(&format!("r{i}"), "browser.desktop", &format!("w{}", i + 1), i, "A", Rect::new(i as i32 * 500, 32, 500, 500), WA_A)).collect();
     let mut cfg = Config::default();
-    cfg.apps.insert("browser.desktop".into(), AppPolicy { launch: LaunchPolicy::IfMissing, extra_args: vec![], app_manages_session: true });
+    cfg.apps.insert("browser.desktop".into(), AppPolicy { launch: LaunchPolicy::IfMissing, extra_args: vec![], app_manages_session: Some(true) });
     let s = snapshot(outs, recs);
     let o = opts(&cfg);
     let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
@@ -297,6 +297,43 @@ fn session_managing_app_launched_once() {
     assert!(rep.all_success(), "{:#?}", rep.items);
     assert_eq!(sim.launches.borrow().len(), 1);
     assert_eq!(sim.count("browser.desktop"), 3);
+}
+
+/// A well-known browser with no per-app setting restores its own windows by
+/// default: one launch, no extra windows, and the window it did not reopen is
+/// reported as such instead of being opened blank.
+#[test]
+fn known_browser_without_policy_is_launched_once_and_missing_window_reported() {
+    let outs = vec![out("A", 0, 2560)];
+    let sim = Sim::new(outs.clone()).app("firefox.desktop", 2, 100, false, &["w1", "w2"]);
+    let recs = (0..3).map(|i| rec(&format!("r{i}"), "firefox.desktop", &format!("w{}", i + 1), i, "A", Rect::new(i as i32 * 500, 32, 500, 500), WA_A)).collect();
+    let cfg = Config::default();
+    let s = snapshot(outs, recs);
+    let o = opts(&cfg);
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    assert_eq!(sim.launches.borrow().len(), 1, "{:#?}", rep.items);
+    assert_eq!(sim.count("firefox.desktop"), 2);
+    assert_eq!(rep.items.iter().filter(|i| i.status.is_success()).count(), 2, "{:#?}", rep.items);
+    let missing = rep.items.iter().find(|i| !i.status.is_success()).unwrap();
+    assert_eq!(missing.status, ItemStatus::TimedOut);
+    assert!(missing.message.as_deref().unwrap_or("").contains("restores its own windows"), "{:?}", missing.message);
+}
+
+/// The same browser with the user's setting turned off is launched per window.
+#[test]
+fn users_off_switch_beats_the_builtin_list() {
+    let outs = vec![out("A", 0, 2560)];
+    let sim = Sim::new(outs.clone()).app("firefox.desktop", 1, 50, false, &["w1", "w2"]);
+    let recs = (0..2).map(|i| rec(&format!("r{i}"), "firefox.desktop", &format!("w{}", i + 1), i, "A", Rect::new(i as i32 * 500, 32, 500, 500), WA_A)).collect();
+    let mut cfg = Config::default();
+    cfg.apps.insert("firefox.desktop".into(), AppPolicy { launch: LaunchPolicy::IfMissing, extra_args: vec![], app_manages_session: Some(false) });
+    let s = snapshot(outs, recs);
+    let o = opts(&cfg);
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    assert!(rep.all_success(), "{:#?}", rep.items);
+    assert_eq!(sim.launches.borrow().len(), 2);
 }
 
 /// Non-session app with two recorded windows: launched twice, sequentially.
