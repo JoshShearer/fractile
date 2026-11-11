@@ -405,8 +405,9 @@ pub fn boot_id() -> String {
     std::fs::read_to_string("/proc/sys/kernel/random/boot_id").map(|s| s.trim().to_string()).unwrap_or_else(|_| "unknown-boot".into())
 }
 
-pub fn session_key() -> String {
-    format!("{}:{}", boot_id(), std::env::var("XDG_SESSION_ID").unwrap_or_else(|_| "nosession".into()))
+/// One login: the boot plus the logind session id (see logind::find_session).
+pub fn session_key(session_id: Option<&str>) -> String {
+    format!("{}:{}", boot_id(), session_id.unwrap_or("nosession"))
 }
 
 /// Periodic autosave (only for automatic policies), retention and daily DB backup.
@@ -629,8 +630,21 @@ pub fn login_flow(d: Arc<Daemon>) {
     }
 }
 
-/// Capture at orderly end of session (SIGTERM / PrepareForShutdown).
+/// Capture at orderly end of session (SIGTERM / PrepareForShutdown), unless
+/// the session manager's end-of-session notice already did (see
+/// gnome_session): by SIGTERM the desktop is being torn down.
 pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
+    if d.exit_captured.load(Ordering::SeqCst) {
+        info!(d.log, "{mode:?}: the exit snapshot was already taken when the session manager ended the session");
+    } else {
+        capture_before_exit(d, mode);
+    }
+    let _ = d.store.lock().unwrap().session_end(&d.session_key, true);
+}
+
+/// The exit snapshot itself. Also called by gnome_session on EndSession,
+/// before GNOME Shell stops.
+pub fn capture_before_exit(d: &Daemon, mode: SnapshotMode) {
     let cfg = d.config();
     let auto = matches!(cfg.session.policy, RestorePolicy::LastClean | RestorePolicy::LastKnown | RestorePolicy::Ask);
     // A restore still running when the session ends: stop it first so the
@@ -652,7 +666,10 @@ pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
     } else if let Some((run_id, _)) = &job {
         match capture_interrupted(d, mode, run_id) {
             Ok(s) if !s.windows.is_empty() => match save_automatic(d, &s) {
-                Ok(()) => info!(d.log, "{mode:?} snapshot {} saved ({} windows; the session ended during restore {run_id}, so windows it had not finished keep their restore targets)", s.snapshot_id, s.windows.len()),
+                Ok(()) => {
+                    d.exit_captured.store(true, Ordering::SeqCst);
+                    info!(d.log, "{mode:?} snapshot {} saved ({} windows; the session ended during restore {run_id}, so windows it had not finished keep their restore targets)", s.snapshot_id, s.windows.len())
+                }
                 Err(e) => error!(d.log, "exit snapshot failed: {e}"),
             },
             Ok(_) => {}
@@ -663,14 +680,37 @@ pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
     } else {
         match capture_now(d, mode, None) {
             Ok(s) if !s.windows.is_empty() => match save_automatic(d, &s) {
-                Ok(()) => info!(d.log, "{mode:?} snapshot {} saved ({} windows)", s.snapshot_id, s.windows.len()),
+                Ok(()) => {
+                    d.exit_captured.store(true, Ordering::SeqCst);
+                    info!(d.log, "{mode:?} snapshot {} saved ({} windows)", s.snapshot_id, s.windows.len())
+                }
                 Err(e) => error!(d.log, "exit snapshot failed: {e}"),
             },
             Ok(_) => {}
-            Err(e) => warn!(d.log, "exit capture failed: {}", e.message),
+            Err(e) => {
+                // The compositor (or its Fractile integration) went away
+                // before the service was told the session ends. Keep the
+                // layout last seen in this session (at most ~10 s old) rather
+                // than nothing.
+                let seen = d.topology_memory.lock().unwrap().as_ref().map(|(_, s)| s.clone());
+                match seen.filter(|s| !s.windows.is_empty()) {
+                    Some(mut s) => {
+                        let seen_at = s.created_at.clone();
+                        s.snapshot_id = uuid::Uuid::new_v4().to_string();
+                        s.mode = mode;
+                        match save_automatic(d, &s) {
+                            Ok(()) => {
+                                d.exit_captured.store(true, Ordering::SeqCst);
+                                warn!(d.log, "exit capture failed ({}); saved the layout last seen at {seen_at} as {mode:?} snapshot {} ({} windows)", e.message, s.snapshot_id, s.windows.len())
+                            }
+                            Err(se) => error!(d.log, "exit snapshot failed: {se}"),
+                        }
+                    }
+                    None => warn!(d.log, "exit capture failed: {}", e.message),
+                }
+            }
         }
     }
-    let _ = d.store.lock().unwrap().session_end(&d.session_key, true);
 }
 
 /// Exit snapshot of a session that ended during restore `run_id`: live state

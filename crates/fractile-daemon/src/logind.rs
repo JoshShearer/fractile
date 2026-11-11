@@ -30,7 +30,50 @@ fn connect() -> zbus::Result<Connection> {
     }
 }
 
-pub fn start(d: Arc<Daemon>) {
+/// The logind session this service belongs to, and how it was found.
+pub struct LoginSession {
+    pub id: String,
+    pub path: Option<OwnedObjectPath>,
+    pub how: &'static str,
+}
+
+/// Finds the graphical session the service works for. Started by the
+/// systemd user unit, the service is not inside any session and the user
+/// manager's environment usually has no XDG_SESSION_ID, so the last step
+/// asks logind for the user's graphical session (User.Display), the one
+/// GNOME and Plasma run in. Without that, every login of a boot looked like
+/// the same session and no login restore ran after a log-out.
+/// With `use_bus` false (FRACTILE_NO_LOGIND) only XDG_SESSION_ID counts.
+pub fn find_session(use_bus: bool) -> Option<LoginSession> {
+    let env_id = std::env::var("XDG_SESSION_ID").ok().filter(|s| !s.is_empty());
+    let conn = if use_bus { connect().ok() } else { None };
+    let mgr = conn.as_ref().and_then(|c| Proxy::new(c, DEST, MGR_PATH, MGR).ok());
+    let id_of = |path: &OwnedObjectPath| -> Option<String> {
+        let c = conn.as_ref()?;
+        Proxy::new(c, DEST, path.as_str().to_owned(), "org.freedesktop.login1.Session").ok()?.get_property::<String>("Id").ok()
+    };
+    if let Some(id) = env_id {
+        let path = mgr.as_ref().and_then(|m| m.call::<_, _, OwnedObjectPath>("GetSession", &(id.as_str(),)).ok());
+        return Some(LoginSession { id, path, how: "XDG_SESSION_ID" });
+    }
+    let mgr = mgr?;
+    if let Ok(path) = mgr.call::<_, _, OwnedObjectPath>("GetSessionByPID", &(std::process::id(),)) {
+        if let Some(id) = id_of(&path) {
+            return Some(LoginSession { id, path: Some(path), how: "the session this process runs in" });
+        }
+    }
+    // SAFETY: getuid has no preconditions and cannot fail.
+    let uid = unsafe { libc::getuid() };
+    let user: OwnedObjectPath = mgr.call("GetUser", &(uid,)).ok()?;
+    let c = conn.as_ref()?;
+    let (id, path) = Proxy::new(c, DEST, user.as_str().to_owned(), "org.freedesktop.login1.User").ok()?.get_property::<(String, OwnedObjectPath)>("Display").ok()?;
+    if id.is_empty() {
+        return None;
+    }
+    Some(LoginSession { id, path: Some(path), how: "the user's graphical session (logind User.Display)" })
+}
+
+pub fn start(d: Arc<Daemon>, session: Option<OwnedObjectPath>) {
     let conn = match connect() {
         Ok(c) => c,
         Err(e) => {
@@ -67,12 +110,7 @@ pub fn start(d: Arc<Daemon>) {
     }
     // Lock watcher.
     std::thread::Builder::new().name("logind-lock".into()).spawn(move || {
-        let Ok(mgr) = Proxy::new(&conn, DEST, MGR_PATH, MGR) else { return };
-        let path: zbus::Result<OwnedObjectPath> = match std::env::var("XDG_SESSION_ID") {
-            Ok(id) => mgr.call("GetSession", &(id,)),
-            Err(_) => mgr.call("GetSessionByPID", &(std::process::id(),)),
-        };
-        let Ok(path) = path else { return warn!(d.log, "no logind session for this process; lock state unknown") };
+        let Some(path) = session else { return warn!(d.log, "no logind session found for this service; lock state unknown") };
         let Ok(sess) = Proxy::new(&conn, DEST, path.as_str().to_owned(), "org.freedesktop.login1.Session") else { return };
         if let Ok(v) = sess.get_property::<bool>("LockedHint") {
             d.locked.store(v, Ordering::SeqCst);

@@ -11,6 +11,7 @@ mod kwin_dbus;
 mod daemon;
 mod ipc;
 mod logind;
+mod gnome_session;
 mod session;
 
 use daemon::Daemon;
@@ -168,7 +169,12 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let key = session::session_key();
+    let login_session = logind::find_session(std::env::var_os("FRACTILE_NO_LOGIND").is_none());
+    let key = session::session_key(login_session.as_ref().map(|s| s.id.as_str()));
+    match &login_session {
+        Some(s) => info!(log, "login session {} (from {})", s.id, s.how),
+        None => warn!(log, "no login session found (no XDG_SESSION_ID, and logind did not name one); every start in this boot counts as the same login"),
+    }
     let new_login = store.session_start(&key, &session::boot_id()).unwrap_or(true);
     let adapter = make_adapter(&env, forced, &log);
     let tiling = backend::detect_tiling(&env);
@@ -233,7 +239,10 @@ fn main() {
         std::thread::Builder::new().name("autosave".into()).spawn(move || session::autosave_loop(d)).unwrap();
     }
     if std::env::var_os("FRACTILE_NO_LOGIND").is_none() {
-        logind::start(d.clone());
+        logind::start(d.clone(), login_session.and_then(|s| s.path));
+    }
+    if std::env::var_os("FRACTILE_NO_SESSION_MANAGER").is_none() && d.env.current_desktop.split(':').any(|x| x.eq_ignore_ascii_case("gnome")) {
+        gnome_session::start(d.clone());
     }
     {
         let d = d.clone();

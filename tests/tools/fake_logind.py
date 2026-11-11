@@ -5,8 +5,9 @@ logind delivers. Point fractiled at it with FRACTILE_TEST_LOGIND_BUS.
 
 Implements what fractiled uses:
   Manager: Inhibit(ssss) -> h, GetSession(s) -> o, GetSessionByPID(u) -> o,
-           signal PrepareForShutdown(b)
-  Session: property LockedHint (b), SetLockedHint(b)  (as the real logind)
+           GetUser(u) -> o, signal PrepareForShutdown(b)
+  Session: properties Id (s), LockedHint (b); SetLockedHint(b)  (as the real logind)
+  User:    property Display (so), the user's graphical session
 Test control (io.fractile.test.FakeLogind on /):
   EmitPrepareForShutdown(b), InhibitorCount() -> u
 
@@ -19,17 +20,24 @@ import sys
 from gi.repository import Gio, GLib
 
 SESSION_PATH = "/org/freedesktop/login1/session/test"
+SESSION_ID = "test"
+USER_PATH = "/org/freedesktop/login1/user/_test"
 XML = """
 <node>
   <interface name="org.freedesktop.login1.Manager">
     <method name="Inhibit"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="h" direction="out"/></method>
     <method name="GetSession"><arg type="s" direction="in"/><arg type="o" direction="out"/></method>
     <method name="GetSessionByPID"><arg type="u" direction="in"/><arg type="o" direction="out"/></method>
+    <method name="GetUser"><arg type="u" direction="in"/><arg type="o" direction="out"/></method>
     <signal name="PrepareForShutdown"><arg type="b"/></signal>
   </interface>
   <interface name="org.freedesktop.login1.Session">
+    <property name="Id" type="s" access="read"/>
     <property name="LockedHint" type="b" access="read"/>
     <method name="SetLockedHint"><arg type="b" direction="in"/></method>
+  </interface>
+  <interface name="org.freedesktop.login1.User">
+    <property name="Display" type="(so)" access="read"/>
   </interface>
   <interface name="io.fractile.test.FakeLogind">
     <method name="EmitPrepareForShutdown"><arg type="b" direction="in"/></method>
@@ -65,6 +73,8 @@ def on_call(conn, sender, path, iface, method, params, inv):
         inv.return_value_with_unix_fd_list(GLib.Variant("(h)", (idx,)), fds)
     elif method in ("GetSession", "GetSessionByPID"):
         inv.return_value(GLib.Variant("(o)", (SESSION_PATH,)))
+    elif method == "GetUser":
+        inv.return_value(GLib.Variant("(o)", (USER_PATH,)))
     elif method == "SetLockedHint":
         state["locked"] = params.unpack()[0]
         conn.emit_signal(None, SESSION_PATH, "org.freedesktop.DBus.Properties", "PropertiesChanged",
@@ -80,12 +90,19 @@ def on_call(conn, sender, path, iface, method, params, inv):
 
 
 def on_get(conn, sender, path, iface, prop):
-    return GLib.Variant("b", state["locked"]) if prop == "LockedHint" else None
+    if prop == "LockedHint":
+        return GLib.Variant("b", state["locked"])
+    if prop == "Id":
+        return GLib.Variant("s", SESSION_ID)
+    if prop == "Display":
+        return GLib.Variant("(so)", (SESSION_ID, SESSION_PATH))
+    return None
 
 
 def on_bus(conn, name):
     for i in node.interfaces:
-        p = SESSION_PATH if i.name == "org.freedesktop.login1.Session" else ("/" if i.name.startswith("io.") else "/org/freedesktop/login1")
+        p = {"org.freedesktop.login1.Session": SESSION_PATH, "org.freedesktop.login1.User": USER_PATH}.get(
+            i.name, "/" if i.name.startswith("io.") else "/org/freedesktop/login1")
         conn.register_object(p, i, on_call, on_get, None)
 
 

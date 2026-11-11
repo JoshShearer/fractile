@@ -90,6 +90,9 @@ pub struct Daemon {
     /// The login flow of a new login has not finished deciding/starting its
     /// restore yet (no restore job exists until it does).
     pub login_restore_pending: AtomicBool,
+    /// The exit snapshot of this session has been taken (at the session
+    /// manager's EndSession, or at shutdown); SIGTERM does not take another.
+    pub exit_captured: AtomicBool,
     /// Monitor topology signature last seen, and the most recent layout
     /// captured under it (refreshed every 10 s; see session::remember_layout).
     pub topology: Mutex<Option<String>>,
@@ -139,6 +142,7 @@ impl Daemon {
             // Set from the start for a new login, so an exit snapshot cannot
             // slip in before the login flow has decided; login_flow clears it.
             login_restore_pending: AtomicBool::new(new_login),
+            exit_captured: AtomicBool::new(false),
             topology: Mutex::new(None),
             topology_memory: Mutex::new(None),
             env,
