@@ -131,6 +131,11 @@ desktops only. See PLATFORM_MATRIX.md.
   resolved to depended on hash order, so a restore could launch a different
   entry. The user's own entries win, then the entry named after the class.
 - The shortcut dialog clipped the grid under a two-line message.
+- In the "Restore your windows from last time?" dialog, focus started on the
+  first row's checkbox. In the Ubuntu 24.04 GNOME session, pressing Enter to
+  accept toggled that checkbox, and nothing was restored. The dialog now
+  starts on "Restore selected", and Enter on a row also restores. Space still
+  toggles a row. Found in a real login in the Ubuntu VM.
 - Test harnesses: the nested X11 desktop leaked D-Bus-activated host services
   and FUSE mounts, and `xdotool --sync` could hang forever. Both are fixed.
 

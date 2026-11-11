@@ -2,7 +2,7 @@
 restore and approve launches per app, then runs it with progress."""
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QProgressBar, QPushButton, QTableWidget, QTableWidgetItem,
                              QVBoxLayout)
 
@@ -19,6 +19,25 @@ ACTION_TEXT = {
 }
 SELECTABLE = {"already_open", "will_reopen", "needs_approval"}
 DEFAULT_ON = {"already_open", "will_reopen"}
+
+
+class _EnterPressesDefault(QObject):
+    """Enter or Return on a row's checkbox presses the dialog's default
+    button. Some Qt styles toggle a focused checkbox on Enter (seen with the
+    Ubuntu 24.04 GNOME Wayland session), so a user pressing Enter to accept
+    the restore silently unticked the first window instead. Space still
+    toggles."""
+
+    def __init__(self, button: QPushButton):
+        super().__init__(button)
+        self.button = button
+
+    def eventFilter(self, obj, ev):  # noqa: N802 (Qt API)
+        if ev.type() == QEvent.Type.KeyPress and ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if self.button.isEnabled():
+                self.button.click()
+            return True
+        return False
 
 
 class RecoveryDialog(QDialog):
@@ -81,6 +100,7 @@ class RecoveryDialog(QDialog):
         self.go.setDefault(True)
         self.go.setEnabled(False)
         self.go.clicked.connect(self.run)
+        self._enter = _EnterPressesDefault(self.go)
         row.addWidget(self.go)
         v.addLayout(row)
         self.run_id = None
@@ -116,6 +136,7 @@ class RecoveryDialog(QDialog):
             cb.setEnabled(act in SELECTABLE)
             cb.setChecked(act in DEFAULT_ON)
             cb.setAccessibleName(f"Restore {it['label']}")
+            cb.installEventFilter(self._enter)
             t.setCellWidget(r, 0, cb)
             t.setItem(r, 1, QTableWidgetItem(it["label"]))
             what = ACTION_TEXT.get(act, act)
@@ -139,6 +160,9 @@ class RecoveryDialog(QDialog):
             notes.append("Monitors changed: windows will go to " + "; ".join(remapped))
         self.notes.setText("\n".join(notes))
         self.go.setEnabled(any(cb.isEnabled() for cb, _ in self.checks))
+        # Start on the default action: Enter restores, Tab reaches the rows.
+        if self.go.isEnabled():
+            self.go.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def run(self):
         selected = [it["record_id"] for cb, it in self.checks if cb.isChecked() and cb.isEnabled()]

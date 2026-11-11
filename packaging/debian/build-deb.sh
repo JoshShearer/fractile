@@ -3,6 +3,7 @@
 #   packaging/debian/build-deb.sh [--no-build]
 # Output: packaging/build/fractile_<version>-1_<arch>.deb
 # Set DEB_MAINTAINER="Name <email>" to put a real maintainer in the control file.
+# Honours CARGO_TARGET_DIR (default: target).
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$root"
@@ -15,7 +16,7 @@ fi
 out="$root/packaging/build"
 stage="$out/deb/fractile_${version}-1_${arch}"
 rm -rf "$stage"; mkdir -p "$stage/DEBIAN"
-packaging/install.sh "$stage" /usr target/release >/dev/null
+packaging/install.sh "$stage" /usr "${CARGO_TARGET_DIR:-target}/release" >/dev/null
 strip --strip-unneeded "$stage/usr/bin/fractiled" "$stage/usr/bin/fractile" 2>/dev/null || true
 # Debian keeps the licence in the copyright file, not /usr/share/licenses.
 rm -rf "$stage/usr/share/licenses"

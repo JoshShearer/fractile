@@ -1,0 +1,25 @@
+{
+  "suite": "recovery-keys",
+  "when": "2026-11-11T08:49:34-0600",
+  "environment": "Qt offscreen platform, PyQt6",
+  "results": [
+    {
+      "id": "R01",
+      "name": "the dialog opens on Restore selected; Enter restores everything that is ticked",
+      "ok": true,
+      "detail": "focus QPushButton; restore calls 1; ticks [True, True]; params {\"options\": {\"launch\": true, \"selected\": [\"r1\", \"r2\"], \"approved\": []}, \"snapshot\": \"s1\"}"
+    },
+    {
+      "id": "R02",
+      "name": "Enter on a row's checkbox restores too; it does not untick that row",
+      "ok": true,
+      "detail": "restore calls 1; selected ['r1', 'r2']"
+    },
+    {
+      "id": "R03",
+      "name": "Space still unticks a row, and the restore then leaves that window out",
+      "ok": true,
+      "detail": "ticks [False, True]; restore calls 1; selected ['r2']"
+    }
+  ]
+}
