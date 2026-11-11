@@ -18,6 +18,8 @@ p.add_argument("--windows", type=int, default=1)
 p.add_argument("--size", default="640x420")
 p.add_argument("--min-size", default=None, help="WxH minimum size hint")
 p.add_argument("--fight", action="store_true", help="re-apply own size 300ms after map (app overwrites geometry)")
+p.add_argument("--dialog", action="store_true", help="gtk4: also open a transient dialog for the first window")
+p.add_argument("--retitle", default=None, help="gtk4: on SIGUSR1, retitle the first window to this")
 a = p.parse_args()
 W, H = (int(v) for v in a.size.split("x"))
 
@@ -29,6 +31,7 @@ if a.toolkit == "gtk4":
     app = Gtk.Application(application_id=a.app_id)
 
     def on_activate(app):
+        first = None
         for i in range(a.windows):
             w = Gtk.ApplicationWindow(application=app)
             w.set_title(a.title if a.windows == 1 else f"{a.title} {i + 1}")
@@ -38,6 +41,15 @@ if a.toolkit == "gtk4":
                 mw, mh = (int(v) for v in a.min_size.split("x"))
                 w.get_child().set_size_request(mw, mh)
             w.present()
+            first = first or w
+        if a.dialog:
+            d = Gtk.Window(title=f"{a.title} dialog", transient_for=first, modal=False)
+            d.set_default_size(300, 160)
+            d.set_child(Gtk.Label(label="transient dialog"))
+            d.present()
+        if a.retitle:
+            import signal
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, lambda: (first.set_title(a.retitle), True)[1])
 
     app.connect("activate", on_activate)
     sys.exit(app.run([]))

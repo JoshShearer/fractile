@@ -69,6 +69,10 @@ class Env:
             "[Desktop Entry]\nType=Application\nName=Fractile Launch Test\n"
             f"Exec=python3 {TESTWIN} --toolkit gtk4 --app-id org.fractile.Launchme --title Launchme\nTerminal=false\n"
         )
+        (apps / "org.fractile.Unicode.desktop").write_text(
+            "[Desktop Entry]\nType=Application\nName=Rédacteur 編集 Ünïcode\n"
+            f"Exec=python3 {TESTWIN} --toolkit gtk4 --app-id org.fractile.Unicode\nTerminal=false\n", encoding="utf-8"
+        )
 
     def run(self, *args, check_rc=None, timeout=300) -> subprocess.CompletedProcess:
         p = subprocess.run([str(BIN / "fractile"), *args], env=self.env, capture_output=True, text=True, timeout=timeout)
@@ -171,6 +175,8 @@ def main() -> int:
     e = Env(a.display)
     try:
         run_all(e)
+    except Exception as ex:  # noqa: BLE001  record, then still write evidence
+        check("XXX", "suite crashed", False, repr(ex))
     finally:
         e.cleanup()
         if not a.keep:
@@ -475,6 +481,9 @@ def run_all(e: Env) -> None:
     check("X28", "logging out during the login restore: the next login restores that layout again",
           skipped and again, f"exit snapshot of the unrestored desktop skipped: {skipped}; editor back {again} at {e.frame(g)} want {want_g}")
 
+    # T20: unicode names and titles, title changes, transient dialogs
+    t20(e)
+
     # no-WM / unsupported desktop honesty
     env2 = dict(e.env)
     env2.update(XDG_SESSION_TYPE="wayland", WAYLAND_DISPLAY="wayland-fake", XDG_CURRENT_DESKTOP="Hyprland")
@@ -482,6 +491,81 @@ def run_all(e: Env) -> None:
     caps = json.loads(out.stdout)["capabilities"]
     levels = {v["level"] for v in caps["operations"].values()}
     check("X24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, str(levels))
+
+
+UNI_TITLE = "Résumé 履歴書 Ünïcode ✓ 🎉"
+
+
+def t20(e: Env) -> None:
+    def win(app_id, pred=lambda w: True, all_=False, timeout=15.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            # a GTK dialog carries the app's WM_CLASS but no application id
+            ws = [w for w in e.cli_json("list-windows", *(["--all"] if all_ else [])) if app_id in (w.get("app_id"), w.get("wm_class")) and pred(w)]
+            if ws:
+                return ws
+            time.sleep(0.2)
+        return []
+
+    # no restore of the earlier checks may still be running
+    e.wait_for(lambda: e.cli_json("restore-status").get("running") is None, 30.0, 0.3)
+
+    # X29: unicode app name and title survive listing, snapshot, restore; redacted output hides them
+    e.window("gtk4", "org.fractile.Unicode", UNI_TITLE)
+    u = (win("org.fractile.Unicode") or [None])[0]
+    if not check("X29a", "a window with a unicode title is listed with its exact title", bool(u) and u.get("title") == UNI_TITLE, u and u.get("title")):
+        return
+    e.cli_json("snap", "left-third", "--window", u["id"])
+    want = e.frame(u["id"])
+    e.cli_json("save", "--name", "unicode")
+    snap = e.cli_json("snapshot", "export", "unicode")
+    rec = next((r for r in snap["windows"] if r.get("app_id") == "org.fractile.Unicode"), {})
+    e.cli_json("snap", "center", "--window", u["id"])
+    e.cli_json("restore", "--snapshot", "unicode", "--no-launch")
+    back = e.wait_for(lambda: rect_eq(e.frame(u["id"]), want, 2), 8.0, 0.2)
+    red = e.run("snapshot", "export", "unicode", "--redacted").stdout
+    logs = "\n".join(e.cli_json("logs", "--redacted", "--lines", "2000"))
+    check("X29", "unicode app name and title: identified by desktop id, recorded, restored exactly; redacted export and logs omit the title",
+          rec.get("desktop_file_id") == "org.fractile.Unicode.desktop" and rec.get("title_hint") == UNI_TITLE and bool(back) and "履歴書" not in red and "履歴書" not in logs,
+          f"desktop id {rec.get('desktop_file_id')}, title hint ok {rec.get('title_hint') == UNI_TITLE}, restored {bool(back)}, title in redacted export {'履歴書' in red}, in redacted logs {'履歴書' in logs}")
+
+    # X30: two windows of one app; one is retitled after the snapshot; each still goes back to its own place
+    tw = e.window("gtk4", "org.fractile.Twins", "Doc", "--windows", "2", "--retitle", "Doc 1 (edited)")
+    ws = win("org.fractile.Twins", timeout=15.0)
+    ws = e.wait_for(lambda: (lambda l: l if len(l) == 2 else None)(win("org.fractile.Twins", timeout=1.0)), 10.0, 0.2) or ws
+    d1 = next((w for w in ws if w.get("title") == "Doc 1"), None)
+    d2 = next((w for w in ws if w.get("title") == "Doc 2"), None)
+    if not check("X30a", "two windows of the same app are listed separately", bool(d1 and d2), str([w.get("title") for w in ws])):
+        return
+    e.cli_json("snap", "left-half", "--window", d1["id"])
+    e.cli_json("snap", "right-half", "--window", d2["id"])
+    w1, w2 = e.frame(d1["id"]), e.frame(d2["id"])
+    e.cli_json("save", "--name", "twins")
+    os.kill(tw.pid, signal.SIGUSR1)
+    renamed = win("org.fractile.Twins", lambda w: w.get("title") == "Doc 1 (edited)", timeout=5.0)
+    e.cli_json("snap", "right-half", "--window", d1["id"])
+    e.cli_json("snap", "left-half", "--window", d2["id"])
+    rep = e.cli_json("restore", "--snapshot", "twins", "--no-launch")
+    ok = e.wait_for(lambda: rect_eq(e.frame(d1["id"]), w1, 2) and rect_eq(e.frame(d2["id"]), w2, 2), 8.0, 0.2)
+    n = len(win("org.fractile.Twins", timeout=1.0))
+    check("X30", "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
+          bool(renamed) and bool(ok) and n == 2, f"retitled {bool(renamed)}; Doc 1 at {e.frame(d1['id'])} want {w1}; Doc 2 at {e.frame(d2['id'])} want {w2}; windows {n}; report {json.dumps(rep)[:200]}")
+
+    # X31: a transient dialog is never a placement target and never recorded
+    e.window("gtk4", "org.fractile.Dlg", "Main", "--dialog")
+    allw = win("org.fractile.Dlg", lambda w: True, all_=True)
+    allw = e.wait_for(lambda: (lambda l: l if len(l) >= 2 else None)(win("org.fractile.Dlg", all_=True, timeout=1.0)), 10.0, 0.2) or allw
+    dlg = next((w for w in allw if w.get("title") == "Main dialog"), None)
+    main_ = next((w for w in allw if w.get("title") == "Main"), None)
+    placeable = [w.get("title") for w in win("org.fractile.Dlg", timeout=3.0)]
+    before = e.frame(dlg["id"]) if dlg else None
+    e.cli_json("save", "--name", "dialog")
+    recs = [r.get("title_hint") for r in e.cli_json("snapshot", "export", "dialog")["windows"] if "org.fractile.Dlg" in (r.get("app_id"), r.get("wm_class"))]
+    e.cli_json("restore", "--snapshot", "dialog", "--no-launch")
+    after = e.frame(dlg["id"]) if dlg else None
+    check("X31", "a transient dialog is seen (list-windows --all) but never offered for placement, recorded, or moved by a restore",
+          bool(dlg and main_) and placeable == ["Main"] and recs == ["Main"] and before == after,
+          f"all {[w.get('title') for w in allw]}; placeable {placeable}; recorded {recs}; dialog frame {before} -> {after}")
 
 
 if __name__ == "__main__":

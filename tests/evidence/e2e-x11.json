@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-11T03:01:27-0600",
+  "when": "2026-11-11T03:39:32-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 2761683"
+      "detail": "pid 3024014"
     },
     {
       "id": "SEC1",
@@ -97,7 +97,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1780 ms"
+      "detail": "1757 ms"
     },
     {
       "id": "X14",
@@ -199,7 +199,37 @@
       "id": "X28",
       "name": "logging out during the login restore: the next login restores that layout again",
       "ok": true,
-      "detail": "exit snapshot of the half-restored desktop skipped: True; editor back True at {'h': 584, 'w': 767, 'x': 833, 'y': 32} want {'h': 584, 'w': 767, 'x': 833, 'y': 32}"
+      "detail": "exit snapshot of the unrestored desktop skipped: True; editor back True at {'h': 584, 'w': 767, 'x': 833, 'y': 32} want {'h': 584, 'w': 767, 'x': 833, 'y': 32}"
+    },
+    {
+      "id": "X29a",
+      "name": "a window with a unicode title is listed with its exact title",
+      "ok": true,
+      "detail": "R\u00e9sum\u00e9 \u5c65\u6b74\u66f8 \u00dcn\u00efcode \u2713 \ud83c\udf89"
+    },
+    {
+      "id": "X29",
+      "name": "unicode app name and title: identified by desktop id, recorded, restored exactly; redacted export and logs omit the title",
+      "ok": true,
+      "detail": "desktop id org.fractile.Unicode.desktop, title hint ok True, restored True, title in redacted export False, in redacted logs False"
+    },
+    {
+      "id": "X30a",
+      "name": "two windows of the same app are listed separately",
+      "ok": true,
+      "detail": "['Doc 1', 'Doc 2']"
+    },
+    {
+      "id": "X30",
+      "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
+      "ok": true,
+      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 767, 'x': 66, 'y': 32} want {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; Doc 2 at {'h': 1168, 'w': 767, 'x': 833, 'y': 32} want {'h': 1168, 'w': 767, 'x': 833, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2228, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 767, \"x\": 833, \"y\": 616}, \"record_"
+    },
+    {
+      "id": "X31",
+      "name": "a transient dialog is seen (list-windows --all) but never offered for placement, recorded, or moved by a restore",
+      "ok": true,
+      "detail": "all ['Main', 'Main dialog']; placeable ['Main']; recorded ['Main']; dialog frame {'h': 197, 'w': 300, 'x': 66, 'y': 32} -> {'h': 197, 'w': 300, 'x': 66, 'y': 32}"
     },
     {
       "id": "X24",
