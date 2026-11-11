@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland-multimon",
-  "when": "2026-11-11T12:30:18+0000",
+  "when": "2026-11-11T17:16:16+0000",
   "environment": "headless GNOME Shell 45.10 --wayland --no-x11, virtual monitors 1600x1200,1280x1024 (scale 1), Fractile extension fractile@fractile.io",
   "results": [
     {

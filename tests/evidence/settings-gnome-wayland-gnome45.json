@@ -1,6 +1,6 @@
 {
   "suite": "settings-gnome-wayland",
-  "when": "2026-11-11T12:31:40+0000",
+  "when": "2026-11-11T17:17:49+0000",
   "environment": "headless GNOME Shell 45.10 --wayland --no-x11, Fractile extension fractile@fractile.io, PyQt6 UI on Wayland",
   "screenshots": "tests/evidence/gui/wayland/",
   "results": [
@@ -80,7 +80,7 @@
       "id": "S10",
       "name": "after Apply the service saved and registered it; the table says active",
       "ok": true,
-      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-b3c38748', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-8d89b16d', 'name': 'Probe left half', 'scope': 'global'}] status=active"
     },
     {
       "id": "S13",
@@ -92,7 +92,7 @@
       "id": "S12",
       "name": "the UI logged no Python errors",
       "ok": true,
-      "detail": "G **: 12:31:19.556: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\nMESA: error: ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)\nlibEGL warning: egl: failed to create dri2 screen\n"
+      "detail": "G **: 17:17:22.811: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\nMESA: error: ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)\nlibEGL warning: egl: failed to create dri2 screen\n"
     },
     {
       "id": "S11",

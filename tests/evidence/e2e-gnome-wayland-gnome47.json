@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-11T12:24:26+0000",
+  "when": "2026-11-11T17:09:14+0000",
   "environment": "headless GNOME Shell 47.10 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:2208797057 gnome:2208797056"
+      "detail": "gnome:3085038565 gnome:3085038564"
     },
     {
       "id": "W03",
@@ -73,7 +73,7 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1747 ms"
+      "detail": "1740 ms"
     },
     {
       "id": "W12",
@@ -91,7 +91,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:2208797057"
+      "detail": "active gnome:3085038565"
     },
     {
       "id": "W15",
@@ -127,7 +127,7 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot c2d1eee9-fbcc-475c-a6ba-3f8735d86c24 (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot d80b779e-1a10-4133-859a-3a148d9f79ee (4 windows)"
     },
     {
       "id": "W23",
@@ -139,7 +139,7 @@
       "id": "W24",
       "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
       "ok": true,
-      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:2208797062 closed while being placed']"
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:3085038570 closed while being placed']"
     },
     {
       "id": "W18",

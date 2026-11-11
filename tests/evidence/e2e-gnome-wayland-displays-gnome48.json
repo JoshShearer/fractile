@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland-displays",
-  "when": "2026-11-11T12:37:50+0000",
+  "when": "2026-11-11T17:13:49+0000",
   "environment": "headless GNOME Shell 48.8 --wayland --no-x11, virtual monitors 1600x1200,1280x1024, changed at runtime through Mutter DisplayConfig (scale 2+1, disable/enable); Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -13,7 +13,7 @@
       "id": "D01",
       "name": "monitor scale changed at runtime to 2 and 1: Fractile reports both scales, same stable ids",
       "ok": true,
-      "detail": "Mutter layout mode logical; mon-MetaVendor-MetaVirtualMonitor-0x00 scale 2.0 rect {'h': 600, 'w': 800, 'x': 0, 'y': 0} work {'h': 568, 'w': 800, 'x': 0, 'y': 32}; mon-MetaVendor-MetaVirtualMonitor-0x01 scale 1.0 rect {'h': 1024, 'w': 1280, 'x': 800, 'y': 0} work {'h': 992, 'w': 1280, 'x': 800, 'y': 32}"
+      "detail": "Mutter layout mode logical; mon-MetaVendor-MetaVirtualMonitor-0x00 scale 2.0 rect {'h': 600, 'w': 800, 'x': 0, 'y': 0} work {'h': 568, 'w': 800, 'x': 0, 'y': 32}; mon-MetaVendor-MetaVirtualMonitor-0x01 scale 1.0 rect {'h': 1024, 'w': 1280, 'x': 800, 'y': 0} work {'h': 1024, 'w': 1280, 'x': 800, 'y': 0}"
     },
     {
       "id": "D02",

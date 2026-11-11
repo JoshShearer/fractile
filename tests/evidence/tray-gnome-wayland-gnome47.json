@@ -1,6 +1,6 @@
 {
   "suite": "tray-gnome-wayland",
-  "when": "2026-11-11T12:26:40+0000",
+  "when": "2026-11-11T17:11:51+0000",
   "environment": "headless GNOME Shell 47.10 --wayland --no-x11, Fractile extension fractile@fractile.io, Ubuntu AppIndicators extension (gnome-shell-extension-appindicator 58), PyQt6 UI",
   "results": [
     {
@@ -13,7 +13,7 @@
       "id": "Y01",
       "name": "with the tray icon on, starting the service puts Fractile's icon in the tray, with no window opened",
       "ok": true,
-      "detail": "item=(':1.17', '/StatusNotifierItem') after 2.9 s; own windows=[]"
+      "detail": "item=(':1.18', '/StatusNotifierItem') after 2.3 s; own windows=[]"
     },
     {
       "id": "Y02",
@@ -25,7 +25,7 @@
       "id": "Y03",
       "name": "the GNOME top bar shows the icon (screenshot 30-tray-topbar.png)",
       "ok": true,
-      "detail": "top bar indicators: [{'key': 'appindicator-:1.17@/StatusNotifierItem', 'visible': True, 'w': 48, 'h': 32}]"
+      "detail": "top bar indicators: [{'key': 'appindicator-:1.18@/StatusNotifierItem', 'visible': True, 'w': 48, 'h': 32}]"
     },
     {
       "id": "Y04",
@@ -37,7 +37,7 @@
       "id": "Y05",
       "name": "choosing Settings in the tray menu opens Settings",
       "ok": true,
-      "detail": "gnome:2386674949"
+      "detail": "gnome:322205361"
     },
     {
       "id": "Y06",
@@ -61,13 +61,13 @@
       "id": "Y09",
       "name": "the UI logged no Python errors",
       "ok": true,
-      "detail": "\n(python3:4496): dbind-WARNING **: 12:26:04.052: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\n"
+      "detail": "\n(python3:4038): dbind-WARNING **: 17:11:06.240: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\n"
     },
     {
       "id": "Y10",
       "name": "without a tray on the desktop, the background UI opens no window and exits (about 30 s)",
       "ok": true,
-      "detail": "started=[4741] exited=True windows=[] log='ceUnknown: The name org.a11y.Bus was not provided by any .service files\\nfractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)'"
+      "detail": "started=[4326] exited=True windows=[] log='ceUnknown: The name org.a11y.Bus was not provided by any .service files\\nfractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)'"
     },
     {
       "id": "Y11",
