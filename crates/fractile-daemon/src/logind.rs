@@ -19,8 +19,19 @@ fn inhibit(mgr: &Proxy) -> zbus::Result<OwnedFd> {
     mgr.call("Inhibit", &("shutdown", "Fractile", "Saving the window layout for session restore", "delay"))
 }
 
+/// The system bus, or for tests only the bus named by
+/// FRACTILE_TEST_LOGIND_BUS (tests/tools/fake_logind.py serves logind
+/// there). Same-user processes can set the daemon's environment anyway, so
+/// this grants nothing new.
+fn connect() -> zbus::Result<Connection> {
+    match std::env::var("FRACTILE_TEST_LOGIND_BUS") {
+        Ok(addr) if !addr.is_empty() => zbus::blocking::connection::Builder::address(addr.as_str())?.build(),
+        _ => Connection::system(),
+    }
+}
+
 pub fn start(d: Arc<Daemon>) {
-    let conn = match Connection::system() {
+    let conn = match connect() {
         Ok(c) => c,
         Err(e) => {
             warn!(d.log, "logind unavailable (no system bus): {e}");

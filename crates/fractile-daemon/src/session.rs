@@ -38,7 +38,7 @@ pub fn save_snapshot(d: &Daemon, name: Option<String>, mode: SnapshotMode) -> R<
     if d.config().session.policy == RestorePolicy::Off && mode != SnapshotMode::Manual {
         return Err(err("disabled", "session snapshots are turned off"));
     }
-    if d.locked.load(Ordering::SeqCst) && d.config().session.skip_capture_when_locked && mode != SnapshotMode::Manual {
+    if d.is_locked() && d.config().session.skip_capture_when_locked && mode != SnapshotMode::Manual {
         return Err(err("locked", "session is locked; capture skipped"));
     }
     let s = capture_now(d, mode, name.clone())?;
@@ -191,6 +191,9 @@ pub fn dry_run_layout(d: &Arc<Daemon>, name: &str, mode: ApplyMode, req: &Restor
 fn start_job(d: &Arc<Daemon>, src: Source, req: &RestoreRequest, source_label: &str, source_id: Option<String>, wait: bool) -> R<Value> {
     if d.restore.lock().unwrap().is_some() {
         return Err(err("busy", "a restore is already running"));
+    }
+    if d.is_locked() {
+        return Err(err("locked", "the session is locked; restore runs only while it is unlocked"));
     }
     let run_id = req.run_id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let (targets, recorded, opts, mut host) = build(d, &src, req, &run_id)?;
@@ -410,7 +413,7 @@ pub fn autosave_loop(d: Arc<Daemon>) {
             continue;
         }
         last_capture = Instant::now();
-        if d.locked.load(Ordering::SeqCst) && cfg.session.skip_capture_when_locked {
+        if d.is_locked() && cfg.session.skip_capture_when_locked {
             continue;
         }
         match capture_now(&d, SnapshotMode::Periodic, None) {
@@ -448,6 +451,13 @@ pub fn wait_for_readiness(d: &Daemon, timeout: Duration) -> bool {
     while start.elapsed() < timeout {
         if d.shutdown.load(Ordering::SeqCst) {
             return false;
+        }
+        // Restoring behind a lock screen would move and activate windows
+        // nobody can see; wait for the unlock.
+        if d.is_locked() {
+            stable = 0;
+            std::thread::sleep(Duration::from_millis(500));
+            continue;
         }
         let outs = d.outputs().ok();
         let n = d.windows().map(|w| w.len()).ok();
@@ -566,7 +576,7 @@ pub fn login_flow(d: Arc<Daemon>) {
 pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
     let cfg = d.config();
     let auto = matches!(cfg.session.policy, RestorePolicy::LastClean | RestorePolicy::LastKnown | RestorePolicy::Ask);
-    if auto && d.restore.lock().unwrap().is_none() && !(d.locked.load(Ordering::SeqCst) && cfg.session.skip_capture_when_locked) {
+    if auto && d.restore.lock().unwrap().is_none() && !(d.is_locked() && cfg.session.skip_capture_when_locked) {
         match capture_now(d, mode, None) {
             Ok(s) if !s.windows.is_empty() => match d.store.lock().unwrap().save_snapshot(&s, false) {
                 Ok(()) => info!(d.log, "{mode:?} snapshot {} saved ({} windows)", s.snapshot_id, s.windows.len()),

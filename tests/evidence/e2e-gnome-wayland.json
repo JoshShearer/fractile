@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-11T00:38:19-0600",
+  "when": "2026-11-11T00:48:14-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:2034957205 gnome:2034957204"
+      "detail": "gnome:191012082 gnome:191012081"
     },
     {
       "id": "W03",
@@ -73,7 +73,7 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1740 ms"
+      "detail": "1739 ms"
     },
     {
       "id": "W12",
@@ -91,7 +91,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:2034957205"
+      "detail": "active gnome:191012082"
     },
     {
       "id": "W15",
@@ -110,6 +110,24 @@
       "name": "daemon restart: the extension reconnects without user action",
       "ok": true,
       "detail": ""
+    },
+    {
+      "id": "W20",
+      "name": "an on-create rule places a new matching window",
+      "ok": true,
+      "detail": "{'h': 1168, 'w': 800, 'x': 800, 'y': 32} want {'h': 1168, 'w': 800, 'x': 800, 'y': 32}"
+    },
+    {
+      "id": "W21",
+      "name": "session locked: status says so, on-create rules and restores do not run, shortcuts do nothing",
+      "ok": true,
+      "detail": "locked=True rule_held=True restore exit 1: fractile: the session is locked; restore runs only while it is unlocked"
+    },
+    {
+      "id": "W22",
+      "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
+      "ok": true,
+      "detail": "inhibitors before (uint32 1,); snapshot aa5ac3fc-c2ad-48d2-a500-59d0d28d8d9f (4 windows)"
     },
     {
       "id": "W18",

@@ -213,7 +213,7 @@ pub fn status(d: &Daemon) -> Value {
         "restore_policy": cfg.session.policy,
         "restore": restore,
         "ui_attached": d.ui_attached(),
-        "locked": d.locked.load(Ordering::SeqCst),
+        "locked": d.is_locked(),
         "config_error": d.cfg_error.lock().unwrap().clone(),
         "hotkey_errors": d.hotkey_errors.lock().unwrap().clone(),
         "integration": crate::bridge::get().map(|b| b.status()).unwrap_or(Value::Null),

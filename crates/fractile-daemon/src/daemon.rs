@@ -481,9 +481,20 @@ impl Daemon {
         }
     }
 
+    /// Locked per logind (LockedHint) or per the compositor integration.
+    /// While locked Fractile moves, activates and captures nothing on its
+    /// own (SRS T23).
+    pub fn is_locked(&self) -> bool {
+        self.locked.load(std::sync::atomic::Ordering::SeqCst) || self.adapter().session_locked() == Some(true)
+    }
+
     pub fn handle_hotkey(self: &Arc<Self>, binding: &str, ts: u32) {
         let entry = self.hotkey_actions.lock().unwrap().get(binding).cloned();
         let Some((name, action, cyc)) = entry else { return };
+        if self.is_locked() {
+            info!(self.log, "hotkey {binding} ignored: session is locked");
+            return;
+        }
         info!(self.log, "hotkey {binding} ({name})");
         let d = self.clone();
         let b = binding.to_string();
@@ -632,7 +643,7 @@ impl Daemon {
                     return;
                 }
                 let cfg = self.config();
-                if cfg.rules_enabled && cfg.rules.iter().any(|r| r.enabled && r.trigger == RuleTrigger::OnCreate) {
+                if cfg.rules_enabled && cfg.rules.iter().any(|r| r.enabled && r.trigger == RuleTrigger::OnCreate) && !self.is_locked() {
                     let d = self.clone();
                     let id = id.clone();
                     std::thread::spawn(move || d.apply_rules_to_new(&id));

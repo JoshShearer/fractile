@@ -264,7 +264,9 @@ const ops = {
         });
     },
     session_locked: function () {
-        return false;
+        // KWin scripts cannot observe the lock screen; the daemon relies on
+        // logind's LockedHint (set by KDE's screen locker) instead.
+        return null;
     },
 };
 

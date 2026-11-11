@@ -80,7 +80,8 @@ class Env:
             XDG_STATE_HOME=str(self.base / "state"),
             XDG_DATA_HOME=str(self.base / "xdgdata"),
             XDG_CONFIG_HOME=str(self.base / "xdgconfig"),
-            FRACTILE_NO_LOGIND="1",
+            # logind is the fake on the private bus (tests/tools/fake_logind.py)
+            FRACTILE_TEST_LOGIND_BUS=info["DBUS_SESSION_BUS_ADDRESS"],
             FRACTILE_AUTOSTART_MODE="none",
             FRACTILE_NO_SCOPE="1",
             GSETTINGS_BACKEND="memory",
@@ -95,6 +96,10 @@ class Env:
         self.env["FRACTILE_UI"] = str(wrap)
         self.procs: list[subprocess.Popen] = []
         self.daemon: subprocess.Popen | None = None
+        fl = subprocess.Popen([sys.executable, str(ROOT / "tests" / "tools" / "fake_logind.py")], env=self.env, stdout=subprocess.PIPE, text=True)
+        if fl.stdout.readline().strip() != "ready":
+            raise RuntimeError("fake logind did not start")
+        self.procs.append(fl)
         apps = self.base / "xdgdata" / "applications"
         apps.mkdir(parents=True)
 
@@ -167,6 +172,12 @@ class Env:
         finally:
             c.close()
         self.wait_for(lambda: self.active() == wid, 3.0)
+
+    def logind(self, path, iface, method, *args):
+        """Drive the fake logind (test tool)."""
+        p = subprocess.run(["gdbus", "call", "--session", "--dest", "org.freedesktop.login1", "--object-path", path, "--method", f"{iface}.{method}", *args],
+                           env=self.env, capture_output=True, text=True, timeout=10)
+        return p.stdout.strip()
 
     def keys(self, *combos):
         subprocess.run([sys.executable, str(WLKEYS), *combos], env=self.env, check=True, timeout=30)
@@ -381,6 +392,52 @@ def run_all(e: Env) -> None:
     back = e.wait_for(lambda: e.status()["window_control"], 10.0)
     check("W17", "daemon restart: the extension reconnects without user action", back)
 
+    # placement rule on window creation (positive control for W21)
+    c = e.client()
+    cfg = c.call("get_config")["config"]
+    cfg["rules_enabled"] = True
+    cfg["rules"] = [{"id": "r-late", "name": "Late apps right", "trigger": "on_create", "matcher": {"app_id": "org.fractile.Late"},
+                     "placement": {"kind": "snap", "action": "right-half"}}]
+    c.call("set_config", {"config": cfg})
+    c.close()
+    right = expected(e, 2, 1, 1, 0, 1, 0)
+    e.window("gtk4", "org.fractile.Late", "Late one")
+    late = e.wait_window(lambda w: w["app_id"] == "org.fractile.Late", 15.0)
+    ok = late and e.wait_for(lambda: rect_eq(e.frame(late["id"]), right, 2), 6.0)
+    check("W20", "an on-create rule places a new matching window", ok, f"{late and e.frame(late['id'])} want {right}")
+
+    # session locked: Fractile moves, activates and restores nothing
+    # The lock screen sets logind's LockedHint on real sessions (gnome-shell
+    # and KDE's locker both do); the headless shell has no lock screen, so
+    # the fake logind sets it.
+    e.logind("/org/freedesktop/login1/session/test", "org.freedesktop.login1.Session", "SetLockedHint", "true")
+    locked = e.wait_for(lambda: e.status().get("locked"), 8.0)
+    e.window("qt", "org.fractile.Late", "Late two")  # GTK would hand off to the running GApplication
+    late2 = e.wait_for(lambda: next((w for w in e.windows(True) if w["title"] == "Late two"), None), 15.0)
+    time.sleep(2.0)
+    rule_held = late2 and not rect_eq(e.frame(late2["id"]), right, 2)
+    rp = e.run("restore", "--snapshot", "wl")
+    before = e.frame(q)
+    e.keys("ctrl+alt+g")
+    time.sleep(1.0)
+    no_panel = not any(w["title"].startswith("Fractile panel") and not w["state"]["minimized"] for w in e.windows(True))
+    check("W21", "session locked: status says so, on-create rules and restores do not run, shortcuts do nothing",
+          locked and rule_held and rp.returncode != 0 and "locked" in rp.stderr and no_panel and rect_eq(e.frame(q), before),
+          f"locked={locked} rule_held={bool(rule_held)} restore exit {rp.returncode}: {rp.stderr.strip()[:90]}")
+
+    # orderly shutdown announced by logind: snapshot written, delay lock released
+    e.logind("/org/freedesktop/login1/session/test", "org.freedesktop.login1.Session", "SetLockedHint", "false")
+    unlocked = e.wait_for(lambda: not e.status().get("locked"), 5.0)
+    e.run("config", "set", "session.policy", '"last_clean"')
+    held = e.logind("/", "io.fractile.test.FakeLogind", "InhibitorCount")
+    before_ids = {x["id"] for x in e.cli_json("list-snapshots")}
+    e.logind("/", "io.fractile.test.FakeLogind", "EmitPrepareForShutdown", "true")
+    snap = e.wait_for(lambda: next((x for x in e.cli_json("list-snapshots") if x["id"] not in before_ids and x["mode"] == "shutdown"), None), 8.0)
+    released = e.wait_for(lambda: e.logind("/", "io.fractile.test.FakeLogind", "InhibitorCount") == "(uint32 0,)", 5.0)
+    check("W22", "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
+          unlocked and held == "(uint32 1,)" and snap and released, f"inhibitors before {held}; snapshot {snap and snap['id']} ({snap and snap['window_count']} windows)")
+    e.run("config", "set", "session.policy", '"manual"')
+
     tb = [l for l in (e.ui_log.read_text().splitlines() if e.ui_log.exists() else []) if "Traceback" in l or "Error" in l and "qt.qpa" not in l]
     check("W18", "UI logged no Python errors during the run", not tb, "; ".join(tb[:3]))
     log = (e.shell_state / "shell.log").read_text(errors="replace")
@@ -399,6 +456,9 @@ def main() -> int:
     except Exception as ex:  # report, don't hide
         check("WXX", "suite crashed", False, repr(ex))
     finally:
+        if any(not r["ok"] for r in results) and (e.base / "daemon.out").exists():
+            print("== daemon log (rules, warnings)")
+            print("\n".join([ln for ln in (e.base / "daemon.out").read_text().splitlines() if " Warn " in ln or " Error " in ln or "rule" in ln][-25:]))
         e.cleanup(a.keep)
     gs = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout.strip()
     ev = {"suite": "e2e-gnome-wayland", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
