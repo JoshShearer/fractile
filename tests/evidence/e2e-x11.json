@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-11T00:50:36-0600",
+  "when": "2026-11-11T01:05:56-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 1637522"
+      "detail": "pid 1777694"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "57 ms incl. polling"
+      "detail": "59 ms incl. polling"
     },
     {
       "id": "X10",
@@ -97,7 +97,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1755 ms"
+      "detail": "1763 ms"
     },
     {
       "id": "X14",
@@ -188,6 +188,12 @@
       "name": "hostile layout import: command fields dropped, launches demoted to ask, nothing executed or launched; path-like ids rejected",
       "ok": true,
       "detail": "import 0, policies {'ask'}, apply exit 6, relaunched False, path-like import exit 7"
+    },
+    {
+      "id": "X27",
+      "name": "new login with 'restore last session': missing app relaunched and both windows placed; a same-session restart adds nothing",
+      "ok": true,
+      "detail": "launchme {'h': 584, 'w': 767, 'x': 833, 'y': 616} want {'h': 584, 'w': 767, 'x': 833, 'y': 616}; editor back True; instances after restart 1"
     },
     {
       "id": "X24",

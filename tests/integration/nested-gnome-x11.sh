@@ -6,10 +6,27 @@ set -euo pipefail
 cmd=${1:-start}; num=${2:-17}; screens=${3:-1600x900}
 # State lives in the per-user runtime dir so start/stop agree whatever TMPDIR is.
 state="${XDG_RUNTIME_DIR:-/tmp}/fractile-nested-$num"
+# Every process of the nested session carries XDG_RUNTIME_DIR=$state/rt;
+# kill exactly those (never by name), then unmount anything left there.
+session_pids() {
+  local d
+  for d in /proc/[0-9]*; do
+    [[ -O $d ]] || continue
+    { tr '\0' '\n' <"$d/environ"; } 2>/dev/null | grep -qx "XDG_RUNTIME_DIR=$state/rt" && echo "${d#/proc/}"
+  done
+  return 0
+}
 if [[ $cmd == stop ]]; then
-  for f in shell xephyr; do
+  for f in shell dbus xephyr; do
     [[ -f $state/$f.pid ]] && kill "$(cat "$state/$f.pid")" 2>/dev/null || true
   done
+  for _ in 1 2 3; do
+    pids=$(session_pids); [[ -z $pids ]] && break
+    kill $pids 2>/dev/null || true; sleep 0.3
+  done
+  if [[ -d $state/rt ]]; then
+    for m in $(awk -v p="$state/rt/" 'index($2, p) == 1 {print $2}' /proc/self/mounts); do fusermount -u "$m" 2>/dev/null || true; done
+  fi
   rm -rf "$state"
   sleep 0.5
   if [[ -e /tmp/.X$num-lock ]]; then
@@ -34,7 +51,27 @@ mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
 # Private runtime dir: gnome-shell writes a crash-guard file there which, in
 # the real one, would make the user's own shell start with extensions off.
 mkdir -p "$state/rt"; chmod 700 "$state/rt"
-DISPLAY=":$num" XDG_RUNTIME_DIR="$state/rt" XDG_SESSION_TYPE=x11 GSETTINGS_BACKEND=memory dbus-run-session -- gnome-shell --x11 --replace >"$state/shell.log" 2>&1 &
+# Private session bus with no service directories: nothing from the host
+# (portals, gvfs, evolution, keyring...) gets D-Bus-activated into the test
+# session, so nothing outlives it.
+cat >"$state/bus.conf" <<BUS
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <listen>unix:dir=$state</listen>
+  <auth>EXTERNAL</auth>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+BUS
+XDG_RUNTIME_DIR="$state/rt" dbus-daemon --config-file="$state/bus.conf" --fork --print-address=1 --print-pid=1 --nopidfile >"$state/dbus.out"
+sed -n 2p "$state/dbus.out" >"$state/dbus.pid"
+DISPLAY=":$num" XDG_RUNTIME_DIR="$state/rt" XDG_SESSION_TYPE=x11 GSETTINGS_BACKEND=memory DBUS_SESSION_BUS_ADDRESS="$(sed -n 1p "$state/dbus.out")" \
+  gnome-shell --x11 --replace >"$state/shell.log" 2>&1 &
 echo $! >"$state/shell.pid"
 ok=0
 for _ in $(seq 150); do DISPLAY=":$num" xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -q 'window id' && { ok=1; break; }; sleep 0.1; done
@@ -51,4 +88,4 @@ for _ in $(seq 150); do
 done
 if (( ! struts )); then echo "warning: work area still covers the whole screen (no panel struts yet)" >&2; fi
 sleep 1
-echo "DISPLAY=:$num XEPHYR_PID=$(cat "$state/xephyr.pid") SHELL_PID=$(cat "$state/shell.pid") STATE=$state"
+echo "DISPLAY=:$num XEPHYR_PID=$(cat "$state/xephyr.pid") SHELL_PID=$(cat "$state/shell.pid") STATE=$state DBUS_SESSION_BUS_ADDRESS=$(sed -n 1p "$state/dbus.out")"

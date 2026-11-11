@@ -114,6 +114,15 @@ class Env:
             time.sleep(0.2)
         return None
 
+    @staticmethod
+    def wait_for(fn, timeout=8.0, step=0.1):
+        end = time.time() + timeout
+        while True:
+            v = fn()
+            if v or time.time() >= end:
+                return v
+            time.sleep(step)
+
     def frame(self, wid: str):
         for w in self.cli_json("list-windows", "--all"):
             if w["id"] == wid:
@@ -406,6 +415,32 @@ def run_all(e: Env) -> None:
     check("SEC7", "hostile layout import: command fields dropped, launches demoted to ask, nothing executed or launched; path-like ids rejected",
           imp.returncode == 0 and "touch" not in text and pols <= {"ask"} and not mark.exists() and not relaunched and rej.returncode != 0,
           f"import {imp.returncode}, policies {pols}, apply exit {ap.returncode}, relaunched {relaunched}, path-like import exit {rej.returncode}")
+
+    # log out and back in (new XDG_SESSION_ID): automatic restore by policy (T10, simulated relogin)
+    c = e.client()
+    c.call("set_config", {"patch": {"session": {"policy": "last_clean", "confirm_before_restore": False},
+                                    "apps": {"org.fractile.Launchme.desktop": {"launch": "if_missing"}}}})
+    c.close()
+    subprocess.Popen(["gio", "launch", str(e.base / "xdgdata/applications/org.fractile.Launchme.desktop")], env=e.env)
+    lw = e.wait_window(lambda w: w.get("app_id") == "org.fractile.Launchme", 15.0)
+    e.cli_json("snap", "bottom-right-quarter", "--window", lw["id"])
+    e.cli_json("snap", "top-left-quarter", "--window", g)
+    want_l, want_g = e.frame(lw["id"]), e.frame(g)
+    e.stop_daemon(signal.SIGTERM)  # logout: snapshot
+    os.kill(lw["pid"], signal.SIGTERM)  # the app does not survive the logout
+    e.wait_for(lambda: not os.path.exists(f"/proc/{lw['pid']}"), 5.0)
+    e.env["XDG_SESSION_ID"] = f"e2e-relogin-{os.getpid()}"
+    e.start_daemon()
+    e.cli_json("snap", "center", "--window", g)  # the desktop reopened it somewhere else
+    back = e.wait_for(lambda: (lambda ws: ws if len(ws) == 1 and rect_eq(ws[0]["frame"], want_l, 2) else None)(
+        [w for w in e.cli_json("list-windows") if w.get("app_id") == "org.fractile.Launchme"]), 30.0, 0.5)
+    g_back = e.wait_for(lambda: rect_eq(e.frame(g), want_g, 2), 10.0, 0.5)
+    e.stop_daemon()
+    e.start_daemon()  # same session again: must not restore a second time
+    time.sleep(4)
+    n = sum(1 for w in e.cli_json("list-windows") if w.get("app_id") == "org.fractile.Launchme")
+    check("X27", "new login with 'restore last session': missing app relaunched and both windows placed; a same-session restart adds nothing",
+          bool(back) and g_back and n == 1, f"launchme {back and back[0]['frame']} want {want_l}; editor back {g_back}; instances after restart {n}")
 
     # no-WM / unsupported desktop honesty
     env2 = dict(e.env)

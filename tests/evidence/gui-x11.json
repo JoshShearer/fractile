@@ -1,6 +1,6 @@
 {
   "suite": "gui-x11",
-  "when": "2026-11-11T00:59:50-0600",
+  "when": "2026-11-11T01:07:58-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
@@ -14,7 +14,7 @@
       "id": "G01",
       "name": "hotkey starts the UI and shows the panel above all windows",
       "ok": true,
-      "detail": "0.9s incl. UI start; stack top 0x1800006"
+      "detail": "0.9s incl. UI start; stack top 0x1200006"
     },
     {
       "id": "G02",
@@ -104,7 +104,7 @@
       "id": "G17",
       "name": "relaunching from the app menu shows the panel for the focused window; no second UI stays running",
       "ok": true,
-      "detail": "exit 0; ui pids [1715950] -> [1715950]; got {'h': 194, 'w': 255, 'x': 66, 'y': 32}"
+      "detail": "exit 0; ui pids [1815985] -> [1815985]; got {'h': 194, 'w': 255, 'x': 66, 'y': 32}"
     },
     {
       "id": "G13",
