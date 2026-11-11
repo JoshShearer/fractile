@@ -635,7 +635,7 @@ pub fn login_flow(d: Arc<Daemon>) {
 /// gnome_session): by SIGTERM the desktop is being torn down.
 pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
     if d.exit_captured.load(Ordering::SeqCst) {
-        info!(d.log, "{mode:?}: the exit snapshot was already taken when the session manager ended the session");
+        info!(d.log, "{mode:?}: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)");
     } else {
         capture_before_exit(d, mode);
     }

@@ -848,6 +848,16 @@ impl Daemon {
                 error!(self.log, "adapter disconnected: {reason}");
                 self.broadcast("notice", json!({"level": "error", "message": format!("desktop connection lost: {reason}")}));
             }
+            AdapterEvent::DisplayClosed { reason } => {
+                // Some desktops end the session without stopping this unit
+                // (Plasma 5.27 leaves graphical-session.target active). A
+                // service without its display can do nothing, and would keep
+                // the next login from starting a fresh one: end the session
+                // and exit.
+                warn!(self.log, "the display closed ({reason}): the desktop session has ended; exiting");
+                crate::session::capture_at_exit(self, fractile_core::snapshot::SnapshotMode::Logout);
+                crate::request_shutdown(self);
+            }
         }
     }
 

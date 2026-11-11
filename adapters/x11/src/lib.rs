@@ -774,7 +774,9 @@ impl CompositorAdapter for X11Adapter {
                 let ev = match conn.wait_for_event() {
                     Ok(e) => e,
                     Err(e) => {
-                        let _ = tx.send(AdapterEvent::Disconnected { reason: e.to_string() });
+                        // wait_for_event only fails when the connection is
+                        // lost: the X server has gone, with the session.
+                        let _ = tx.send(AdapterEvent::DisplayClosed { reason: e.to_string() });
                         return;
                     }
                 };

@@ -91,10 +91,34 @@ pub fn set(enabled: bool) -> Result<Value, String> {
     Ok(status())
 }
 
+/// Targets the installed unit's [Install] section names that have no link
+/// to it yet: an upgrade added one (0.9.0 added plasma-workspace.target).
+fn missing_wants() -> Vec<String> {
+    let mut dirs = vec![config_home().join("systemd/user")];
+    dirs.extend(["/etc/systemd/user", "/usr/local/lib/systemd/user", "/usr/lib/systemd/user"].iter().map(PathBuf::from));
+    let Some(unit) = dirs.iter().find_map(|d| std::fs::read_to_string(d.join(UNIT)).ok()) else { return vec![] };
+    unit.lines()
+        .filter_map(|l| l.trim().strip_prefix("WantedBy="))
+        .flat_map(|v| v.split_whitespace().map(str::to_string).collect::<Vec<_>>())
+        .filter(|t| !config_home().join("systemd/user").join(format!("{t}.wants")).join(UNIT).exists())
+        .collect()
+}
+
 /// Make the real autostart state follow the config, only when they differ.
 pub fn reconcile(d: &Daemon) {
     let want = d.config().general.autostart;
     let st = status();
+    if want && st["mode"] == "systemd" && st["enabled"].as_bool() == Some(true) {
+        let missing = missing_wants();
+        if !missing.is_empty() {
+            match Command::new("systemctl").args(["--user", "reenable", UNIT]).output() {
+                Ok(o) if o.status.success() => info!(d.log, "autostart: linked the unit to {}", missing.join(", ")),
+                Ok(o) => warn!(d.log, "systemctl --user reenable {UNIT} failed: {}", String::from_utf8_lossy(&o.stderr).trim()),
+                Err(e) => warn!(d.log, "systemctl --user reenable {UNIT} failed: {e}"),
+            }
+        }
+        return;
+    }
     if st["mode"] == "none" || st["enabled"].as_bool() == Some(want) {
         return;
     }

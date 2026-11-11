@@ -1,9 +1,12 @@
 [Unit]
 Description=Fractile window placement and session restore
 Documentation=file:///usr/share/doc/fractile/README.md
-# Runs only inside a graphical login and stops with it.
-PartOf=graphical-session.target
-After=graphical-session.target
+# Runs only inside a graphical login and stops with it. Plasma 5.27 leaves
+# graphical-session.target active across a log-out and stops (and at the next
+# login starts) plasma-workspace.target instead, so the unit is bound to that
+# too. Where that target does not exist (GNOME), systemd ignores it.
+PartOf=graphical-session.target plasma-workspace.target
+After=graphical-session.target plasma-workspace.target
 Requisite=graphical-session.target
 
 [Service]
@@ -24,4 +27,4 @@ SystemCallArchitectures=native
 UMask=0077
 
 [Install]
-WantedBy=graphical-session.target
+WantedBy=graphical-session.target plasma-workspace.target

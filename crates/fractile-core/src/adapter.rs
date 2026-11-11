@@ -154,6 +154,9 @@ pub enum AdapterEvent {
     WorkspacesChanged,
     Hotkey { binding_id: String, timestamp: u32 },
     Disconnected { reason: String },
+    /// The display server itself is gone (the X server closed the
+    /// connection): the desktop session this service belongs to has ended.
+    DisplayClosed { reason: String },
 }
 
 /// The compositor adapter contract.
