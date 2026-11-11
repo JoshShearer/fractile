@@ -4,7 +4,7 @@ use crate::backend::Environment;
 use crate::logging::Logger;
 use fractile_core::adapter::{AdapterEvent, Capabilities, CompositorAdapter, Operation, PlacementOutcome};
 use fractile_core::config::{Config, ShortcutAction, ShortcutScope};
-use fractile_core::geometry::{apply_constraints, remap_rect, selection_rect, Grid, Rect, Selection, SnapAction};
+use fractile_core::geometry::{apply_constraints, learn_min_size, remap_rect, selection_rect, Grid, Rect, Selection, SizeConstraints, SnapAction};
 use fractile_core::output::{next_output, output_for_rect, Output};
 use fractile_core::rules::{first_match, OutputSel, RuleTrigger};
 use fractile_core::window::{WindowInfo, WindowState};
@@ -69,6 +69,9 @@ pub struct Daemon {
     pub apps: Mutex<AppIndex>,
     pub exec_lock: Mutex<()>,
     pub undo: Mutex<Vec<UndoEntry>>,
+    /// Minimum sizes learned from placements, per window id (see
+    /// geometry::learn_min_size).
+    pub learned_limits: Mutex<HashMap<String, SizeConstraints>>,
     cycle: Mutex<Option<CycleState>>,
     pub subscribers: Mutex<Vec<Subscriber>>,
     pub next_sub: AtomicU64,
@@ -109,6 +112,7 @@ impl Daemon {
             apps: Mutex::new(AppIndex::system()),
             exec_lock: Mutex::new(()),
             undo: Mutex::new(vec![]),
+            learned_limits: Mutex::new(HashMap::new()),
             cycle: Mutex::new(None),
             subscribers: Mutex::new(vec![]),
             next_sub: AtomicU64::new(1),
@@ -227,7 +231,12 @@ impl Daemon {
             return Err(err("ineligible", format!("window {wid} is not placeable: {e:?}")));
         }
         let cfg = self.config();
-        let c = apply_constraints(rect, &w.constraints, cfg.placement.constraint_policy).map_err(|e| err("constraints", e))?;
+        let policy = cfg.placement.constraint_policy;
+        let mut limits = w.constraints;
+        if let Some(l) = self.learned_limits.lock().unwrap().get(wid) {
+            limits = limits.merged(l);
+        }
+        let mut c = apply_constraints(rect, &limits, policy).map_err(|e| err("constraints", e))?;
         if record_undo {
             let mut u = self.undo.lock().unwrap();
             u.push(UndoEntry { window_id: wid.into(), frame: w.frame, state: w.state });
@@ -238,8 +247,44 @@ impl Daemon {
             }
         }
         let mut out = self.adapter().move_resize(wid, c.rect).map_err(|e| err("adapter", e.to_string()))?;
+        // A size limit the adapter could not report shows up as a window
+        // larger than requested; compositors may then also skip the move.
+        // Learn it and apply the configured constraint policy once more.
+        if !out.within_tolerance {
+            if let Some(l) = out.observed.and_then(|o| learn_min_size(c.rect, o, cfg.placement.tolerance_px)) {
+                limits = limits.merged(&l);
+                {
+                    let mut m = self.learned_limits.lock().unwrap();
+                    if m.len() > 512 {
+                        m.clear();
+                    }
+                    m.insert(wid.to_string(), limits);
+                }
+                match apply_constraints(rect, &limits, policy) {
+                    Ok(c2) if c2.rect != c.rect => {
+                        let attempts = out.attempts;
+                        out = self.adapter().move_resize(wid, c2.rect).map_err(|e| err("adapter", e.to_string()))?;
+                        out.attempts += attempts;
+                        c = c2;
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        // Policy "fail": put the window back as it was.
+                        let _ = self.adapter().move_resize(wid, w.frame);
+                        if record_undo {
+                            self.undo.lock().unwrap().pop();
+                        }
+                        return Err(err("constraints", e));
+                    }
+                }
+            }
+        }
         if c.adjusted {
-            out.note = Some(format!("{}; constrained: {}", out.note.clone().unwrap_or_default(), c.reason.clone().unwrap_or_default()));
+            let why = format!("constrained by the window: {}", c.reason.clone().unwrap_or_default());
+            out.note = Some(match out.note.take().filter(|n| !n.is_empty()) {
+                Some(n) => format!("{n}; {why}"),
+                None => why,
+            });
             out.requested = rect;
         }
         let ms = t0.elapsed().as_millis() as u64;

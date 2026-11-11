@@ -416,6 +416,47 @@ pub struct SizeConstraints {
     pub inc_h: Option<i32>,
 }
 
+impl SizeConstraints {
+    /// The stricter of two sets of limits.
+    pub fn merged(&self, o: &SizeConstraints) -> SizeConstraints {
+        fn hi(a: Option<i32>, b: Option<i32>) -> Option<i32> {
+            match (a, b) {
+                (Some(x), Some(y)) => Some(x.max(y)),
+                (x, y) => x.or(y),
+            }
+        }
+        fn lo(a: Option<i32>, b: Option<i32>) -> Option<i32> {
+            match (a, b) {
+                (Some(x), Some(y)) => Some(x.min(y)),
+                (x, y) => x.or(y),
+            }
+        }
+        SizeConstraints {
+            min_w: hi(self.min_w, o.min_w),
+            min_h: hi(self.min_h, o.min_h),
+            max_w: lo(self.max_w, o.max_w),
+            max_h: lo(self.max_h, o.max_h),
+            inc_w: self.inc_w.or(o.inc_w),
+            inc_h: self.inc_h.or(o.inc_h),
+        }
+    }
+}
+
+/// Minimum sizes revealed by a placement: the window ended up larger than
+/// requested. Wayland compositors do not expose client minimum sizes to
+/// Fractile, so this is how they become known. Smaller-than-requested
+/// results are not treated as maximums (the app may still be resizing).
+pub fn learn_min_size(requested: Rect, observed: Rect, tolerance: i32) -> Option<SizeConstraints> {
+    let mut c = SizeConstraints::default();
+    if observed.w > requested.w + tolerance {
+        c.min_w = Some(observed.w);
+    }
+    if observed.h > requested.h + tolerance {
+        c.min_h = Some(observed.h);
+    }
+    (c.min_w.is_some() || c.min_h.is_some()).then_some(c)
+}
+
 /// Policy when the requested rectangle violates window constraints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -643,6 +684,23 @@ mod tests {
         let b = Rect::new(2560, 0, 3440, 1440);
         let r = Rect::new(0, 0, 1280, 1440);
         assert_eq!(remap_rect(r, a, b), Rect::new(2560, 0, 1720, 1440));
+    }
+
+    #[test]
+    fn learned_minimum_sizes() {
+        let req = Rect::new(2311, 0, 142, 1024);
+        // the window kept a larger width and ignored the move
+        let obs = Rect::new(159, 140, 146, 1024);
+        let l = learn_min_size(req, obs, 2).unwrap();
+        assert_eq!((l.min_w, l.min_h), (Some(146), None));
+        // within tolerance or smaller than requested teaches nothing
+        assert!(learn_min_size(req, Rect::new(0, 0, 143, 1024), 2).is_none());
+        assert!(learn_min_size(req, Rect::new(0, 0, 100, 900), 2).is_none());
+        // merging keeps the stricter limits
+        let a = SizeConstraints { min_w: Some(200), max_w: Some(900), ..Default::default() };
+        let m = a.merged(&SizeConstraints { min_w: Some(146), min_h: Some(80), max_w: Some(800), ..Default::default() });
+        assert_eq!((m.min_w, m.min_h, m.max_w), (Some(200), Some(80), Some(800)));
+        assert_eq!(apply_constraints(req, &m, ConstraintPolicy::Fit).unwrap().rect, Rect::new(2311, 0, 200, 1024));
     }
 
     #[test]

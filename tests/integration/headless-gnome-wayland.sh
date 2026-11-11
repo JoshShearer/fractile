@@ -5,7 +5,8 @@
 # the shell gets its own XDG_RUNTIME_DIR (gnome-shell writes a crash guard
 # file there that would otherwise disable the real session's extensions).
 #
-#   headless-gnome-wayland.sh start <name> [WxH] [extension-uuid...]
+#   headless-gnome-wayland.sh start <name> [WxH[,WxH...]] [extension-uuid...]
+# Several sizes give several virtual monitors, left to right.
 #   headless-gnome-wayland.sh stop <name>
 # Prints: XDG_RUNTIME_DIR=<dir> WAYLAND_DISPLAY=<name> DBUS_SESSION_BUS_ADDRESS=... STATE=<dir>
 # Clients of the nested session must use that XDG_RUNTIME_DIR.
@@ -58,8 +59,9 @@ addr=$(sed -n 1p "$state/dbus.out"); sed -n 2p "$state/dbus.out" >"$state/dbus.p
 export DBUS_SESSION_BUS_ADDRESS=$addr
 unset DISPLAY WAYLAND_DISPLAY
 export XDG_RUNTIME_DIR="$state/rt"
+mons=(); IFS=, read -ra sizes <<<"$size"; for s in "${sizes[@]}"; do mons+=(--virtual-monitor "$s"); done
 GSETTINGS_BACKEND=keyfile XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=GNOME \
-  gnome-shell --headless --wayland --no-x11 --virtual-monitor "$size" --wayland-display "$name" \
+  gnome-shell --headless --wayland --no-x11 "${mons[@]}" --wayland-display "$name" \
   >"$state/shell.log" 2>&1 &
 echo $! >"$state/shell.pid"
 for _ in $(seq 150); do [[ -S $XDG_RUNTIME_DIR/$name ]] && break; sleep 0.1; done

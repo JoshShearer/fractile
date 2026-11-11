@@ -53,7 +53,7 @@ def rect_eq(a, b, tol=0):
 
 
 class Env:
-    def __init__(self):
+    def __init__(self, monitors="1600x1200"):
         self.base = Path(tempfile.mkdtemp(prefix="fractile-wl-e2e-"))
         ext_home = self.base / "shell-data"
         dst = ext_home / "gnome-shell" / "extensions" / EXT_UUID
@@ -61,7 +61,7 @@ class Env:
         env = dict(os.environ)
         env["FRACTILE_TEST_DATA_HOME"] = str(ext_home)
         env.pop("FRACTILE_RUNTIME_DIR", None)
-        st = subprocess.run(["bash", str(HEADLESS), "start", NAME, "1600x1200", EXT_UUID], env=env, capture_output=True, text=True)
+        st = subprocess.run(["bash", str(HEADLESS), "start", NAME, monitors, EXT_UUID], env=env, capture_output=True, text=True)
         if st.returncode != 0:
             raise RuntimeError(f"headless shell failed: {st.stderr}")
         info = dict(kv.split("=", 1) for kv in st.stdout.strip().splitlines()[-1].split())

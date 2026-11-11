@@ -118,7 +118,7 @@ impl StubAdapter {
             name: "cosmic".into(),
             session_type: "wayland".into(),
             compositor: "cosmic-comp".into(),
-            reason: "COSMIC exposes no supported client API to move/resize other applications' windows (cosmic-toplevel-management offers activate/close/minimize/maximize/fullscreen/workspace moves only).".into(),
+            reason: "Fractile has no COSMIC adapter: COSMIC has no client API to move or resize other applications' windows (its toplevel management protocol covers activate, close, minimize, maximize, fullscreen, sticky and workspace moves only), so window control is not offered on COSMIC.".into(),
             notes: vec![
                 "BLOCKED BY PLATFORM: window geometry control needs a compositor-side hook; see docs/compatibility/cosmic.md for the upstream proposal.".into(),
                 "COSMIC auto-tiling is never modified by Fractile.".into(),
