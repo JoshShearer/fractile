@@ -9,7 +9,7 @@ the test harness through Mutter's RemoteDesktop virtual keyboard
 and the window geometry is checked.
 
 S05 differs from X11: on Wayland no other client can hold a key grab, so the
-check uses a combination GNOME's own settings assign (Ctrl+Alt+T, terminal).
+check uses a combination GNOME's own settings assign (Ctrl+Alt+Delete, log out).
 
 Usage: tests/gui/settings_gnome_wayland.py [--keep] [--evidence FILE]
 """

@@ -1,0 +1,79 @@
+{
+  "suite": "tray-gnome-wayland",
+  "when": "2026-11-11T12:29:26+0000",
+  "environment": "headless GNOME Shell 48.8 --wayland --no-x11, Fractile extension fractile@fractile.io, Ubuntu AppIndicators extension (gnome-shell-extension-appindicator 58), PyQt6 UI",
+  "results": [
+    {
+      "id": "Y00",
+      "name": "the AppIndicator extension runs in the test shell and hosts StatusNotifierItems",
+      "ok": true,
+      "detail": "appindicatorsupport@rgcjonas.gmail.com shell-version ['45', '46', '47', '48']"
+    },
+    {
+      "id": "Y01",
+      "name": "with the tray icon on, starting the service puts Fractile's icon in the tray, with no window opened",
+      "ok": true,
+      "detail": "item=(':1.11', '/StatusNotifierItem') after 2.4 s; own windows=[]"
+    },
+    {
+      "id": "Y02",
+      "name": "the icon describes itself: name, status Active, an icon image and a tooltip",
+      "ok": true,
+      "detail": "{'Id': 'Fractile', 'Title': 'Fractile', 'Status': 'Active', 'Category': 'ApplicationStatus'} icon_name='' pixmaps=[(22, 22), (64, 64)] tooltip='Fractile'"
+    },
+    {
+      "id": "Y03",
+      "name": "the GNOME top bar shows the icon (screenshot 30-tray-topbar.png)",
+      "ok": true,
+      "detail": "top bar indicators: [{'key': 'appindicator-:1.11@/StatusNotifierItem', 'visible': True, 'w': 48, 'h': 32}]"
+    },
+    {
+      "id": "Y04",
+      "name": "the icon's menu (dbusmenu, as the top bar reads it) has the Fractile actions",
+      "ok": true,
+      "detail": "['Show panel', 'Command palette', 'Save workspace now', 'Restore latest\u2026', 'Workspace dashboard', 'Settings', 'Quit Fractile']"
+    },
+    {
+      "id": "Y05",
+      "name": "choosing Settings in the tray menu opens Settings",
+      "ok": true,
+      "detail": "gnome:4241939388"
+    },
+    {
+      "id": "Y06",
+      "name": "'Save workspace now' in the tray menu saves a snapshot",
+      "ok": true,
+      "detail": "snapshots 0 -> 1"
+    },
+    {
+      "id": "Y07",
+      "name": "clicking the icon shows the placement panel",
+      "ok": true,
+      "detail": "Fractile panel mon-MetaVendor-MetaVirtualMonitor-0x00"
+    },
+    {
+      "id": "Y08",
+      "name": "turning the tray icon off in settings removes it; on brings it back",
+      "ok": true,
+      "detail": "removed=True back=True"
+    },
+    {
+      "id": "Y09",
+      "name": "the UI logged no Python errors",
+      "ok": true,
+      "detail": "\n(python3:4135): dbind-WARNING **: 12:28:50.886: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\n"
+    },
+    {
+      "id": "Y10",
+      "name": "without a tray on the desktop, the background UI opens no window and exits (about 30 s)",
+      "ok": true,
+      "detail": "started=[4361] exited=True windows=[] log='ceUnknown: The name org.a11y.Bus was not provided by any .service files\\nfractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)'"
+    },
+    {
+      "id": "Y11",
+      "name": "after that UI exited, the panel still opens on request",
+      "ok": true,
+      "detail": "Fractile panel mon-MetaVendor-MetaVirtualMonitor-0x00"
+    }
+  ]
+}

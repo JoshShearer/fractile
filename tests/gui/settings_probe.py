@@ -152,11 +152,12 @@ def drive_dialog(state: dict) -> None:
     check("S04", "a combination Fractile already uses is reported by name (the panel shortcut)",
           msg.startswith("⚠") and "Show/hide panel" in msg and ed.value == "Ctrl+Alt+G", msg)
     if WAYLAND:
-        # Ctrl+Alt+T is the terminal shortcut in GNOME's settings (media-keys);
-        # the service reads the desktop's bindings.
-        msg = capture(ed, "ctrl+alt+t")
+        # Ctrl+Alt+Delete is GNOME's log-out shortcut (media-keys) on every
+        # GNOME version and distribution (Ctrl+Alt+T for the terminal is an
+        # Ubuntu addition). The service reads the desktop's bindings.
+        msg = capture(ed, "ctrl+alt+delete")
         check("S05", "a combination GNOME's settings assign is reported as taken, with where it is set",
-              msg.startswith("⚠") and "assigned in desktop settings" in msg and "terminal" in msg and ed.value == "Ctrl+Alt+T", msg)
+              msg.startswith("⚠") and "assigned in desktop settings" in msg and "logout" in msg and ed.value.startswith("Ctrl+Alt+Del"), f"{msg} (value {ed.value})")
     else:
         msg = capture(ed, "ctrl+alt+shift+k")
         check("S05", "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",

@@ -522,6 +522,52 @@ pub fn apply_constraints(req: Rect, c: &SizeConstraints, policy: ConstraintPolic
     }
 }
 
+/// Move `r` (not resize it) so it lies inside `area`, as close to where it
+/// was as possible. Used when a window's minimum size makes it larger than
+/// the cell it was placed on: without this, the part past the monitor edge
+/// makes the compositor move the window, sometimes onto another monitor. A
+/// rectangle larger than `area` is aligned to its top-left corner.
+pub fn shift_into(r: Rect, area: Rect) -> Rect {
+    let x = if r.w >= area.w { area.x } else { r.x.clamp(area.x, area.x + area.w - r.w) };
+    let y = if r.h >= area.h { area.y } else { r.y.clamp(area.y, area.y + area.h - r.h) };
+    Rect::new(x, y, r.w, r.h)
+}
+
+/// Whether an observed frame after moving a window between monitors of
+/// different scale (`ratio` = target scale / source scale, not 1) looks like
+/// the compositor's transient rescale rather than the window's own limits:
+/// the size is the request multiplied or divided by the ratio, or the window
+/// ended up outside the requested monitor's `target_area` without growing
+/// past the request (a window that grew shows a real minimum size, and the
+/// compositor skipping the move is the known reaction to that). Seen with Mutter
+/// in its physical layout mode (GNOME 45) while the client switches its
+/// buffer scale. Such an observation is re-requested, never learned from.
+pub fn scale_transient(requested: Rect, observed: Rect, ratio: f64, target_area: Rect, tolerance: i32) -> bool {
+    if !(ratio.is_finite() && ratio > 0.0) || (ratio - 1.0).abs() < 1e-6 {
+        return false;
+    }
+    let near = |a: i32, b: f64| (a as f64 - b).abs() <= tolerance as f64 * ratio.max(1.0 / ratio);
+    let scaled = |k: f64| near(observed.w, requested.w as f64 * k) && near(observed.h, requested.h as f64 * k);
+    let (cx, cy) = observed.center();
+    // Any growth counts: a window 2 px over the request that the compositor
+    // did not move (GNOME 47, a 73 px minimum for a 71 px cell) has a limit.
+    let grew = observed.w > requested.w || observed.h > requested.h;
+    scaled(ratio) || scaled(1.0 / ratio) || (!grew && !target_area.contains_point(cx, cy))
+}
+
+/// Learned minimum sizes the window has since shown it does not have (it was
+/// observed smaller) are dropped. Returns None when nothing is left.
+pub fn relax_learned(learned: &SizeConstraints, observed: Rect, tolerance: i32) -> Option<SizeConstraints> {
+    let mut l = *learned;
+    if l.min_w.is_some_and(|m| observed.w + tolerance < m) {
+        l.min_w = None;
+    }
+    if l.min_h.is_some_and(|m| observed.h + tolerance < m) {
+        l.min_h = None;
+    }
+    (l != SizeConstraints::default()).then_some(l)
+}
+
 /// Keyboard snap commands (beyond Divvy) expressed as normalized rects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -684,6 +730,53 @@ mod tests {
         let b = Rect::new(2560, 0, 3440, 1440);
         let r = Rect::new(0, 0, 1280, 1440);
         assert_eq!(remap_rect(r, a, b), Rect::new(2560, 0, 1720, 1440));
+    }
+
+    #[test]
+    fn a_rescale_while_crossing_monitors_is_a_transient_not_a_limit() {
+        let wa = Rect::new(0, 32, 1600, 1168);
+        let req = Rect::new(800, 64, 400, 1136);
+        // GNOME 45, scale 1 -> 2: frame doubled
+        assert!(scale_transient(req, Rect::new(800, 64, 800, 2272), 2.0, wa, 2));
+        // or halved
+        assert!(scale_transient(Rect::new(888, 64, 178, 1136), Rect::new(888, 64, 89, 568), 2.0, wa, 2));
+        // or left on the other monitor
+        assert!(scale_transient(Rect::new(888, 64, 178, 1136), Rect::new(1600, 0, 178, 600), 2.0, wa, 2));
+        // a real minimum width on the right monitor is not a transient
+        assert!(!scale_transient(Rect::new(800, 632, 200, 568), Rect::new(800, 632, 292, 568), 2.0, wa, 2));
+        // nor is a window grown to its minimum and left on the old monitor
+        // (GNOME 45 skips the move then): that minimum must be learned
+        let wb = Rect::new(1600, 0, 1280, 1024);
+        assert!(!scale_transient(Rect::new(2026, 409, 285, 307), Rect::new(1280, 632, 292, 306), 0.5, wb, 2));
+        // grown by no more than the tolerance and not moved (GNOME 47)
+        let wl = Rect::new(0, 32, 800, 568);
+        assert!(!scale_transient(Rect::new(0, 529, 800, 71), Rect::new(800, 682, 800, 73), 2.0, wl, 2));
+        // same scale: never
+        assert!(!scale_transient(req, Rect::new(800, 64, 800, 2272), 1.0, wa, 2));
+    }
+
+    #[test]
+    fn a_learned_minimum_the_window_later_undercuts_is_dropped() {
+        let l = SizeConstraints { min_w: Some(800), min_h: Some(2272), ..Default::default() };
+        assert_eq!(relax_learned(&l, Rect::new(0, 64, 800, 1136), 2), Some(SizeConstraints { min_w: Some(800), ..Default::default() }));
+        assert_eq!(relax_learned(&l, Rect::new(0, 64, 400, 1136), 2), None);
+        assert_eq!(relax_learned(&l, Rect::new(0, 64, 900, 2300), 2), Some(l));
+    }
+
+    #[test]
+    fn shift_into_keeps_a_grown_window_on_its_monitor() {
+        let wa = Rect::new(0, 32, 800, 568);
+        // bottom cell, window 2 px taller than the cell: moved up, not resized
+        assert_eq!(shift_into(Rect::new(0, 529, 800, 73), wa), Rect::new(0, 527, 800, 73));
+        // right edge
+        assert_eq!(shift_into(Rect::new(700, 100, 200, 50), wa), Rect::new(600, 100, 200, 50));
+        // already inside: unchanged
+        assert_eq!(shift_into(Rect::new(10, 40, 100, 100), wa), Rect::new(10, 40, 100, 100));
+        // larger than the area: top-left aligned
+        assert_eq!(shift_into(Rect::new(300, 300, 900, 700), wa), Rect::new(0, 32, 900, 700));
+        // second monitor to the right, left of it overflowing
+        let wb = Rect::new(800, 0, 1280, 1024);
+        assert_eq!(shift_into(Rect::new(780, 10, 300, 300), wb), Rect::new(800, 10, 300, 300));
     }
 
     #[test]

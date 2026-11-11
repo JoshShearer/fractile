@@ -26,6 +26,9 @@ const ADAPTER_API = 1;
 const RETRY_SECONDS = 3;
 const REJECTED_RETRY_SECONDS = 30;
 const SETTLE_TIMEOUT_MS = 1500;
+// A new window is offered once Mutter shows it, or after this long anyway.
+const UNSHOWN_TIMEOUT_MS = 3000;
+const MAX_ATTEMPTS = 3;
 const TOLERANCE_PX = 2;
 
 const TILING_EXTENSIONS = {
@@ -159,6 +162,10 @@ export default class FractileExtension extends Extension {
         this._monitorConfig = null;
         this._signals = [];
         this._windowSignals = new Map();
+        // Windows created but not yet shown: Mutter has not placed them, and
+        // their frame can be 0x0 at 0,0 (GNOME 47). Placing one now is undone
+        // by Mutter's initial placement, so they are not offered until shown.
+        this._unshown = new Map(); // window -> {shownId, timeoutId}
         this._settleSources = new Set();
         this._overlay = null;
         this._overlayLabel = null;
@@ -185,6 +192,8 @@ export default class FractileExtension extends Extension {
                 w.disconnect(id);
         }
         this._windowSignals.clear();
+        for (const w of [...this._unshown.keys()])
+            this._dropUnshown(w);
         this._ungrabAll();
         this._destroyOverlay();
         this._closeConnection();
@@ -441,7 +450,7 @@ export default class FractileExtension extends Extension {
     _windows() {
         return global.get_window_actors()
             .map(a => a.meta_window)
-            .filter(w => w && !w.is_override_redirect());
+            .filter(w => w && !w.is_override_redirect() && !this._unshown.has(w));
     }
 
     _find(id) {
@@ -549,9 +558,13 @@ export default class FractileExtension extends Extension {
                 stable = same ? stable + 1 : 0;
                 last = cur;
                 const hit = maxDelta(cur, rect) <= TOLERANCE_PX;
-                if (!hit && stable >= 4 && attempts < 2 && elapsed < SETTLE_TIMEOUT_MS) {
+                if (!hit && stable >= 4 && attempts < MAX_ATTEMPTS && elapsed < SETTLE_TIMEOUT_MS) {
                     // Some clients apply the size before the position (or
-                    // the reverse); one re-request settles them.
+                    // the reverse); a re-request settles them. Moving to a
+                    // monitor with another scale can take a second one: in
+                    // Mutter's physical layout mode (GNOME 45) the frame is
+                    // rescaled once more when the client switches its buffer
+                    // scale after the move.
                     attempts++;
                     stable = 0;
                     w.move_resize_frame(true, rect.x, rect.y, rect.w, rect.h);
@@ -863,16 +876,50 @@ export default class FractileExtension extends Extension {
         this._signals.push([obj, obj.connect(sig, fn)]);
     }
 
+    /** Announce a new window once Mutter has shown (and so placed) it. A
+     * window that is never shown (created minimized, or a client that never
+     * maps it) is announced after a bound anyway. */
+    _whenShown(w) {
+        const shownId = w.connect('shown', () => {
+            if (this._dropUnshown(w))
+                this._emit({type: 'window_created', id: wid(w)});
+        });
+        const timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, UNSHOWN_TIMEOUT_MS, () => {
+            const p = this._unshown.get(w);
+            if (p)
+                p.timeoutId = 0; // this source ends now; do not remove it again
+            if (this._dropUnshown(w))
+                this._emit({type: 'window_created', id: wid(w)});
+            return GLib.SOURCE_REMOVE;
+        });
+        this._unshown.set(w, {shownId, timeoutId});
+    }
+
+    /** Stop waiting for `w` to be shown. True if it was waiting. */
+    _dropUnshown(w) {
+        const p = this._unshown.get(w);
+        if (!p)
+            return false;
+        this._unshown.delete(w);
+        w.disconnect(p.shownId);
+        if (p.timeoutId)
+            GLib.source_remove(p.timeoutId);
+        return true;
+    }
+
     _trackWindow(w) {
         if (this._windowSignals.has(w))
             return;
         const ids = [
             w.connect('unmanaged', () => {
+                // closed before it was ever shown: it was never announced
+                const announced = !this._dropUnshown(w);
                 const sigs = this._windowSignals.get(w) ?? [];
                 this._windowSignals.delete(w);
                 for (const id of sigs)
                     w.disconnect(id);
-                this._emit({type: 'window_closed', id: wid(w)});
+                if (announced)
+                    this._emit({type: 'window_closed', id: wid(w)});
             }),
             w.connect('notify::title', () => this._emit({type: 'window_changed', id: wid(w)})),
         ];
@@ -887,7 +934,7 @@ export default class FractileExtension extends Extension {
             if (w.is_override_redirect())
                 return;
             this._trackWindow(w);
-            this._emit({type: 'window_created', id: wid(w)});
+            this._whenShown(w);
         });
         this._on(display, 'notify::focus-window', () => {
             const w = display.focus_window;

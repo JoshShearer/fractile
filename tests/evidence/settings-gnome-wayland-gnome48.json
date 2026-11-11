@@ -1,0 +1,116 @@
+{
+  "suite": "settings-gnome-wayland",
+  "when": "2026-11-11T12:28:49+0000",
+  "environment": "headless GNOME Shell 48.8 --wayland --no-x11, Fractile extension fractile@fractile.io, PyQt6 UI on Wayland",
+  "screenshots": "tests/evidence/gui/wayland/",
+  "results": [
+    {
+      "id": "S00",
+      "name": "test window is up and the GNOME integration is connected (Wayland)",
+      "ok": true,
+      "detail": "adapter=gnome session=wayland"
+    },
+    {
+      "id": "S01",
+      "name": "Settings opens from the service request with all eight pages",
+      "ok": true,
+      "detail": "['General', 'Appearance', 'Shortcuts', 'Session Restore', 'Rules', 'Monitors', 'Diagnostics', 'About']"
+    },
+    {
+      "id": "S02",
+      "name": "every page renders (screenshots in tests/evidence/gui/)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S08",
+      "name": "a General change is only pending until Apply, then the service has it",
+      "ok": true,
+      "detail": "before=True pending_dirty=True service_before=True service_after=False"
+    },
+    {
+      "id": "S03",
+      "name": "a global shortcut without a modifier is refused and the editor keeps listening",
+      "ok": true,
+      "detail": "\u26a0 Global shortcuts need at least one modifier (Ctrl, Alt, Shift or Super). Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "S14",
+      "name": "while the editor listens, global shortcuts are paused so the desktop passes their keys to it",
+      "ok": true,
+      "detail": "hotkeys_paused=True"
+    },
+    {
+      "id": "S04",
+      "name": "a combination Fractile already uses is reported by name (the panel shortcut)",
+      "ok": true,
+      "detail": "\u26a0 already used by Fractile shortcut 'Show/hide panel'"
+    },
+    {
+      "id": "S05",
+      "name": "a combination GNOME's settings assign is reported as taken, with where it is set",
+      "ok": true,
+      "detail": "\u26a0 assigned in desktop settings: org.gnome.settings-daemon.plugins.media-keys logout (value Ctrl+Alt+Delete)"
+    },
+    {
+      "id": "S06",
+      "name": "a free combination is reported as available",
+      "ok": true,
+      "detail": "\u2713 Available. Note: some desktop shortcuts cannot be detected until they are pressed."
+    },
+    {
+      "id": "S07",
+      "name": "a panel shortcut on a navigation key is refused (reserved by the panel)",
+      "ok": true,
+      "detail": "\u26a0 The panel uses this key for keyboard navigation. Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "S09",
+      "name": "the new shortcut appears in the table, pending until Apply",
+      "ok": true,
+      "detail": "dialog=True modal=None add_button=True rows=14"
+    },
+    {
+      "id": "S15",
+      "name": "the pause ends when the editor closes",
+      "ok": true,
+      "detail": "hotkeys_paused=False"
+    },
+    {
+      "id": "S10",
+      "name": "after Apply the service saved and registered it; the table says active",
+      "ok": true,
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-f3214657', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+    },
+    {
+      "id": "S13",
+      "name": "the shortcut list shows the panel shortcut with its real keys; Edit\u2026 on it opens General",
+      "ok": true,
+      "detail": "keys=Ctrl+Alt+G status=active page after Edit=general"
+    },
+    {
+      "id": "S12",
+      "name": "the UI logged no Python errors",
+      "ok": true,
+      "detail": "\n(python3:3932): dbind-WARNING **: 12:28:27.731: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\n"
+    },
+    {
+      "id": "S11",
+      "name": "pressing the shortcut created in Settings places the window (left half)",
+      "ok": true,
+      "detail": "want {'x': 0, 'y': 32, 'w': 800, 'h': 1168} got {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "S16",
+      "name": "an editor that disconnects while listening does not leave shortcuts paused",
+      "ok": true,
+      "detail": "during=True after_close=False"
+    },
+    {
+      "id": "S17",
+      "name": "a pause that is never ended times out and shortcuts come back",
+      "ok": true,
+      "detail": "after_timeout=False"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ from gi.repository import Gio, GLib
 
 KEYSYMS = {"ctrl": 0xFFE3, "control": 0xFFE3, "alt": 0xFFE9, "shift": 0xFFE1, "super": 0xFFEB,
            "escape": 0xFF1B, "return": 0xFF0D, "left": 0xFF51, "up": 0xFF52, "right": 0xFF53, "down": 0xFF54,
-           "equal": 0x3D, "minus": 0x2D, "space": 0x20, "tab": 0xFF09}
+           "equal": 0x3D, "minus": 0x2D, "space": 0x20, "tab": 0xFF09, "delete": 0xFFFF}
 
 
 def keysym(name: str) -> int:

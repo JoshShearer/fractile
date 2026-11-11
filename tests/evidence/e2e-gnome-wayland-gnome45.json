@@ -1,0 +1,157 @@
+{
+  "suite": "e2e-gnome-wayland",
+  "when": "2026-11-11T12:29:55+0000",
+  "environment": "headless GNOME Shell 45.10 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
+  "results": [
+    {
+      "id": "W01",
+      "name": "extension attaches over the private socket; window control available on Wayland",
+      "ok": true,
+      "detail": "GNOME Shell 45.10"
+    },
+    {
+      "id": "SEC5",
+      "name": "a non-compositor process cannot attach as the integration or inject events",
+      "ok": true,
+      "detail": "attach: only the compositor (gnome-shell) may attach; peer runs /usr/bin/python3.12; event: not the attached integration"
+    },
+    {
+      "id": "W02",
+      "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
+      "ok": true,
+      "detail": "gnome:1974546728 gnome:1974546727"
+    },
+    {
+      "id": "W03",
+      "name": "outputs have a stable id and a work area that excludes the top bar",
+      "ok": true,
+      "detail": "mon-MetaVendor-MetaVirtualMonitor-0x00 work_area={'h': 1168, 'w': 1600, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "W04",
+      "name": "grid placements land on the requested rectangle (GTK4, client-side decorations)",
+      "ok": true,
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+    },
+    {
+      "id": "W05",
+      "name": "grid placement on a Qt Wayland window",
+      "ok": true,
+      "detail": "err=0px"
+    },
+    {
+      "id": "W06",
+      "name": "1x1 selection fills the work area exactly",
+      "ok": true,
+      "detail": "{'h': 1168, 'w': 1600, 'x': 0, 'y': 32} vs {'h': 1168, 'w': 1600, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "W07",
+      "name": "undo restores the previous geometry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "W08",
+      "name": "placing a maximized window unmaximizes it and lands exactly",
+      "ok": true,
+      "detail": "maximized=False frame={'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "W09",
+      "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
+      "ok": true,
+      "detail": "970 ms incl. key injection"
+    },
+    {
+      "id": "W10",
+      "name": "workspaces are listed and a window can be moved between them",
+      "ok": true,
+      "detail": "2 workspaces"
+    },
+    {
+      "id": "W11",
+      "name": "snapshot restore puts Wayland windows back exactly",
+      "ok": true,
+      "detail": "1734 ms"
+    },
+    {
+      "id": "W12",
+      "name": "shortcut starts the Wayland UI; the panel is shown, focused and inside the work area",
+      "ok": true,
+      "detail": "1.0s incl. UI start; panel {'h': 368, 'w': 375, 'x': 612, 'y': 432} own=True"
+    },
+    {
+      "id": "W13",
+      "name": "panel keyboard selection (arrows, Shift+arrows, Enter) places the window",
+      "ok": true,
+      "detail": "want {'h': 584, 'w': 800, 'x': 533, 'y': 32} got {'h': 584, 'w': 800, 'x': 533, 'y': 32}"
+    },
+    {
+      "id": "W14",
+      "name": "panel closes after placing and focus returns to the window",
+      "ok": true,
+      "detail": "active gnome:1974546728"
+    },
+    {
+      "id": "W15",
+      "name": "Fractile UI windows are never offered as placement targets",
+      "ok": true,
+      "detail": "0 own window(s)"
+    },
+    {
+      "id": "W16",
+      "name": "extension disabled: Fractile reports no window control and refuses; re-enabled: control and shortcuts return",
+      "ok": true,
+      "detail": "place exit 5: fractile: unsupported: The Fractile GNOME Shell extension is not connected. Enab"
+    },
+    {
+      "id": "W17",
+      "name": "daemon restart: the extension reconnects without user action",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "W20",
+      "name": "an on-create rule places a new matching window",
+      "ok": true,
+      "detail": "{'h': 1168, 'w': 800, 'x': 800, 'y': 32} want {'h': 1168, 'w': 800, 'x': 800, 'y': 32}"
+    },
+    {
+      "id": "W21",
+      "name": "session locked: status says so, on-create rules and restores do not run, shortcuts do nothing",
+      "ok": true,
+      "detail": "locked=True rule_held=True restore exit 1: fractile: the session is locked; restore runs only while it is unlocked"
+    },
+    {
+      "id": "W22",
+      "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
+      "ok": true,
+      "detail": "inhibitors before (uint32 1,); snapshot ff0a810e-5a78-419d-b8d2-9df902c7811b (4 windows)"
+    },
+    {
+      "id": "W23",
+      "name": "an integration with a mismatched adapter API is refused; status reports the mismatch and how to fix it; the right version reattaches",
+      "ok": true,
+      "detail": "refused: version mismatch: the integration speaks adapter API 999, this Fractile needs 1. To fix: reinstall the Fractil; status line: The GNOME Shell integration tried to connect but was refused: version mismatch: the integr"
+    },
+    {
+      "id": "W24",
+      "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
+      "ok": true,
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:1974546733 closed while being placed']"
+    },
+    {
+      "id": "W18",
+      "name": "UI logged no Python errors during the run",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "W19",
+      "name": "GNOME Shell logged no errors from the extension",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

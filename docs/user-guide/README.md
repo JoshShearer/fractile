@@ -38,7 +38,14 @@ what to do.
 ## The panel
 
 Open it with your panel shortcut, the tray icon (if your desktop has a tray),
-or by launching Fractile again from the menu. It shows which window it will
+or by launching Fractile again from the menu.
+
+The tray icon is on by default. Stock GNOME has no tray; Ubuntu and Pop!_OS
+add one with the AppIndicators extension, and KDE has one. Where there is a
+tray, the icon appears at login without opening a window; its menu has the
+panel, Settings, the Dashboard and "Save workspace now". Where there is none,
+nothing is shown and the shortcut still works. Turn the icon off in Settings >
+General. It shows which window it will
 move, with its name and icon. That window is chosen when the panel opens, so the
 panel taking focus does not change the target.
 
@@ -74,6 +81,10 @@ monitor, undo, save or restore workspace, the command palette) and a key.
 - **Global** shortcuts work everywhere. The editor checks for conflicts with
   your desktop's bindings and with Fractile's own. It tells you when it cannot
   check, which happens for bindings held by other programs.
+- While the editor waits for your keys, Fractile's own global shortcuts are
+  paused, so pressing one of them reaches the editor instead of running it
+  (on Wayland the desktop would otherwise take those keys). They come back
+  when the editor closes, or after 5 minutes at most.
 - "Cycle monitors": pressing the same placement shortcut again moves the
   window to the same spot on the next monitor.
 
@@ -96,6 +107,14 @@ browser tabs or terminal contents. Apps that restore their own sessions (most
 browsers, many editors) still do that themselves. Fractile then only places
 their windows.
 
+For such apps a restore starts the app **once** and places the windows it
+reopens, instead of starting it once per window (which would open extra
+windows). Firefox, Chrome, Chromium, Brave, Edge, Vivaldi, Web (Epiphany),
+VS Code, VSCodium, Zed and JetBrains IDEs are treated this way by default.
+Change it per app in Settings > Session Restore > Applications ("Restores its own
+documents"). If the app does not reopen a window it had, the restore report
+says so; Fractile does not open a blank one in its place.
+
 - Save now: `fractile save --name Work`, the "Save current workspace" shortcut,
   or the Dashboard.
 - Restore: the Dashboard, or `fractile restore --snapshot latest`. Try
@@ -104,13 +123,13 @@ their windows.
 - Windows that are already open are moved. They are never closed and never
   opened twice.
 - Apps that are not running are launched only with your approval. Each app has
-  a policy: ask (the default), always, if missing, or never. Set it in Settings >
-  Session or approve it in the restore dialog.
+  a policy: ask (the default), always, if missing, or never. Set it in Settings > Session Restore >
+  Applications, or approve it in the restore dialog.
 - Undo a whole restore with "Undo restore" (`fractile undo-restore`).
 
 ### At login
 
-Settings > Session > "When I log in":
+Settings > Session Restore > Restore > "At login":
 
 | Policy | What happens |
 |---|---|
@@ -121,7 +140,7 @@ Settings > Session > "When I log in":
 | Named layout | applies a chosen layout at every login |
 | Ask | shows the most recent snapshot at login with each window listed: "Restore selected", "Not now", or "Don't restore automatically". Other snapshots are on the Dashboard. |
 
-"Start Fractile at login" is a separate switch.
+"Start Fractile when I log in" (Settings > General) is a separate switch.
 
 If you log out while a restore is still running, Fractile stops it and saves
 what you had: windows the restore had already placed are saved where they are
@@ -129,6 +148,17 @@ now (including any you moved since), and windows it had not reached yet are
 saved at their restore position. The next login restores that. One limit: if
 you move a window by hand before the restore reaches it, the restore moves it
 to its saved position.
+
+### When a monitor goes away or comes back
+
+When a monitor is unplugged or turned off, your desktop moves its windows to
+the remaining monitors, and Fractile keeps the layout you had as a "monitor
+setup" snapshot. Restoring a snapshot from a setup with more monitors puts the
+windows of a missing monitor on the remaining ones, at the same relative
+position. With Settings > Session Restore > "Move windows back when a monitor is reconnected"
+on (it is off by default), reconnecting the monitor puts its windows back
+where they were. Monitors are recognized by their EDID identity, not by the
+port they are plugged into.
 
 Retention: the newest 30 automatic snapshots, plus one per day for 7 days. Your
 named and manual saves are kept until you delete them. While the screen is
@@ -204,5 +234,20 @@ skipped when the program is gone.
 ## Privacy
 
 No telemetry, no network access. Data stays in the three directories above.
-Private and incognito browser windows are left out of snapshots. See
-[security](../security/README.md).
+See [security](../security/README.md).
+
+### Private windows
+
+Fractile leaves a window out of snapshots when its title matches one of the
+patterns in `session.private_title_patterns` (by default "Private Browsing",
+"Incognito", "InPrivate" and "Private window", any case). This works for
+browsers that put such a marker in the window title, for example Firefox
+("... Mozilla Firefox Private Browsing").
+
+Google Chrome and Chromium do not: an incognito window is titled like a normal
+one ("Page - Google Chrome") and has no window property that tells it apart
+(checked with Chrome 157 on X11). Fractile cannot detect these windows and
+records them, including their title, like normal windows. If that matters to
+you, turn off "Store window titles" (`session.store_titles = false`), or close
+incognito windows before you log out. Chrome never reopens incognito windows,
+so a restore reports them as not reopened and does not open them.

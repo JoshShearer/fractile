@@ -1,0 +1,55 @@
+{
+  "suite": "e2e-gnome-wayland-multimon",
+  "when": "2026-11-11T12:27:35+0000",
+  "environment": "headless GNOME Shell 48.8 --wayland --no-x11, virtual monitors 1600x1200,1280x1024 (scale 1), Fractile extension fractile@fractile.io",
+  "results": [
+    {
+      "id": "M01",
+      "name": "two monitors listed with distinct stable ids, left to right",
+      "ok": true,
+      "detail": "mon-MetaVendor-MetaVirtualMonitor-0x00 {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}; mon-MetaVendor-MetaVirtualMonitor-0x01 {'h': 1024, 'w': 1280, 'x': 1600, 'y': 0}"
+    },
+    {
+      "id": "M02",
+      "name": "a grid selection on the second monitor places the window there exactly",
+      "ok": true,
+      "detail": "{'h': 512, 'w': 640, 'x': 2240, 'y': 512} want {'h': 512, 'w': 640, 'x': 2240, 'y': 512}"
+    },
+    {
+      "id": "M03",
+      "name": "move to next monitor cycles in a stable order and keeps the relative placement",
+      "ok": true,
+      "detail": "mon-MetaVendor-MetaVirtualMonitor-0x01 -> mon-MetaVendor-MetaVirtualMonitor-0x00 -> mon-MetaVendor-MetaVirtualMonitor-0x01"
+    },
+    {
+      "id": "M04",
+      "name": "pressing the same placement shortcut repeatedly cycles the window across monitors",
+      "ok": true,
+      "detail": "mon-MetaVendor-MetaVirtualMonitor-0x00 -> mon-MetaVendor-MetaVirtualMonitor-0x01 -> mon-MetaVendor-MetaVirtualMonitor-0x00"
+    },
+    {
+      "id": "M05",
+      "name": "the panel shortcut shows one panel inside each monitor's work area",
+      "ok": true,
+      "detail": "2 panels on ['mon-MetaVendor-MetaVirtualMonitor-0x00', 'mon-MetaVendor-MetaVirtualMonitor-0x01'], 1.02 s after the key press"
+    },
+    {
+      "id": "M06",
+      "name": "100 placements alternating monitors and grid sizes: each exact (or fitted to the window minimum size and reported), no drift, service alive",
+      "ok": true,
+      "detail": "10.2s total; 4 hit the window's minimum size and were fitted"
+    },
+    {
+      "id": "M07",
+      "name": "snapshot restore puts windows back on their own monitors exactly",
+      "ok": true,
+      "detail": "{'h': 1168, 'w': 800, 'x': 0, 'y': 32} {'h': 1024, 'w': 640, 'x': 2240, 'y': 0}"
+    },
+    {
+      "id": "M08",
+      "name": "UI logged no Python errors",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

@@ -6,8 +6,9 @@ Two virtual monitors (1600x1200 and 1280x1024). The monitor configuration is
 changed while everything runs, through Mutter's org.gnome.Mutter.DisplayConfig
 ApplyMonitorsConfig (the call GNOME Settings > Displays makes):
   - mixed DPI: the 1600x1200 monitor at scale 2, the other at scale 1, in
-    Mutter's default (physical) layout mode, which is what GNOME uses unless
-    fractional scaling is turned on;
+    whichever layout mode Mutter runs in: physical (upstream default) or
+    logical (when scale-monitor-framebuffer is on, as Fedora ships it). The
+    mode is recorded in D01;
   - disconnect: the second monitor disabled, then enabled again. This is the
     compositor-side event an unplug produces (outputs removed, windows moved
     by Mutter, monitors-changed). It is not a physical unplug: the connector
@@ -43,6 +44,17 @@ def gdbus(e: Env, method: str, *args: str) -> str:
     return p.stdout
 
 
+def layout_mode(e: Env) -> str:
+    """Mutter's layout mode: "logical" (positions in scaled pixels) or "physical"."""
+    m = re.search(r"'layout-mode': <uint32 (\d+)>", gdbus(e, "GetCurrentState"))
+    return "logical" if m and m.group(1) == "1" else "physical"
+
+
+def right_of(e: Env, width: int, scale: float) -> int:
+    """x of a monitor placed right of one `width` physical pixels wide at `scale`."""
+    return round(width / scale) if layout_mode(e) == "logical" else width
+
+
 def apply_monitors(e: Env, layout: list[tuple[str, int, int, float, bool]]) -> None:
     """layout: (connector, x, y, scale, primary). Monitors not listed are disabled."""
     serial = re.match(r"\(uint32 (\d+),", gdbus(e, "GetCurrentState")).group(1)
@@ -75,11 +87,12 @@ def run_all(e: Env) -> None:
     ida, idb = outs0[0]["stable_id"], outs0[1]["stable_id"]
 
     # ---- T08: mixed DPI ----
-    apply_monitors(e, [("Meta-0", 0, 0, 2.0, True), ("Meta-1", 1600, 0, 1.0, False)])
+    mode = layout_mode(e)
+    apply_monitors(e, [("Meta-0", 0, 0, 2.0, True), ("Meta-1", right_of(e, 1600, 2.0), 0, 1.0, False)])
     mixed = e.wait_for(lambda: (lambda os_: os_ if len(os_) == 2 and sorted(o["scale"] for o in os_) == [1.0, 2.0] else None)(outputs(e)), 10.0, 0.3)
     check("D01", "monitor scale changed at runtime to 2 and 1: Fractile reports both scales, same stable ids",
           bool(mixed) and [o["stable_id"] for o in mixed] == [ida, idb],
-          "; ".join(f"{o['stable_id']} scale {o['scale']} rect {o['rect']} work {o['work_area']}" for o in (mixed or outputs(e))))
+          f"Mutter layout mode {mode}; " + "; ".join(f"{o['stable_id']} scale {o['scale']} rect {o['rect']} work {o['work_area']}" for o in (mixed or outputs(e))))
     if not mixed:
         return
     rnd = random.Random(8)

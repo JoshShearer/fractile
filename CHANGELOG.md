@@ -27,7 +27,7 @@ desktops only. See PLATFORM_MATRIX.md.
   exact N), per-topology variants, and on-create placement rules with
   explanations.
 - **Adapters.** X11 (EWMH, ICCCM, RandR with EDID ids). GNOME Shell extension
-  for Wayland (45-48 declared, 46 tested). KWin script for Plasma Wayland (6.x,
+  for Wayland (45-48 declared; see PLATFORM_MATRIX.md for the versions run). KWin script for Plasma Wayland (6.x,
   6.8.2 tested). COSMIC and unknown Wayland compositors are reported as
   unsupported, with reasons.
 - **UI.** A PyQt6 panel, settings (General, Appearance, Shortcuts, Session,
@@ -43,6 +43,20 @@ desktops only. See PLATFORM_MATRIX.md.
   auto-launch, no shell, no telemetry.
 - Session lock handling through logind LockedHint and the compositor.
 - logind PrepareForShutdown snapshot with a delay inhibitor.
+- Shortcut editor on Wayland: while it listens, Fractile pauses its own
+  global shortcuts so the desktop passes the keys to it. The pause ends when
+  the editor closes or disconnects, and after at most 300 s (S14-S17).
+- Tray icon at login: with the tray icon on, the service starts the UI in the
+  background, so the icon appears without opening a window. On a desktop
+  without a tray host the background UI exits again; the panel still opens
+  on request (Y01-Y11).
+- Monitor changes: when a monitor goes away, the layout it had is kept as a
+  "monitor setup" snapshot. With "return windows when a monitor comes back"
+  (off by default), reconnecting it puts the windows back (D06-D08).
+- Browsers and editors that reopen their own windows (Firefox, Chrome,
+  Chromium, Brave, Edge, Vivaldi, Epiphany, VS Code, VSCodium, Zed, JetBrains
+  IDEs) are started once by a restore, and Fractile places the windows they
+  open. A per-app setting overrides the built-in list (T14, A01-A03).
 
 ### Fixed during validation
 
@@ -77,6 +91,46 @@ desktops only. See PLATFORM_MATRIX.md.
 - The Shortcuts list showed "Show/hide panel: no keys set" while the panel
   shortcut (set under General) was active. The list now shows the panel
   shortcut with its keys and status; Edit opens General (S13).
+- GNOME Shell crashed (SIGSEGV) when a window closed while Fractile was
+  still placing it. The extension now stops at once for a window being
+  unmanaged (W24; before the fix see
+  `tests/evidence/e2e-gnome-wayland-w24-before-fix.log`).
+- GNOME 47 lists a new window before Mutter has placed it (frame 0x0 at
+  0,0), and the first placement was then undone by Mutter's initial
+  placement. New windows are now offered once Mutter has shown them (W04 on
+  GNOME 47; before the fix see
+  `tests/evidence/e2e-gnome-wayland-gnome47-before-fix.json`).
+- A window grown to its minimum size near a monitor edge could be moved by
+  the compositor onto another monitor. The grown rectangle is now kept inside
+  the work area it was meant for (D02, GNOME 47 logical layout mode).
+- On GNOME 45 (Mutter physical layout mode), moving a window to a monitor
+  with another scale could report a transiently rescaled frame (twice or half
+  the requested size, or left on the old monitor). Fractile learned that as
+  the window's minimum size, and every later placement of that window came
+  out too large. Such frames are now re-requested (twice, the second after a
+  short pause) and never learned from, and a learned minimum the window later
+  undercuts is dropped (D02 on GNOME 45).
+- A window whose minimum was only a pixel or two over the cell, and which the
+  compositor therefore did not move (GNOME 47, a 73 px minimum for a 71 px
+  cell), stayed on the wrong monitor: the growth was within the size
+  tolerance, so no minimum was learned. When the move was skipped, any growth
+  is now learned (D02 on GNOME 47).
+- A service stopped very early in a login could miss the stop signal and lose
+  the exit snapshot. Signal handlers are now installed before the service
+  accepts connections.
+- A running kwin_x11 (Plasma X11) was taken for KWin Wayland.
+- Apps installed after the service started were not found for a restore
+  until the next start. The app index is now rebuilt when an application
+  directory changes.
+- A launch that failed at once (for example a failing `systemd-run`) was
+  counted as started, and the restore waited 30 s for a window. The failure
+  is now reported with the program's own error, and a failing `systemd-run`
+  wrapper falls back to starting the app directly.
+- When two desktop entries claimed the same window class (Chrome ships
+  `google-chrome.desktop` and `com.google.Chrome.desktop`), which one a window
+  resolved to depended on hash order, so a restore could launch a different
+  entry. The user's own entries win, then the entry named after the class.
+- The shortcut dialog clipped the grid under a two-line message.
 - Test harnesses: the nested X11 desktop leaked D-Bus-activated host services
   and FUSE mounts, and `xdotool --sync` could hang forever. Both are fixed.
 
@@ -85,6 +139,9 @@ desktops only. See PLATFORM_MATRIX.md.
 - Not validated on real logins, real logout/reboot, mixed DPI, monitor hot-plug,
   the tray, Plasma X11, or GNOME 45/47/48.
 - COSMIC: no window control (platform limitation).
+- Google Chrome and Chromium incognito windows cannot be detected (no marker
+  in the title or the window properties) and are recorded in snapshots like
+  normal windows. Firefox private windows are left out.
 - Fractile cannot restore application contents.
 - If the service is stopped within milliseconds of starting at a new login,
   before the login flow has picked a snapshot, the next login may find no

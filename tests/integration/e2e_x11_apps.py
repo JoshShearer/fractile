@@ -34,6 +34,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "integration"))
 from e2e_x11 import Env, check, rect_eq, results  # noqa: E402
 
+KNOWN: list = []  # known limitations observed, reported in the evidence
+
 def page(base: Path, title: str) -> str:
     """A local page with a known title (browsers block top-level data: URLs)."""
     f = base / "pages" / (title.replace(" ", "-") + ".html")
@@ -78,6 +80,7 @@ def firefox_spec(base: Path) -> dict:
         "exec": " ".join(argv) + " %u",
         "first": argv + ["--new-window", page(base, "T14 Alpha")],
         "second": argv + ["--new-window", page(base, "T14 Beta")],
+        "private": argv + ["--private-window", page(base, "T14 Secret")],
         "titles": ["T14 Alpha", "T14 Beta"],
         "match": lambda w: (w.get("wm_class") or "").lower() == "firefox" or (w.get("app_id") or "").lower() == "firefox",
     }
@@ -96,6 +99,8 @@ def chrome_spec(base: Path) -> dict:
         "exec": " ".join(argv) + " %U",
         "first": argv + ["--new-window", page(base, "T14 Gamma")],
         "second": argv + ["--new-window", page(base, "T14 Delta")],
+        "private": argv + ["--incognito", page(base, "T14 Secret")],
+        "private_detectable": False,
         "titles": ["T14 Gamma", "T14 Delta"],
         "match": lambda w: (w.get("wm_class") or "").lower() == "google-chrome",
     }
@@ -232,6 +237,25 @@ def run_app(e: Env, key: str, n: int) -> None:
     time.sleep(3)
     check(f"{tid}d", f"{spec['name']}: restoring again launches nothing and opens nothing new",
           rep2["report"]["launches"] == 0 and len(mine()) == 2, f"launches={rep2['report']['launches']} windows={len(mine())}")
+    if spec.get("private"):
+        # RS-20: a real private / incognito window is left out of snapshots.
+        p3 = subprocess.Popen(spec["private"], env=e.env, stdout=subprocess.DEVNULL, stderr=open(e.base / f"{key}.log", "a"))
+        e.procs.append(p3)
+        priv = e.wait_for(lambda: titled("T14 Secret"), 30.0, 0.5)
+        e.cli_json("save", "--name", f"t14-{key}-private")
+        snap = e.cli_json("snapshot", "export", f"t14-{key}-private")
+        recs = [r for r in snap["windows"] if r.get("desktop_file_id") == spec["desktop"]]
+        hints = [r.get("title_hint") for r in recs]
+        left_out = bool(priv) and len(mine()) == 3 and len(recs) == 2 and not any("Secret" in (h or "") for h in hints)
+        detail = f"private window title {(priv or {}).get('title')!r}; open {len(mine())}; recorded {len(recs)}"
+        if spec.get("private_detectable", True):
+            check(f"{tid}e", f"{spec['name']}: a private window is left out of the snapshot; the two normal windows are recorded", left_out, detail)
+        else:
+            # Documented limitation (docs/user-guide/README.md, "Private windows"): nothing in the
+            # title or the X11 properties marks this app's private windows, so
+            # Fractile records them like normal windows. Reported, not passed.
+            KNOWN.append({"id": f"{tid}e", "name": f"{spec['name']}: private windows cannot be detected and are recorded", "left_out": left_out, "detail": detail})
+            print(f"KNOWN {tid}e {spec['name']}: private window not detectable :: {detail}")
     for pid in app_pids(e, EXE[key]):
         try:
             os.kill(pid, signal.SIGTERM)
@@ -285,7 +309,7 @@ def main() -> int:
             subprocess.run(["bash", str(nested), "stop", str(a.display)])
     gs = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout.strip()
     ev = {"suite": "e2e-x11-apps", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-          "environment": f"Xephyr nested {gs} (X11); throwaway profiles; {versions}", "results": results}
+          "environment": f"Xephyr nested {gs} (X11); throwaway profiles; {versions}", "results": results, "known_limitations": KNOWN}
     Path(a.evidence).write_text(json.dumps(ev, indent=2) + "\n")
     failed = [r for r in results if not r["ok"]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed; evidence: {a.evidence}")

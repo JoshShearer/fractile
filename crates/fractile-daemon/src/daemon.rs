@@ -252,7 +252,19 @@ impl Daemon {
         if let Some(l) = self.learned_limits.lock().unwrap().get(wid) {
             limits = limits.merged(l);
         }
+        // The work area the request was made for (the monitor holding its
+        // center). A window grown to its minimum size is kept inside it.
+        let (cx, cy) = rect.center();
+        let area = || self.outputs().ok().and_then(|os| os.iter().find(|o| o.work_area.contains_point(cx, cy)).map(|o| o.work_area));
+        let keep_on_monitor = |c: &mut fractile_core::geometry::ConstrainedRect| {
+            if c.adjusted {
+                if let Some(wa) = area() {
+                    c.rect = fractile_core::geometry::shift_into(c.rect, wa);
+                }
+            }
+        };
         let mut c = apply_constraints(rect, &limits, policy).map_err(|e| err("constraints", e))?;
+        keep_on_monitor(&mut c);
         if record_undo {
             let mut u = self.undo.lock().unwrap();
             u.push(UndoEntry { window_id: wid.into(), frame: w.frame, state: w.state });
@@ -263,11 +275,59 @@ impl Daemon {
             }
         }
         let mut out = self.adapter().move_resize(wid, c.rect).map_err(|e| err("adapter", e.to_string()))?;
+        // Moving to a monitor with another scale: the compositor may report a
+        // transiently rescaled frame (or one left on the old monitor) while
+        // the client switches its buffer scale. Ask once more, and never
+        // learn a size limit from such an observation.
+        let outs = self.outputs().unwrap_or_default();
+        let on = |x: i32, y: i32| outs.iter().find(|o| o.rect.contains_point(x, y));
+        let (fx, fy) = w.frame.center();
+        let crossing = match (on(fx, fy), on(cx, cy)) {
+            (Some(src), Some(dst)) if src.stable_id != dst.stable_id && src.scale > 0.0 => Some((dst.scale / src.scale, dst.work_area)),
+            _ => None,
+        };
+        let tol = cfg.placement.tolerance_px;
+        let transient = |o: &PlacementOutcome| {
+            !o.within_tolerance
+                && crossing.is_some_and(|(ratio, wa)| o.observed.is_some_and(|ob| fractile_core::geometry::scale_transient(c.rect, ob, ratio, wa, tol)))
+        };
+        // Up to two re-requests; the second after a short pause, by which
+        // time the client has finished switching its buffer scale.
+        for pause_ms in [0u64, 250] {
+            if !transient(&out) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(pause_ms));
+            let attempts = out.attempts;
+            out = self.adapter().move_resize(wid, c.rect).map_err(|e| err("adapter", e.to_string()))?;
+            out.attempts += attempts;
+        }
+        let learnable = !transient(&out);
+        // A learned minimum the window has now undercut was wrong: drop it.
+        if learnable {
+            if let Some(ob) = out.observed {
+                let mut m = self.learned_limits.lock().unwrap();
+                if let Some(l) = m.get(wid).copied() {
+                    match fractile_core::geometry::relax_learned(&l, ob, tol) {
+                        Some(r) if r != l => {
+                            m.insert(wid.to_string(), r);
+                        }
+                        None => {
+                            m.remove(wid);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
         // A size limit the adapter could not report shows up as a window
         // larger than requested; compositors may then also skip the move.
         // Learn it and apply the configured constraint policy once more.
-        if !out.within_tolerance {
-            if let Some(l) = out.observed.and_then(|o| learn_min_size(c.rect, o, cfg.placement.tolerance_px)) {
+        if !out.within_tolerance && learnable {
+            // When the compositor also skipped the move, any growth is the
+            // window's limit, even one within the size tolerance.
+            let learn_tol = |o: Rect| if (o.x - c.rect.x).abs() > tol || (o.y - c.rect.y).abs() > tol { 0 } else { tol };
+            if let Some(l) = out.observed.and_then(|o| learn_min_size(c.rect, o, learn_tol(o))) {
                 limits = limits.merged(&l);
                 {
                     let mut m = self.learned_limits.lock().unwrap();
@@ -276,7 +336,10 @@ impl Daemon {
                     }
                     m.insert(wid.to_string(), limits);
                 }
-                match apply_constraints(rect, &limits, policy) {
+                match apply_constraints(rect, &limits, policy).map(|mut c2| {
+                    keep_on_monitor(&mut c2);
+                    c2
+                }) {
                     Ok(c2) if c2.rect != c.rect => {
                         let attempts = out.attempts;
                         out = self.adapter().move_resize(wid, c2.rect).map_err(|e| err("adapter", e.to_string()))?;

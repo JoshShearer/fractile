@@ -16,6 +16,17 @@ rc=0
 for s in "$@"; do
   n=$(basename "$s" .py | tr _ -)
   echo "== $n"
-  python3 "/src/$s" --evidence "/evidence/$n-gnome$major.json" || rc=1
+  if [ -d /keep ]; then
+    # FRACTILE_KEEP_DIR on the host: keep the service and shell logs.
+    python3 "/src/$s" --keep --evidence "/evidence/$n-gnome$major.json" || rc=1
+    for d in /tmp/fractile-*e2e-*; do
+      [ -d "$d" ] || continue
+      mkdir -p "/keep/$n-gnome$major"
+      find "$d" -maxdepth 2 -type f \( -name '*.out' -o -name '*.log' \) -exec cp {} "/keep/$n-gnome$major/" \;
+      rm -rf "$d"
+    done
+  else
+    python3 "/src/$s" --evidence "/evidence/$n-gnome$major.json" || rc=1
+  fi
 done
 exit $rc

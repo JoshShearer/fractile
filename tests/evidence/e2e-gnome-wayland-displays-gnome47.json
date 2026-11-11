@@ -1,0 +1,67 @@
+{
+  "suite": "e2e-gnome-wayland-displays",
+  "when": "2026-11-11T12:34:54+0000",
+  "environment": "headless GNOME Shell 47.10 --wayland --no-x11, virtual monitors 1600x1200,1280x1024, changed at runtime through Mutter DisplayConfig (scale 2+1, disable/enable); Fractile extension fractile@fractile.io",
+  "results": [
+    {
+      "id": "D00",
+      "name": "two monitors and two windows are up",
+      "ok": true,
+      "detail": "['mon-MetaVendor-MetaVirtualMonitor-0x00', 'mon-MetaVendor-MetaVirtualMonitor-0x01']"
+    },
+    {
+      "id": "D01",
+      "name": "monitor scale changed at runtime to 2 and 1: Fractile reports both scales, same stable ids",
+      "ok": true,
+      "detail": "Mutter layout mode logical; mon-MetaVendor-MetaVirtualMonitor-0x00 scale 2.0 rect {'h': 600, 'w': 800, 'x': 0, 'y': 0} work {'h': 568, 'w': 800, 'x': 0, 'y': 32}; mon-MetaVendor-MetaVirtualMonitor-0x01 scale 1.0 rect {'h': 1024, 'w': 1280, 'x': 800, 'y': 0} work {'h': 992, 'w': 1280, 'x': 800, 'y': 32}"
+    },
+    {
+      "id": "D02",
+      "name": "100 placements alternating a scale-2 and a scale-1 monitor: each exact (or fitted to the window minimum and reported), no drift, service alive",
+      "ok": true,
+      "detail": "13 fitted to the window minimum"
+    },
+    {
+      "id": "D03",
+      "name": "snapshot restore across the scale-2 and scale-1 monitors puts both windows back exactly",
+      "ok": true,
+      "detail": "{'h': 568, 'w': 400, 'x': 0, 'y': 32} {'h': 1024, 'w': 640, 'x': 1440, 'y': 0} want {'h': 568, 'w': 400, 'x': 0, 'y': 32} {'h': 1024, 'w': 640, 'x': 1440, 'y': 0}"
+    },
+    {
+      "id": "D04",
+      "name": "second monitor disconnected: Fractile sees one monitor, and the window from it is now on the remaining one",
+      "ok": true,
+      "detail": "outputs ['mon-MetaVendor-MetaVirtualMonitor-0x00']; window {'h': 512, 'w': 640, 'x': 960, 'y': 688}"
+    },
+    {
+      "id": "D05",
+      "name": "restoring a two-monitor snapshot with one monitor: the missing monitor's window goes to the remaining one at the same relative position",
+      "ok": true,
+      "detail": "warning: monitor mon-MetaVendor-MetaVirtualMonitor-0x01 not present; its windows go to mon-MetaVendor-MetaVirtualMonitor-0x00 (NearestFallback); window {'h': 584, 'w': 800, 'x': 800, 'y': 32} want {'x': 800, 'y': 32, 'w': 800, 'h': 584}; state completed"
+    },
+    {
+      "id": "D06",
+      "name": "the layout the two-monitor setup had is kept as a 'monitor setup' snapshot when the monitor goes",
+      "ok": true,
+      "detail": "1 matching topology snapshots"
+    },
+    {
+      "id": "D07",
+      "name": "monitor reconnected (return enabled): same stable id, and both windows go back to where they were on the two-monitor setup",
+      "ok": true,
+      "detail": "outputs ['mon-MetaVendor-MetaVirtualMonitor-0x00', 'mon-MetaVendor-MetaVirtualMonitor-0x01']; g {'h': 512, 'w': 640, 'x': 2240, 'y': 512} want {'h': 512, 'w': 640, 'x': 2240, 'y': 512}; q {'h': 1168, 'w': 800, 'x': 0, 'y': 32} want {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "D08",
+      "name": "with the return turned off (the default), reconnecting the monitor moves no window",
+      "ok": true,
+      "detail": "{'h': 584, 'w': 800, 'x': 400, 'y': 324} want {'h': 584, 'w': 800, 'x': 400, 'y': 324}"
+    },
+    {
+      "id": "D09",
+      "name": "service alive through all monitor changes; no UI errors",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

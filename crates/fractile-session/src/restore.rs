@@ -770,11 +770,13 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 let i = waiting[k];
                 let Some(wid) = win else { continue };
                 // Wait for first stable geometry after map (bounded).
+                // A 0x0 frame means the compositor has not placed the window
+                // yet; it is not a stable geometry to place over.
                 let mut prev = host.window(&wid).ok().map(|w| w.frame);
                 for _ in 0..8 {
                     std::thread::sleep(Duration::from_millis(60));
                     let cur = host.window(&wid).ok().map(|w| w.frame);
-                    if cur == prev {
+                    if cur == prev && cur.is_some_and(|f| f.w > 0 && f.h > 0) {
                         break;
                     }
                     prev = cur;

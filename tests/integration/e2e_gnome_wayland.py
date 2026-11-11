@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -496,7 +497,10 @@ def run_all(e: Env) -> None:
     check("W24", "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
           alive and still, f"shell alive={alive} attached={still}; errors reported: {crashes[:3]}")
 
-    tb = [l for l in (e.ui_log.read_text().splitlines() if e.ui_log.exists() else []) if "Traceback" in l or "Error" in l and "qt.qpa" not in l]
+    # Python errors: tracebacks and exception lines. Not GLib warnings that
+    # quote a D-Bus error name (no accessibility bus in a container).
+    pyerr = re.compile(r"^\s*(Traceback|[A-Za-z_][\w.]*(Error|Exception)\b)")
+    tb = [l for l in (e.ui_log.read_text().splitlines() if e.ui_log.exists() else []) if pyerr.match(l)]
     check("W18", "UI logged no Python errors during the run", not tb, "; ".join(tb[:3]))
     log = (e.shell_state / "shell.log").read_text(errors="replace")
     js = [l for l in log.splitlines() if "fractile" in l.lower() and ("error" in l.lower() or "exception" in l.lower())]
