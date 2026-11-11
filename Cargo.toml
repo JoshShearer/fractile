@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/fractile-daemon",
+    "crates/fractile-cli",
     "crates/fractile-core",
     "adapters/x11",
     "crates/fractile-ipc",

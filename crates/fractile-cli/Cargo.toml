@@ -1,0 +1,15 @@
+[package]
+name = "fractile-cli"
+description = "Command-line control for Fractile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "fractile"
+path = "src/main.rs"
+
+[dependencies]
+fractile-core.workspace = true
+fractile-ipc.workspace = true
+serde_json.workspace = true

@@ -5,7 +5,7 @@
 use fractile_core::adapter::{Capabilities, Operation, PlacementOutcome};
 use fractile_core::config::Config;
 use fractile_core::geometry::{norm_rect_to_rect, NormRect, Rect, Spacing};
-use fractile_core::identity::{assign, score, APP_MATCH_THRESHOLD};
+use fractile_core::identity::{assign, match_threshold, score};
 use fractile_core::layout::{ApplyMode, Layout};
 use fractile_core::output::{map_outputs, Output, OutputMapping};
 use fractile_core::rules::{OutputSel, Placement};
@@ -140,6 +140,9 @@ pub struct ItemResult {
     pub requested: Option<Rect>,
     pub observed: Option<Rect>,
     pub launched: bool,
+    /// Skipped because the user excluded or deselected it.
+    #[serde(default)]
+    pub excluded: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,7 +169,7 @@ impl RunReport {
         c.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join(" ")
     }
     pub fn all_success(&self) -> bool {
-        self.items.iter().all(|i| i.status.is_success() || i.status == ItemStatus::Skipped)
+        self.items.iter().all(|i| i.status.is_success() || i.excluded)
     }
 }
 
@@ -306,7 +309,13 @@ pub fn targets_from_layout(l: &Layout, mode: ApplyMode, outputs: &[Output], cfg:
             let app = launch.and_then(|l| cfg.apps.get(&l.desktop_id));
             let policy = match mode {
                 ApplyMode::PositionExisting => LaunchPolicy::Never,
-                _ => launch.map(|l| app.map(|a| a.launch).filter(|p| *p != LaunchPolicy::Never).unwrap_or(l.policy)).unwrap_or(LaunchPolicy::Never),
+                // The user's per-app policy always wins; `Never` is a hard deny.
+                _ => match (launch, app.map(|a| a.launch)) {
+                    (None, _) => LaunchPolicy::Never,
+                    (Some(_), Some(LaunchPolicy::Never)) => LaunchPolicy::Never,
+                    (Some(_), Some(p)) => p,
+                    (Some(l), None) => l.policy,
+                },
             };
             out.push(Target {
                 record: rec,
@@ -404,7 +413,7 @@ fn launch_decision(t: &Target, windows: &[WindowInfo], host: &dyn RestoreHost, o
     // confirmation rather than risking a duplicate process.
     let weak = windows.iter().any(|w| {
         let (s, _) = score(&t.record, w);
-        s > 0 && s < APP_MATCH_THRESHOLD && w.is_placeable()
+        s > 0 && s < match_threshold(&t.record) && w.is_placeable()
     });
     let approved = opts.approve_all || opts.approved.contains(d);
     if !opts.launch_enabled {
@@ -475,7 +484,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
     let emit = |live: &Vec<Live>, i: usize, phase: &str| {
         let t = &p.targets[i];
         let l = &live[i];
-        let r = ItemResult { record_id: t.record.record_id.clone(), label: t.label.clone(), status: l.status, window_id: l.window.clone(), message: l.message.clone(), requested: l.requested, observed: l.observed, launched: l.launched };
+        let r = ItemResult { record_id: t.record.record_id.clone(), label: t.label.clone(), status: l.status, window_id: l.window.clone(), message: l.message.clone(), requested: l.requested, observed: l.observed, launched: l.launched, excluded: p.items.get(i).map(|it| it.action == PlannedAction::Excluded).unwrap_or(false) };
         host.persist(&opts.run_id, &r);
         let done = live.iter().filter(|x| x.status.is_terminal()).count();
         host.progress(&Progress { run_id: opts.run_id.clone(), done, total, item: Some(r), phase: phase.into() });
@@ -849,7 +858,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
         .map(|i| {
             let t = &p.targets[i];
             let l = &live[i];
-            ItemResult { record_id: t.record.record_id.clone(), label: t.label.clone(), status: if l.status == ItemStatus::Pending { ItemStatus::Skipped } else { l.status }, window_id: l.window.clone(), message: l.message.clone(), requested: l.requested, observed: l.observed, launched: l.launched }
+            ItemResult { record_id: t.record.record_id.clone(), label: t.label.clone(), status: if l.status == ItemStatus::Pending { ItemStatus::Skipped } else { l.status }, window_id: l.window.clone(), message: l.message.clone(), requested: l.requested, observed: l.observed, launched: l.launched, excluded: p.items.get(i).map(|it| it.action == PlannedAction::Excluded).unwrap_or(false) }
         })
         .collect();
     RunReport { run_id: opts.run_id.clone(), items, cancelled: cancel.load(Ordering::SeqCst), timed_out, launches: launches_total, duration_ms: start.elapsed().as_millis() as u64, warnings }

@@ -205,10 +205,24 @@ impl Snapshot {
             Ok(())
         };
         check("name", &self.name)?;
+        for (label, v) in [("snapshot_id", &self.snapshot_id), ("desktop", &self.desktop), ("compositor", &self.compositor), ("session_type", &self.session_type)] {
+            check(label, &Some(v.clone()))?;
+        }
+        check("active_workspace", &self.active_workspace)?;
+        if self.diagnostics.len() > 100 || self.diagnostics.iter().any(|d| d.len() > MAX_STRING) {
+            return Err("diagnostics too large".into());
+        }
+        for ws in &self.workspaces {
+            check("workspace id", &Some(ws.id.clone()))?;
+            check("workspace name", &Some(ws.name.clone()))?;
+        }
         for o in &self.outputs {
-            if o.stable_id.is_empty() || o.stable_id.len() > MAX_STRING {
+            if o.stable_id.is_empty() {
                 return Err("invalid output id".into());
             }
+            check("output id", &Some(o.stable_id.clone()))?;
+            check("output name", &Some(o.name.clone()))?;
+            check("output description", &o.description)?;
             if o.rect.w <= 0 || o.rect.h <= 0 || o.rect.w > 100_000 || o.rect.h > 100_000 {
                 return Err(format!("invalid output geometry for {}", o.stable_id));
             }
@@ -220,6 +234,16 @@ impl Snapshot {
             check("role", &w.role)?;
             check("title_hint", &w.title_hint)?;
             check("executable", &w.executable)?;
+            check("record_id", &Some(w.record_id.clone()))?;
+            check("wm_class_instance", &w.wm_class_instance)?;
+            check("sandbox", &w.sandbox)?;
+            check("window_group", &w.window_group)?;
+            check("output_stable_id", &w.output_stable_id)?;
+            check("workspace_id", &w.workspace_id)?;
+            check("placement_rule", &w.placement_rule)?;
+            if w.diagnostics.len() > 32 || w.diagnostics.iter().any(|d| d.len() > MAX_STRING || d.chars().any(|c| c.is_control())) {
+                return Err(format!("diagnostics too large in record {}", w.record_id));
+            }
             if let Some(d) = &w.desktop_file_id {
                 if !is_safe_desktop_id(d) {
                     return Err(format!("unsafe desktop_file_id '{d}'"));

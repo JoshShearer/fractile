@@ -10,6 +10,24 @@ use std::collections::{BTreeMap, HashSet};
 /// Minimum score for a window to be considered the same application.
 pub const APP_MATCH_THRESHOLD: u32 = 40;
 
+/// Threshold for one record, based on the evidence it carries. A record with
+/// a desktop id or app id must match one of them (score >= 40). A record that
+/// only has WM_CLASS (no desktop file could be identified at capture) can at
+/// best match class + instance; that is the strongest evidence available, so
+/// it is accepted, but never class alone when an instance was recorded.
+pub fn match_threshold(target: &WindowRecord) -> u32 {
+    let has = |o: &Option<String>| o.as_deref().map(|s| !s.is_empty()).unwrap_or(false);
+    if has(&target.desktop_file_id) || has(&target.app_id) {
+        APP_MATCH_THRESHOLD
+    } else if has(&target.wm_class) && has(&target.wm_class_instance) {
+        25
+    } else if has(&target.wm_class) || has(&target.wm_class_instance) {
+        20
+    } else {
+        u32::MAX
+    }
+}
+
 fn eq_ci(a: &Option<String>, b: &Option<String>) -> bool {
     match (a, b) {
         (Some(x), Some(y)) => !x.is_empty() && x.eq_ignore_ascii_case(y),
@@ -115,7 +133,7 @@ pub fn assign(targets: &[WindowRecord], windows: &[WindowInfo], already_claimed:
                 continue;
             }
             let (sc, _) = score(t, w);
-            if sc < APP_MATCH_THRESHOLD {
+            if sc < match_threshold(t) {
                 continue;
             }
             let title = match &t.title_hint {

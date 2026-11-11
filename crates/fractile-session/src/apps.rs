@@ -74,6 +74,14 @@ impl AppIndex {
         self.entries.get(id).or_else(|| self.entries.get(&format!("{id}.desktop")))
     }
 
+    /// Program name of an entry's Exec line (lowercased basename).
+    pub fn exec_name_of(&self, id: &str) -> Option<String> {
+        let e = self.entries.get(id)?;
+        let argv = fractile_core::desktop::exec_to_argv(e.exec.as_deref()?, &e.name, None).ok()?;
+        let prog = argv.iter().find(|a| !a.contains('=') && *a != "env").cloned().or_else(|| argv.first().cloned())?;
+        Path::new(&prog).file_name().map(|n| n.to_string_lossy().to_lowercase())
+    }
+
     fn find_ci(&self, stem: &str) -> Option<String> {
         let want = format!("{}.desktop", stem.to_lowercase());
         if self.entries.contains_key(&format!("{stem}.desktop")) {
@@ -83,88 +91,109 @@ impl AppIndex {
     }
 
     /// Fill desktop_file_id / executable / sandbox on a window.
-    /// Evidence order (most to least deterministic):
-    /// 1. systemd scope of the process (app-<launcher>-<id>-N.scope)
-    /// 2. GIO_LAUNCHED_DESKTOP_FILE / BAMF_DESKTOP_FILE_HINT in the process env
-    /// 3. flatpak / snap sandbox app id
-    /// 4. app id (_GTK_APPLICATION_ID / Wayland app_id) == desktop id
-    /// 5. StartupWMClass == WM_CLASS
-    /// 6. desktop id == WM_CLASS (class or instance)
-    /// 7. Exec program name == executable name
+    /// Evidence order (most to least specific to *this* window):
+    /// 1. the window's own claims: app id (_GTK_APPLICATION_ID / Wayland
+    ///    app_id) == desktop id, StartupWMClass == WM_CLASS, desktop id == WM_CLASS
+    /// 2. systemd scope of the process (app-<launcher>-<id>-N.scope)
+    /// 3. GIO_LAUNCHED_DESKTOP_FILE, only when GIO_LAUNCHED_DESKTOP_FILE_PID is
+    ///    this very process (the variable is inherited by children)
+    /// 4. Exec program name == executable name, never for interpreters or
+    ///    generic launchers (python3, sh, env, java, ...)
+    /// Process-derived evidence (2-4) can be inherited from a parent such as a
+    /// terminal, which is why the window's own claims win.
     pub fn enrich(&self, w: &mut WindowInfo) {
-        if let Some(pid) = w.pid {
-            let proc_dir = PathBuf::from(format!("/proc/{pid}"));
+        let proc_dir = w.pid.map(|pid| PathBuf::from(format!("/proc/{pid}")));
+        let mut unit: Option<String> = None;
+        if let Some(pd) = &proc_dir {
             if w.executable.is_none() {
-                w.executable = std::fs::read_link(proc_dir.join("exe")).ok().map(|p| p.to_string_lossy().to_string());
+                w.executable = std::fs::read_link(pd.join("exe")).ok().map(|p| p.to_string_lossy().to_string());
             }
-            if let Ok(cg) = std::fs::read_to_string(proc_dir.join("cgroup")) {
-                let unit = cg.lines().filter_map(|l| l.rsplit('/').next()).find(|u| u.starts_with("app-")).map(|s| s.to_string());
-                if let Some(unit) = unit {
-                    if unit.starts_with("app-flatpak-") {
+            if let Ok(cg) = std::fs::read_to_string(pd.join("cgroup")) {
+                unit = cg.lines().filter_map(|l| l.rsplit('/').next()).find(|u| u.starts_with("app-") || u.starts_with("snap.")).map(|s| s.to_string());
+                if let Some(u) = &unit {
+                    if u.starts_with("app-flatpak-") {
                         w.sandbox = Some("flatpak".into());
-                    } else if unit.starts_with("snap.") || unit.contains("snap-") {
+                    } else if u.starts_with("snap.") || u.contains("-snap.") {
                         w.sandbox = Some("snap".into());
                     }
-                    if w.desktop_file_id.is_none() {
-                        for cand in app_ids_from_systemd_unit(&unit) {
-                            if let Some(id) = self.find_ci(&cand) {
-                                w.desktop_file_id = Some(id);
-                                w.desktop_file_source = Some("systemd-scope".into());
-                                break;
-                            }
-                        }
-                    }
                 }
             }
-            if w.desktop_file_id.is_none() {
-                if let Ok(env) = std::fs::read(proc_dir.join("environ")) {
-                    for kv in env.split(|b| *b == 0) {
-                        let s = String::from_utf8_lossy(kv);
-                        for key in ["GIO_LAUNCHED_DESKTOP_FILE=", "BAMF_DESKTOP_FILE_HINT="] {
-                            if let Some(path) = s.strip_prefix(key) {
-                                let p = Path::new(path);
-                                if let Some(name) = p.file_name() {
-                                    let id = name.to_string_lossy().to_string();
-                                    if self.entries.contains_key(&id) {
-                                        w.desktop_file_id = Some(id);
-                                        w.desktop_file_source = Some("launch-env".into());
-                                    }
-                                }
-                            }
-                        }
-                        if w.desktop_file_id.is_some() {
-                            break;
-                        }
-                    }
-                }
-            }
-            if w.sandbox.is_none() && proc_dir.join("root/.flatpak-info").exists() {
+            if w.sandbox.is_none() && pd.join("root/.flatpak-info").exists() {
                 w.sandbox = Some("flatpak".into());
             }
         }
         if w.desktop_file_id.is_some() {
             return;
         }
-        let mut set = |id: Option<String>, src: &str| {
-            if w.desktop_file_id.is_none() {
+        let mut found: Option<(String, &str)> = None;
+        let mut try_set = |id: Option<String>, src: &'static str| {
+            if found.is_none() {
                 if let Some(id) = id {
-                    w.desktop_file_id = Some(id);
-                    w.desktop_file_source = Some(src.into());
+                    found = Some((id, src));
                 }
             }
         };
-        set(w.app_id.as_deref().and_then(|a| self.find_ci(a)), "app-id");
-        if let Some(c) = w.wm_class.clone() {
-            set(self.by_wm_class.get(&c.to_lowercase()).cloned(), "startup-wm-class");
+        try_set(w.app_id.as_deref().and_then(|a| self.find_ci(a)), "app-id");
+        try_set(w.wm_class.as_deref().and_then(|c| self.by_wm_class.get(&c.to_lowercase()).cloned()), "startup-wm-class");
+        try_set(w.wm_class_instance.as_deref().and_then(|c| self.by_wm_class.get(&c.to_lowercase()).cloned()), "startup-wm-class");
+        try_set(w.wm_class.as_deref().and_then(|c| self.find_ci(c)), "wm-class-name");
+        try_set(w.wm_class_instance.as_deref().and_then(|c| self.find_ci(c)), "wm-class-name");
+        if let Some(u) = &unit {
+            // A scope is inherited by every child (e.g. apps started from a
+            // terminal). Accept it only when the process plausibly *is* the
+            // scope's app: sandboxed, same program, or the window has no
+            // class of its own.
+            let exe = w.executable.as_deref().and_then(|e| Path::new(e).file_name()).map(|n| n.to_string_lossy().to_lowercase());
+            let cand = app_ids_from_systemd_unit(u).iter().find_map(|c| self.find_ci(c));
+            let consistent = |id: &String| {
+                w.sandbox.is_some()
+                    || (w.wm_class.is_none() && w.app_id.is_none())
+                    || match (self.exec_name_of(id), &exe) {
+                        (Some(prog), Some(exe)) => &prog == exe || is_generic_program(&prog),
+                        _ => true,
+                    }
+            };
+            try_set(cand.filter(consistent), "systemd-scope");
         }
-        if let Some(c) = w.wm_class_instance.clone() {
-            set(self.by_wm_class.get(&c.to_lowercase()).cloned(), "startup-wm-class");
+        if let (Some(pd), Some(pid)) = (&proc_dir, w.pid) {
+            try_set(launched_desktop_file(pd, pid).filter(|id| self.entries.contains_key(id)), "launch-env");
         }
-        set(w.wm_class.as_deref().and_then(|c| self.find_ci(c)), "wm-class-name");
-        set(w.wm_class_instance.as_deref().and_then(|c| self.find_ci(c)), "wm-class-name");
         let exe_name = w.executable.as_deref().and_then(|e| Path::new(e).file_name()).map(|n| n.to_string_lossy().to_lowercase());
-        set(exe_name.and_then(|n| self.by_exec_name.get(&n).cloned()), "exec-name");
+        if let Some(n) = exe_name.filter(|n| !is_generic_program(n)) {
+            try_set(self.by_exec_name.get(&n).cloned(), "exec-name");
+        }
+        if let Some((id, src)) = found {
+            w.desktop_file_id = Some(id);
+            w.desktop_file_source = Some(src.into());
+        }
     }
+}
+
+/// GIO_LAUNCHED_DESKTOP_FILE, trusted only for the process GIO launched.
+fn launched_desktop_file(proc_dir: &Path, pid: u32) -> Option<String> {
+    let env = std::fs::read(proc_dir.join("environ")).ok()?;
+    let mut file = None;
+    let mut fpid = None;
+    for kv in env.split(|b| *b == 0) {
+        let s = String::from_utf8_lossy(kv);
+        if let Some(v) = s.strip_prefix("GIO_LAUNCHED_DESKTOP_FILE=") {
+            file = Path::new(v).file_name().map(|n| n.to_string_lossy().to_string());
+        } else if let Some(v) = s.strip_prefix("GIO_LAUNCHED_DESKTOP_FILE_PID=") {
+            fpid = v.trim().parse::<u32>().ok();
+        }
+    }
+    if fpid == Some(pid) {
+        file
+    } else {
+        None
+    }
+}
+
+/// Programs that run many unrelated applications; their name says nothing
+/// about which app a window belongs to.
+pub fn is_generic_program(name: &str) -> bool {
+    let base = name.trim_end_matches(|c: char| c.is_ascii_digit() || c == '.');
+    matches!(base, "python" | "python3" | "pypy" | "pypy3" | "perl" | "ruby" | "node" | "nodejs" | "deno" | "bun" | "java" | "gjs" | "lua" | "luajit" | "php" | "sh" | "bash" | "dash" | "zsh" | "fish" | "env" | "mono" | "dotnet" | "wine" | "wine64" | "wine-preloader" | "wine64-preloader" | "electron" | "flatpak" | "bwrap" | "snap" | "steam" | "qemu-system-x86_64")
 }
 
 fn scan(base: &Path, dir: &Path, out: &mut HashMap<String, DesktopEntry>, depth: u32) {
@@ -222,6 +251,19 @@ mod tests {
         let mut w = WindowInfo { app_id: Some("org.example.editor".into()), ..Default::default() };
         idx.enrich(&mut w);
         assert_eq!(w.desktop_file_source.as_deref(), Some("app-id"));
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn interpreters_never_identify_an_app() {
+        let d = std::env::temp_dir().join(format!("fractile-apps-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("python3.12.desktop"), "[Desktop Entry]\nType=Application\nName=Python\nExec=/usr/bin/python3.12\nTerminal=true\n").unwrap();
+        let idx = AppIndex::build(&[d.clone()]);
+        let mut w = WindowInfo { app_id: Some("org.example.Unknown".into()), wm_class: Some("org.example.Unknown".into()), executable: Some("/usr/bin/python3.12".into()), ..Default::default() };
+        idx.enrich(&mut w);
+        assert_eq!(w.desktop_file_id, None, "python must not claim a python GUI app's window");
+        assert!(is_generic_program("python3.12") && is_generic_program("bash") && !is_generic_program("firefox"));
         std::fs::remove_dir_all(d).unwrap();
     }
 }
