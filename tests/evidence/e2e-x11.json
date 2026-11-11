@@ -1,0 +1,181 @@
+{
+  "suite": "e2e-x11",
+  "when": "2026-11-10T22:23:06-0600",
+  "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
+  "results": [
+    {
+      "id": "T01",
+      "name": "service starts unprivileged with X11 adapter and window control",
+      "ok": true,
+      "detail": "pid 530187"
+    },
+    {
+      "id": "SEC1",
+      "name": "IPC socket is 0600 in a 0700 dir",
+      "ok": true,
+      "detail": "sock 0o600 dir 0o700"
+    },
+    {
+      "id": "T02",
+      "name": "second instance exits without starting twice",
+      "ok": true,
+      "detail": "fractiled: already running"
+    },
+    {
+      "id": "SEC2",
+      "name": "IPC rejects requests before hello",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T03",
+      "name": "real GTK4 and Qt windows are listed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T04",
+      "name": "grid placements land on the requested rectangle (GTK4)",
+      "ok": true,
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+    },
+    {
+      "id": "T05",
+      "name": "grid placement on a Qt (server-side decorated) window",
+      "ok": true,
+      "detail": "err=0px"
+    },
+    {
+      "id": "T06",
+      "name": "1x1 selection fills the work area exactly (no panel overlap)",
+      "ok": true,
+      "detail": "{'h': 1168, 'w': 1534, 'x': 66, 'y': 32} vs work area {'h': 1168, 'w': 1534, 'x': 66, 'y': 32}"
+    },
+    {
+      "id": "T07",
+      "name": "undo restores the previous geometry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T08",
+      "name": "invalid selection exits 7",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T08b",
+      "name": "unknown window exits 5",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T09",
+      "name": "global shortcut places the focused window (real key event)",
+      "ok": true,
+      "detail": "52 ms incl. polling"
+    },
+    {
+      "id": "T10",
+      "name": "global undo shortcut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T11",
+      "name": "shortcut conflict detection reports Fractile's own binding",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T12",
+      "name": "dry run classifies open windows and changes nothing",
+      "ok": true,
+      "detail": "{'already_open': 2}"
+    },
+    {
+      "id": "T13",
+      "name": "restore puts existing windows back exactly",
+      "ok": true,
+      "detail": "1711 ms"
+    },
+    {
+      "id": "T14",
+      "name": "undo-restore returns to the pre-restore layout",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T15",
+      "name": "launchable test app identified by desktop id",
+      "ok": true,
+      "detail": "app-id"
+    },
+    {
+      "id": "T16",
+      "name": "missing app needs approval by default (no silent launch)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T17",
+      "name": "unapproved restore does not launch and exits 6 (partial)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T18",
+      "name": "approved restore launches the app and places it",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "id": "T19",
+      "name": "repeated restore never duplicates windows",
+      "ok": true,
+      "detail": "1 window(s), 0 launches"
+    },
+    {
+      "id": "SEC3",
+      "name": "imported snapshots cannot auto-launch (policies forced to ask)",
+      "ok": true,
+      "detail": "{'ask'}"
+    },
+    {
+      "id": "SEC4",
+      "name": "import rejects a path-like desktop id",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T20",
+      "name": "redacted logs contain no window titles",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T21",
+      "name": "daemon killed mid-restore: restart resumes, no duplicate launches",
+      "ok": true,
+      "detail": "1 Launchme window(s); last runs ['completed', 'completed', 'completed']"
+    },
+    {
+      "id": "T22",
+      "name": "orderly stop (logout) captures a snapshot",
+      "ok": true,
+      "detail": "8 -> 9"
+    },
+    {
+      "id": "T23",
+      "name": "corrupt config: service starts on defaults, reports it, keeps the file",
+      "ok": true,
+      "detail": "config parse error: TOML parse error at line 1, column 6\n  |"
+    },
+    {
+      "id": "T24",
+      "name": "unknown Wayland desktop reports unsupported (no fake support)",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

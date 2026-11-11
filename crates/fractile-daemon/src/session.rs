@@ -191,8 +191,12 @@ fn start_job(d: &Arc<Daemon>, src: Source, req: &RestoreRequest, source_label: &
     }
     let run_id = req.run_id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let (targets, recorded, opts, mut host) = build(d, &src, req, &run_id)?;
-    // Baseline before touching anything (for "undo restore").
-    if !matches!(src, Source::Snapshot(ref s) if s.mode == SnapshotMode::PreRestore) {
+    // Remember the user's approvals so a resumed run (after a crash) keeps them.
+    let _ = d.store.lock().unwrap().meta_set(&format!("run_req:{run_id}"), &serde_json::to_string(req).unwrap_or_default());
+    // Baseline before touching anything (for "undo restore"); a retry keeps
+    // the original run's baseline.
+    let has_baseline = d.store.lock().unwrap().meta_get(&format!("baseline:{run_id}")).ok().flatten().is_some();
+    if !has_baseline && !matches!(src, Source::Snapshot(ref s) if s.mode == SnapshotMode::PreRestore) {
         if let Ok(mut base) = capture_now(d, SnapshotMode::PreRestore, None) {
             base.diagnostics.push(format!("baseline for restore run {run_id}"));
             let _ = d.store.lock().unwrap().save_snapshot(&base, false);
@@ -474,7 +478,9 @@ pub fn login_flow(d: Arc<Daemon>) {
         if let Some(run) = runs.first() {
             info!(d.log, "resuming interrupted restore {run}");
             if wait_for_readiness(&d, Duration::from_secs(cfg.session.readiness_timeout_s)) {
-                if let Err(e) = retry_run(&d, run, &RestoreRequest { approve_all: false, ..Default::default() }, false) {
+                let saved = d.store.lock().unwrap().meta_get(&format!("run_req:{run}")).ok().flatten();
+                let req: RestoreRequest = saved.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+                if let Err(e) = retry_run(&d, run, &req, false) {
                     warn!(d.log, "resume failed: {}", e.message);
                 }
             }
