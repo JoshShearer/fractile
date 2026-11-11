@@ -12,7 +12,9 @@ url="https://example.invalid/fractile"
 license=('GPL-3.0-or-later')
 depends=('gcc-libs' 'glibc' 'python' 'python-pyqt6')
 makedepends=('cargo')
-optdepends=('libnotify: notifications when the desktop has no tray')
+optdepends=('libnotify: notifications when the desktop has no tray'
+            'gnome-shell: GNOME Wayland window control (extension shipped, enable per user)'
+            'kwin: KDE Plasma window control (KWin script shipped, enable per user)')
 # The bundled SQLite is C code; makepkg's -flto=auto would turn it into GCC
 # LTO objects that Rust's linker cannot read.
 options=('!lto')

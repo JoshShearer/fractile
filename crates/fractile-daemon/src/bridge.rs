@@ -145,7 +145,7 @@ impl BridgeAdapter {
             "gnome",
             vec!["gnome-shell"],
             "GNOME Shell",
-            "The Fractile GNOME Shell extension is not connected. Install it and run: gnome-extensions enable fractile@fractile.io (then log out and in once on Wayland).",
+            "The Fractile GNOME Shell extension is not connected. Enable it in the Extensions app or run: gnome-extensions enable fractile@fractile.io (on Wayland, log out and in once after installing).",
         )
     }
 
@@ -154,7 +154,7 @@ impl BridgeAdapter {
             "kwin",
             vec!["kwin_wayland", "kwin_x11"],
             "KWin",
-            "The Fractile KWin script is not connected. Install it with kpackagetool6 and enable it in System Settings > Window Management > KWin Scripts.",
+            "The Fractile KWin script is not connected. Enable \"Fractile\" in System Settings > Window Management > KWin Scripts.",
         )
     }
 

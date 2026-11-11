@@ -166,7 +166,7 @@ def main() -> int:
 def run_all(e: Env) -> None:
     e.start_daemon()
     st = e.cli_json("status")
-    check("T01", "service starts unprivileged with X11 adapter and window control", st["adapter"] == "x11" and st["window_control"] and os.getuid() != 0, f"pid {st['pid']}")
+    check("X01", "service starts unprivileged with X11 adapter and window control", st["adapter"] == "x11" and st["window_control"] and os.getuid() != 0, f"pid {st['pid']}")
 
     # socket permissions
     sock = Path(e.env["FRACTILE_RUNTIME_DIR"]) / "fractile.sock"
@@ -176,7 +176,7 @@ def run_all(e: Env) -> None:
 
     # second instance
     p = subprocess.run([str(BIN / "fractiled")], env=e.env, capture_output=True, text=True, timeout=10)
-    check("T02", "second instance exits without starting twice", p.returncode == 0 and "already running" in p.stderr, p.stderr.strip())
+    check("X02", "second instance exits without starting twice", p.returncode == 0 and "already running" in p.stderr, p.stderr.strip())
 
     # IPC requires hello
     import socket as _s
@@ -191,7 +191,7 @@ def run_all(e: Env) -> None:
     e.window("qt", "org.fractile.TestQt", "Qt window")
     gtk = e.wait_window(lambda w: w.get("app_id") == "org.fractile.TestGtk")
     qt = e.wait_window(lambda w: w.get("title") == "Qt window")
-    check("T03", "real GTK4 and Qt windows are listed", bool(gtk and qt))
+    check("X03", "real GTK4 and Qt windows are listed", bool(gtk and qt))
     if not (gtk and qt):
         return
     g, q = gtk["id"], qt["id"]
@@ -206,21 +206,21 @@ def run_all(e: Env) -> None:
         ok = out["within_tolerance"] and rect_eq(out["requested"], out["observed"], 2)
         ok_all &= ok
         detail.append(f"{grid}:{cells} err={out['max_error_px']}px")
-    check("T04", "grid placements land on the requested rectangle (GTK4)", ok_all, "; ".join(detail))
+    check("X04", "grid placements land on the requested rectangle (GTK4)", ok_all, "; ".join(detail))
     out = e.cli_json("place", "--grid", "6x6", "--cells", "3,0,5,2", "--window", q)
-    check("T05", "grid placement on a Qt (server-side decorated) window", out["within_tolerance"], f"err={out['max_error_px']}px")
+    check("X05", "grid placement on a Qt (server-side decorated) window", out["within_tolerance"], f"err={out['max_error_px']}px")
     full = e.cli_json("place", "--grid", "1x1", "--cells", "0,0,0,0", "--window", g)
-    check("T06", "1x1 selection fills the work area exactly (no panel overlap)", rect_eq(full["observed"], wa, 2), f"{full['observed']} vs work area {wa}")
+    check("X06", "1x1 selection fills the work area exactly (no panel overlap)", rect_eq(full["observed"], wa, 2), f"{full['observed']} vs work area {wa}")
 
     # snap + undo
     before = e.frame(g)
     e.cli_json("snap", "right-half", "--window", g)
     e.cli_json("undo")
-    check("T07", "undo restores the previous geometry", rect_eq(e.frame(g), before, 2))
+    check("X07", "undo restores the previous geometry", rect_eq(e.frame(g), before, 2))
 
     # error exit codes
-    check("T08", "invalid selection exits 7", e.run("place", "--grid", "6x6", "--cells", "0,0,9,9", "--window", g).returncode == 7)
-    check("T08b", "unknown window exits 5", e.run("place", "--grid", "6x6", "--cells", "0,0,1,1", "--window", "x11:0xdead").returncode == 5)
+    check("X08", "invalid selection exits 7", e.run("place", "--grid", "6x6", "--cells", "0,0,9,9", "--window", g).returncode == 7)
+    check("X08b", "unknown window exits 5", e.run("place", "--grid", "6x6", "--cells", "0,0,1,1", "--window", "x11:0xdead").returncode == 5)
 
     # global hotkeys through real X key events
     c = e.client()
@@ -244,12 +244,12 @@ def run_all(e: Env) -> None:
             placed = time.time() - t0
             break
         time.sleep(0.05)
-    check("T09", "global shortcut places the focused window (real key event)", placed is not None and not r["hotkey_errors"], f"{placed and round(placed * 1000)} ms incl. polling" if placed else f"frame {e.frame(g)} target {target}")
+    check("X09", "global shortcut places the focused window (real key event)", placed is not None and not r["hotkey_errors"], f"{placed and round(placed * 1000)} ms incl. polling" if placed else f"frame {e.frame(g)} target {target}")
     e.xdo("key", "ctrl+alt+z")
     time.sleep(1.0)
-    check("T10", "global undo shortcut", rect_eq(e.frame(g), before, 2))
+    check("X10", "global undo shortcut", rect_eq(e.frame(g), before, 2))
     chk = c.call("shortcut_check", {"accelerator": "Ctrl+Alt+1"})
-    check("T11", "shortcut conflict detection reports Fractile's own binding", chk["free"] is False and "Left third" in chk["reason"])
+    check("X11", "shortcut conflict detection reports Fractile's own binding", chk["free"] is False and "Left third" in chk["reason"])
 
     # snapshot / restore
     e.cli_json("place", "--grid", "2x2", "--cells", "0,0,0,1", "--window", g)
@@ -261,16 +261,16 @@ def run_all(e: Env) -> None:
     plan = e.cli_json("restore", "--dry-run", "--snapshot", "e2e")
     acts = sorted(i["action"] for i in plan["items"])
     moved_g = e.frame(g)
-    check("T12", "dry run classifies open windows and changes nothing", acts == ["already_open", "already_open"] and rect_eq(e.frame(g), moved_g), str(plan["counts"]))
+    check("X12", "dry run classifies open windows and changes nothing", acts == ["already_open", "already_open"] and rect_eq(e.frame(g), moved_g), str(plan["counts"]))
     rep = e.cli_json("restore", "--snapshot", "e2e")
-    check("T13", "restore puts existing windows back exactly", rep["state"] == "completed" and rect_eq(e.frame(g), want_g, 2) and rect_eq(e.frame(q), want_q, 2), f"{rep['report']['duration_ms']} ms")
+    check("X13", "restore puts existing windows back exactly", rep["state"] == "completed" and rect_eq(e.frame(g), want_g, 2) and rect_eq(e.frame(q), want_q, 2), f"{rep['report']['duration_ms']} ms")
     e.cli_json("undo-restore")
-    check("T14", "undo-restore returns to the pre-restore layout", rect_eq(e.frame(g), moved_g, 2))
+    check("X14", "undo-restore returns to the pre-restore layout", rect_eq(e.frame(g), moved_g, 2))
 
     # launching: approval gate, launch, no duplicates
     lp = subprocess.Popen(["gio", "launch", str(e.base / "xdgdata/applications/org.fractile.Launchme.desktop")], env=e.env)
     lw = e.wait_window(lambda w: w.get("app_id") == "org.fractile.Launchme")
-    if not check("T15", "launchable test app identified by desktop id", bool(lw) and lw.get("desktop_file_id") == "org.fractile.Launchme.desktop", lw and lw.get("desktop_file_source")):
+    if not check("X15", "launchable test app identified by desktop id", bool(lw) and lw.get("desktop_file_id") == "org.fractile.Launchme.desktop", lw and lw.get("desktop_file_source")):
         return
     e.cli_json("place", "--grid", "4x4", "--cells", "1,1,2,3", "--window", lw["id"])
     want_l = e.frame(lw["id"])
@@ -283,16 +283,16 @@ def run_all(e: Env) -> None:
         time.sleep(0.1)
     plan = e.cli_json("restore", "--dry-run", "--snapshot", "with-launch")
     na = [i for i in plan["items"] if i["app"] == "org.fractile.Launchme.desktop"]
-    check("T16", "missing app needs approval by default (no silent launch)", na and na[0]["action"] == "needs_approval")
+    check("X16", "missing app needs approval by default (no silent launch)", na and na[0]["action"] == "needs_approval")
     p = e.run("restore", "--snapshot", "with-launch")
     still_missing = not any(w.get("app_id") == "org.fractile.Launchme" for w in e.cli_json("list-windows"))
-    check("T17", "unapproved restore does not launch and exits 6 (partial)", p.returncode == 6 and still_missing)
+    check("X17", "unapproved restore does not launch and exits 6 (partial)", p.returncode == 6 and still_missing)
     rep = e.cli_json("restore", "--snapshot", "with-launch", "--approve-all")
     nl = e.wait_window(lambda w: w.get("app_id") == "org.fractile.Launchme", 5)
-    check("T18", "approved restore launches the app and places it", rep["state"] == "completed" and nl and rect_eq(e.frame(nl["id"]), want_l, 2), json.dumps(rep["report"]["launches"]))
+    check("X18", "approved restore launches the app and places it", rep["state"] == "completed" and nl and rect_eq(e.frame(nl["id"]), want_l, 2), json.dumps(rep["report"]["launches"]))
     rep2 = e.cli_json("restore", "--snapshot", "with-launch", "--approve-all")
     n = sum(1 for w in e.cli_json("list-windows") if w.get("app_id") == "org.fractile.Launchme")
-    check("T19", "repeated restore never duplicates windows", n == 1 and rep2["report"]["launches"] == 0, f"{n} window(s), {rep2['report']['launches']} launches")
+    check("X19", "repeated restore never duplicates windows", n == 1 and rep2["report"]["launches"] == 0, f"{n} window(s), {rep2['report']['launches']} launches")
 
     # import is untrusted
     snap = e.cli_json("snapshot", "export", "with-launch")
@@ -311,7 +311,7 @@ def run_all(e: Env) -> None:
 
     # logs redaction
     logs = e.cli_json("logs", "--redacted", "--lines", "500")
-    check("T20", "redacted logs contain no window titles", not any("Gtk window" in l or "Launchme\"" in l for l in logs))
+    check("X20", "redacted logs contain no window titles", not any("Gtk window" in l or "Launchme\"" in l for l in logs))
 
     # crash during restore -> resume without duplicates
     e.cli_json("snap", "center", "--window", g)
@@ -324,7 +324,7 @@ def run_all(e: Env) -> None:
     time.sleep(8)
     n = sum(1 for w in e.cli_json("list-windows") if w.get("app_id") == "org.fractile.Launchme")
     runs = e.cli_json("restore-status")["recent_runs"]
-    check("T21", "daemon killed mid-restore: restart resumes, no duplicate launches", n == 1, f"{n} Launchme window(s); last runs {[r.get('state') for r in runs[:3]]}")
+    check("X21", "daemon killed mid-restore: restart resumes, no duplicate launches", n == 1, f"{n} Launchme window(s); last runs {[r.get('state') for r in runs[:3]]}")
 
     # SIGTERM at logout writes a snapshot when an automatic policy is on
     c = e.client()
@@ -333,7 +333,7 @@ def run_all(e: Env) -> None:
     e.stop_daemon(signal.SIGTERM)
     e.start_daemon()
     snaps = e.cli_json("list-snapshots", "--limit", "200")
-    check("T22", "orderly stop (logout) captures a snapshot", len(snaps) > count0 and any(s["mode"] == "logout" for s in snaps), f"{count0} -> {len(snaps)}")
+    check("X22", "orderly stop (logout) captures a snapshot", len(snaps) > count0 and any(s["mode"] == "logout" for s in snaps), f"{count0} -> {len(snaps)}")
 
     # broken config: service runs on defaults and never overwrites the file
     e.stop_daemon()
@@ -341,7 +341,7 @@ def run_all(e: Env) -> None:
     cfgp.write_text("this is = = not toml [")
     e.start_daemon()
     st = e.cli_json("status")
-    check("T23", "corrupt config: service starts on defaults, reports it, keeps the file", st["config_error"] is not None and cfgp.read_text().startswith("this is"), st["config_error"] and st["config_error"][:60])
+    check("X23", "corrupt config: service starts on defaults, reports it, keeps the file", st["config_error"] is not None and cfgp.read_text().startswith("this is"), st["config_error"] and st["config_error"][:60])
     cfgp.unlink()
 
     # no-WM / unsupported desktop honesty
@@ -350,7 +350,7 @@ def run_all(e: Env) -> None:
     out = subprocess.run([str(BIN / "fractiled"), "--check"], env=env2, capture_output=True, text=True)
     caps = json.loads(out.stdout)["capabilities"]
     levels = {v["level"] for v in caps["operations"].values()}
-    check("T24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, str(levels))
+    check("X24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, str(levels))
 
 
 if __name__ == "__main__":

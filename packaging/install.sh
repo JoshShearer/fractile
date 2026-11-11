@@ -11,9 +11,13 @@
 #   $prefix/share/applications/io.fractile.Fractile.desktop
 #   $prefix/share/icons/hicolor/scalable/apps/io.fractile.Fractile.svg
 #   $prefix/share/metainfo/io.fractile.Fractile.metainfo.xml
+#   $prefix/share/gnome-shell/extensions/fractile@fractile.io/   (GNOME integration)
+#   $prefix/share/kwin/scripts/fractile/                         (KDE Plasma integration)
 #   $prefix/share/doc/fractile/...
-# Nothing is enabled at install time: login start is the user's choice
-# (first-run setup or Settings), per user, via `systemctl --user`.
+# Nothing is enabled at install time: the GNOME extension and the KWin
+# script are only made available; each user enables them (first-run setup
+# explains how). Login start is also the user's choice (first-run setup or
+# Settings), per user, via `systemctl --user`.
 set -euo pipefail
 dest=${1:?destdir}; prefix=${2:-/usr}; bins=${3:-target/release}
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -32,6 +36,11 @@ sed "s#/usr/bin/#$prefix/bin/#g" packaging/systemd/fractile.service > "$dest.fra
 install -Dm644 "$dest.fractile.service.tmp" "$P/lib/systemd/user/fractile.service"; rm -f "$dest.fractile.service.tmp"
 install -Dm644 packaging/xdg/io.fractile.Fractile.desktop "$P/share/applications/io.fractile.Fractile.desktop"
 install -Dm644 packaging/icons/io.fractile.Fractile.svg "$P/share/icons/hicolor/scalable/apps/io.fractile.Fractile.svg"
+ext=adapters/gnome-shell/fractile@fractile.io
+for f in "$ext"/*; do install -Dm644 "$f" "$P/share/gnome-shell/extensions/fractile@fractile.io/$(basename "$f")"; done
+(cd adapters/kwin/fractile && find . -type f) | while read -r f; do
+  install -Dm644 "adapters/kwin/fractile/$f" "$P/share/kwin/scripts/fractile/${f#./}"
+done
 install -Dm644 packaging/metainfo/io.fractile.Fractile.metainfo.xml "$P/share/metainfo/io.fractile.Fractile.metainfo.xml"
 for d in README.md CHANGELOG.md docs/*.md docs/*/*.md; do
   [[ -f $d ]] && install -Dm644 "$d" "$P/share/doc/fractile/$d"

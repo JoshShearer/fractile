@@ -39,6 +39,7 @@ Maintainer: ${maint}
 Installed-Size: ${size}
 Depends: libc6 (>= 2.35), libgcc-s1, python3 (>= 3.10), python3-pyqt6
 Recommends: libnotify-bin, systemd
+Suggests: gnome-shell (>= 45), kwin-wayland
 Section: x11
 Priority: optional
 Description: grid window placement and workspace session restore
@@ -50,7 +51,9 @@ Description: grid window placement and workspace session restore
  workspace, size and position after a restart or crash. It does not restore
  unsaved content inside applications, and only reopens apps you approve.
  .
- Full support on X11. Wayland support depends on the compositor.
+ Window control: X11; GNOME Shell Wayland through the bundled GNOME Shell
+ extension; KDE Plasma (Wayland and X11) through the bundled KWin script.
+ Other Wayland compositors are not supported.
 CTRL
 # Login start is per user and opt-in; tell admins how, never enable it here.
 cat >"$stage/DEBIAN/postinst" <<'POST'
