@@ -356,6 +356,8 @@ def run_all(e: GuiEnv) -> None:
     lp = subprocess.run([sys.executable, str(ROOT / "ui" / "fractile-ui"), "--launcher"], env=e.env, capture_output=True, text=True, timeout=20)
     g = e.panel_geometry()
     shown = bool(g) and bool(e.visible_named("Fractile panel"))
+    # type only once the panel has keyboard focus, as a person would
+    e.wait_for(lambda: e.active_xid() in e.visible_named("Fractile panel"), 3.0, 0.05)
     e.xdo("key", "Right", "Return")
     want = expected(e, 6, 6, 0, 0, 0, 0)
     got = e.wait_for(lambda: (lambda f: f if rect_eq(f, want) else None)(e.frame(wid)), 4.0) or e.frame(wid)

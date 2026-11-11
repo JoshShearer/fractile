@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-11T01:11:35-0600",
+  "when": "2026-11-11T02:11:35-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:894686078 gnome:894686077"
+      "detail": "gnome:218426749 gnome:218426748"
     },
     {
       "id": "W03",
@@ -61,7 +61,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "970 ms incl. key injection"
+      "detail": "973 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -73,7 +73,7 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1737 ms"
+      "detail": "1741 ms"
     },
     {
       "id": "W12",
@@ -91,7 +91,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:894686078"
+      "detail": "active gnome:218426749"
     },
     {
       "id": "W15",
@@ -127,7 +127,7 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot ceb027a6-9e18-49b8-964f-51785941813d (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot 628c7741-7cd1-4879-8d94-4d7cdf5e8a2e (4 windows)"
     },
     {
       "id": "W23",

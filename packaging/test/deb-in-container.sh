@@ -51,6 +51,7 @@ echo "== removed cleanly"
 echo "== T28 lifecycle: per-user data survives remove, reinstall picks it up, purge-data removes it"
 su u -s /bin/bash -c "test -s ~/.config/fractile/config.toml && test -s ~/.local/share/fractile/fractile.db && echo \"   user data kept after remove\""
 apt-get install -y -qq /pkg/fractile.deb >/tmp/apt2.log 2>&1 || { tail -30 /tmp/apt2.log; exit 1; }
+useradd -m v
 su u -s /bin/bash -c "
 set -euo pipefail
 export XDG_RUNTIME_DIR=/tmp/rt-u FRACTILE_NO_LOGIND=1
@@ -59,6 +60,8 @@ export DISPLAY=:6
 fractiled >/tmp/d2.log 2>&1 & sleep 1.5
 fractile list-snapshots | grep -q container-test && echo \"   snapshot still listed after reinstall\"
 [ \"\$(fractile config get general.show_help)\" = false ] && echo \"   setting kept after reinstall\"
+touch /tmp/u-ready; for _ in \$(seq 100); do [ -e /tmp/root-done ] && break; sleep 0.2; done
+fractile status >/dev/null && echo \"   service still serving its owner after the foreign attempts\"
 fractile purge-data --dry-run
 fractile purge-data </dev/null && { echo \"purge without --yes or a terminal must refuse\"; exit 1; } || true
 fractile purge-data --yes
@@ -68,7 +71,18 @@ for f in ~/.config/fractile ~/.local/share/fractile ~/.local/state/fractile ~/.c
 done
 [ -S \"\$XDG_RUNTIME_DIR/fractile/fractile.sock\" ] && { echo \"service still running after purge-data\"; exit 1; }
 echo \"   purge-data stopped the service and removed config, data, logs and the autostart entry\"
-"
+" &
+upid=$!
+for _ in $(seq 100); do [ -e /tmp/u-ready ] && break; sleep 0.2; done
+echo "== T22: other users cannot use the service of user u"
+# root bypasses file permissions, so this exercises the SO_PEERCRED uid check
+if XDG_RUNTIME_DIR=/tmp/rt-u fractile status >/tmp/root.out 2>&1; then echo "root was served by the service of user u"; cat /tmp/root.out; exit 1; fi
+echo "   root refused: $(head -c 120 /tmp/root.out)"
+if su v -s /bin/bash -c "XDG_RUNTIME_DIR=/tmp/rt-u fractile status" >/tmp/v.out 2>&1; then echo "user v was served by the service of user u"; exit 1; fi
+echo "   user v refused: $(head -c 120 /tmp/v.out)"
+grep -q "rejected connection from uid 0" /home/u/.local/state/fractile/fractile.log && echo "   service logged the rejected uid 0 peer"
+touch /tmp/root-done
+wait $upid
 apt-get purge -y -qq fractile >/dev/null 2>&1
 echo "== purged; lifecycle complete"
 '
