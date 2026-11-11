@@ -182,7 +182,9 @@ def main() -> int:
         if not a.keep:
             subprocess.run(["bash", str(nested), "stop", str(a.display)])
     if os.environ.get("FRACTILE_TEST_WM") == "kwin":
-        kv = subprocess.run(["kwin_x11", "--version"], capture_output=True, text=True).stdout.strip()
+        # kwin_x11 --version needs an X display; ask the package manager.
+        vp = subprocess.run(["dpkg-query", "-W", "-f", "${Version}", "kwin-x11"], capture_output=True, text=True)
+        kv = f"kwin_x11 {vp.stdout.strip()}" if vp.returncode == 0 and vp.stdout.strip() else "kwin_x11 (version unknown)"
         envdesc = f"{os.environ.get('FRACTILE_TEST_XSERVER', 'xephyr')} with {kv} (Plasma X11 window manager, no plasmashell)"
     else:
         gs = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout.strip()
