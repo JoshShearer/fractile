@@ -52,6 +52,7 @@ pub fn keysym_for(name: &str) -> Option<u32> {
         "End" => 0xff57,
         "KP_Add" => 0xffab,
         "KP_Subtract" => 0xffad,
+        "KP_Enter" => 0xff8d,
         _ => return None,
     })
 }

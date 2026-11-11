@@ -227,9 +227,9 @@ fn print_plan(v: &Value) {
     for w in v["warnings"].as_array().cloned().unwrap_or_default() {
         println!("warning: {}", sv(&w));
     }
-    if let Some(m) = v["output_mapping"].as_object() {
-        for (k, val) in m {
-            println!("monitor {k} -> {}", sv(val));
+    for m in v["output_mapping"].as_array().cloned().unwrap_or_default() {
+        if m["exact"].as_bool() != Some(true) || m["recorded_id"] != m["present_id"] {
+            println!("monitor {} -> {} ({}{})", sv(&m["recorded_id"]), sv(&m["present_id"]), sv(&m["method"]), if m["exact"].as_bool() == Some(true) { "" } else { ", fallback" });
         }
     }
     println!("Counts: {}", v["counts"]);
@@ -346,7 +346,11 @@ fn main() {
                 println!("Adapter: {} {} (compositor {})", sv(&caps["adapter"]), sv(&caps["adapter_version"]), sv(&caps["compositor"]));
                 if let Some(ops) = caps["operations"].as_object() {
                     for (op, lvl) in ops {
-                        println!("  {:<22} {}", op, if lvl.is_string() { sv(lvl) } else { lvl.to_string() });
+                        let level = lvl["level"].as_str().unwrap_or("?");
+                        match lvl["note"].as_str() {
+                            Some(n) => println!("  {:<22} {level}: {n}", op),
+                            None => println!("  {:<22} {level}", op),
+                        }
                     }
                 }
                 for n in caps["notes"].as_array().cloned().unwrap_or_default() {

@@ -336,11 +336,11 @@ pub fn default_shortcuts() -> Vec<NamedShortcut> {
         v.push(NamedShortcut { id: id.into(), name: name.into(), action, accelerator: accel.map(|s| s.into()), scope, cycle_monitors: false, favorite: false });
     };
     // Panel-local shortcuts (only active while the panel is visible).
-    add("local-left", "Left half", ShortcutAction::Snap { action: SnapAction::LeftHalf }, Some("Left"), ShortcutScope::Local);
-    add("local-right", "Right half", ShortcutAction::Snap { action: SnapAction::RightHalf }, Some("Right"), ShortcutScope::Local);
-    add("local-up", "Top half", ShortcutAction::Snap { action: SnapAction::TopHalf }, Some("Up"), ShortcutScope::Local);
-    add("local-down", "Bottom half", ShortcutAction::Snap { action: SnapAction::BottomHalf }, Some("Down"), ShortcutScope::Local);
-    add("local-max", "Maximize (fill work area)", ShortcutAction::Snap { action: SnapAction::Maximize }, Some("Space"), ShortcutScope::Local);
+    add("local-left", "Left half", ShortcutAction::Snap { action: SnapAction::LeftHalf }, Some("Ctrl+Left"), ShortcutScope::Local);
+    add("local-right", "Right half", ShortcutAction::Snap { action: SnapAction::RightHalf }, Some("Ctrl+Right"), ShortcutScope::Local);
+    add("local-up", "Top half", ShortcutAction::Snap { action: SnapAction::TopHalf }, Some("Ctrl+Up"), ShortcutScope::Local);
+    add("local-down", "Bottom half", ShortcutAction::Snap { action: SnapAction::BottomHalf }, Some("Ctrl+Down"), ShortcutScope::Local);
+    add("local-max", "Maximize (fill work area)", ShortcutAction::Snap { action: SnapAction::Maximize }, Some("M"), ShortcutScope::Local);
     add("local-center", "Center", ShortcutAction::Snap { action: SnapAction::Center }, Some("C"), ShortcutScope::Local);
     // Global actions: unassigned until the user or wizard picks a free key.
     add("global-panel", "Show/hide panel", ShortcutAction::TogglePanel, None, ShortcutScope::Global);
@@ -350,6 +350,18 @@ pub fn default_shortcuts() -> Vec<NamedShortcut> {
     add("global-restore", "Restore latest snapshot", ShortcutAction::RestoreLatest, None, ShortcutScope::Global);
     add("global-palette", "Command palette", ShortcutAction::CommandPalette, None, ShortcutScope::Global);
     v
+}
+
+/// Keys the panel itself uses (grid keyboard navigation, apply, cancel,
+/// grid resize). Local shortcuts may not use them, so typing in the panel
+/// never collides (DV-07, DV-09, DV-15).
+pub const PANEL_RESERVED_KEYS: [&str; 22] = [
+    "Left", "Right", "Up", "Down", "Shift+Left", "Shift+Right", "Shift+Up", "Shift+Down", "Return", "KP_Enter", "Space", "Escape", "Tab", "Shift+Tab",
+    "Alt+plus", "Alt+minus", "Alt+Shift+plus", "Alt+Shift+minus", "Alt+equal", "Alt+Shift+equal", "Alt+KP_Add", "Alt+KP_Subtract",
+];
+
+pub fn is_panel_reserved(a: &Accelerator) -> bool {
+    PANEL_RESERVED_KEYS.iter().any(|k| Accelerator::parse(k).map(|r| r.same_as(a)).unwrap_or(false))
 }
 
 /// Accelerator candidates for the panel toggle, tried in order by the
@@ -400,6 +412,9 @@ impl Config {
             }
             if let Some(a) = &s.accelerator {
                 let acc = Accelerator::parse(a).map_err(|e| format!("shortcut '{}': {e}", s.name))?;
+                if s.scope == ShortcutScope::Local && is_panel_reserved(&acc) {
+                    return Err(format!("local shortcut '{}' uses {a}, which the panel needs for keyboard navigation", s.name));
+                }
                 if s.scope == ShortcutScope::Global && !acc.has_modifier() {
                     return Err(format!("global shortcut '{}' needs at least one modifier", s.name));
                 }
@@ -529,6 +544,18 @@ pub fn atomic_write(path: &Path, data: &[u8], keep_backup: bool) -> Result<(), S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn panel_reserved_keys_parse_and_block_local_shortcuts() {
+        for k in PANEL_RESERVED_KEYS {
+            assert!(Accelerator::parse(k).is_ok(), "reserved key {k} must parse");
+        }
+        let mut c = Config::default();
+        c.shortcuts[0].accelerator = Some("Left".into());
+        assert!(c.validate().unwrap_err().contains("keyboard navigation"));
+        c.shortcuts[0].accelerator = Some("Ctrl+Left".into());
+        assert!(c.validate().is_ok());
+    }
 
     #[test]
     fn default_round_trips_and_validates() {

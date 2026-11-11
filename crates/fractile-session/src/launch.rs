@@ -65,8 +65,11 @@ pub fn spawn(plan: &LaunchPlan) -> Result<u32, String> {
     let (prog, args) = plan.argv.split_first().ok_or("empty argv")?;
     let mut cmd = Command::new(prog);
     cmd.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
-    // Don't leak Fractile's own environment markers into apps.
-    cmd.env_remove("FRACTILE_RUNTIME_DIR").env_remove("FRACTILE_DATA_DIR").env_remove("FRACTILE_CONFIG").env_remove("FRACTILE_STATE_DIR");
+    // Don't leak Fractile's own environment markers into apps. Fractile's
+    // own UI is the exception: it must reach the same service instance.
+    if plan.method != "ui" {
+        cmd.env_remove("FRACTILE_RUNTIME_DIR").env_remove("FRACTILE_DATA_DIR").env_remove("FRACTILE_CONFIG").env_remove("FRACTILE_STATE_DIR");
+    }
     cmd.env_remove("DESKTOP_STARTUP_ID");
     // SAFETY: setsid is async-signal-safe and has no preconditions.
     unsafe {

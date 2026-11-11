@@ -40,6 +40,7 @@ fn normalize_key(k: &str) -> Option<String> {
         "insert" | "ins" => "Insert",
         "kp_add" => "KP_Add",
         "kp_subtract" => "KP_Subtract",
+        "kp_enter" => "KP_Enter",
         "grave" | "`" => "grave",
         "comma" | "," => "comma",
         "period" | "." => "period",

@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "ui"))
-from fractile_ui.ipc import Client, RpcError  # noqa: E402
+from fractile_ui.ipc import Client  # noqa: E402
 
 BIN = Path(os.environ.get("FRACTILE_BIN_DIR", ROOT / "target" / "debug"))
 TESTWIN = ROOT / "tests" / "tools" / "testwin.py"
@@ -255,7 +255,7 @@ def run_all(e: Env) -> None:
     e.cli_json("place", "--grid", "2x2", "--cells", "0,0,0,1", "--window", g)
     e.cli_json("place", "--grid", "2x2", "--cells", "1,1,1,1", "--window", q)
     want_g, want_q = e.frame(g), e.frame(q)
-    sid = e.cli_json("save", "--name", "e2e")["snapshot_id"]
+    e.cli_json("save", "--name", "e2e")
     e.cli_json("snap", "center", "--window", g)
     e.cli_json("snap", "top-left-quarter", "--window", q)
     plan = e.cli_json("restore", "--dry-run", "--snapshot", "e2e")
@@ -349,7 +349,8 @@ def run_all(e: Env) -> None:
     env2.update(XDG_SESSION_TYPE="wayland", WAYLAND_DISPLAY="wayland-fake", XDG_CURRENT_DESKTOP="Hyprland")
     out = subprocess.run([str(BIN / "fractiled"), "--check"], env=env2, capture_output=True, text=True)
     caps = json.loads(out.stdout)["capabilities"]
-    check("T24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and all(isinstance(v, dict) or v != "full" for v in caps["operations"].values()))
+    levels = {v["level"] for v in caps["operations"].values()}
+    check("T24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, str(levels))
 
 
 if __name__ == "__main__":

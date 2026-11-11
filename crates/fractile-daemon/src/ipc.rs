@@ -218,6 +218,7 @@ pub fn diagnose(d: &Daemon) -> Value {
         "capabilities": caps,
         "outputs": outputs.as_ref().ok(),
         "outputs_error": outputs.as_ref().err().map(|e| e.message.clone()),
+        "topology_signature": outputs.as_ref().ok().filter(|o| !o.is_empty()).map(|o| fractile_core::output::topology_signature(o)),
         "window_count": windows.as_ref().map(|w| w.len()).ok(),
         "placeable_windows": windows.as_ref().map(|w| w.iter().filter(|w| w.is_placeable()).count()).ok(),
         "store": {"path": store.path(), "snapshots": store.list_snapshots(1000).map(|v| v.len()).unwrap_or(0), "layouts": store.list_layouts().map(|v| v.len()).unwrap_or(0), "interrupted_runs": store.interrupted_runs().unwrap_or_default()},
@@ -262,6 +263,27 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             d.register_ui(windows, Some(c.pid as u32));
             Ok(json!({}))
         }
+        "activate_window" => {
+            // Return focus to the placement target after the panel closes.
+            let wid = req_s(p, "window")?;
+            let ts = d.panel.lock().unwrap().last_timestamp;
+            d.adapter().activate(wid, ts).map_err(|e| err("adapter", e.to_string()))?;
+            Ok(json!({}))
+        }
+        "place_own_window" => {
+            // Wayland clients cannot position their own surfaces; the UI asks
+            // the compositor integration. Only windows of a registered UI
+            // process are eligible.
+            let title = req_s(p, "title")?;
+            let rect: fractile_core::geometry::Rect = parse(p, "rect")?;
+            let pid = c.pid as u32;
+            if !d.own_pids.lock().unwrap().contains(&pid) {
+                return Err(err("denied", "only a registered Fractile UI may position its windows"));
+            }
+            let ws = d.adapter().list_windows().map_err(|e| err("adapter", e.to_string()))?;
+            let w = ws.into_iter().find(|w| w.pid == Some(pid) && w.title == title).ok_or_else(|| err("no_window", "own window not found"))?;
+            Ok(json!(d.adapter().move_resize(&w.id, rect).map_err(|e| err("adapter", e.to_string()))?))
+        }
         "focus_own_window" => {
             d.focus_own_window(req_s(p, "window")?);
             Ok(json!({}))
@@ -279,6 +301,16 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
                 c.client = kind.clone();
             }
             if kind == "ui" {
+                // A freshly attached UI shows nothing until the pending
+                // request (if any) is delivered, so the panel flag must
+                // reflect that or the next toggle would "hide" a panel
+                // that never appeared.
+                {
+                    let mut pn = d.panel.lock().unwrap();
+                    if pn.pending_show.as_ref().map(|v| v["event"] != "show_panel").unwrap_or(true) {
+                        pn.visible = false;
+                    }
+                }
                 let d2 = d.clone();
                 // Deliver after this response is written.
                 std::thread::spawn(move || {
@@ -367,6 +399,7 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             let def = Config::default();
             match section {
                 None | Some("all") => cfg = def,
+                Some("general") => cfg.general = def.general,
                 Some("appearance") => cfg.appearance = def.appearance,
                 Some("placement") => cfg.placement = def.placement,
                 Some("shortcuts") => cfg.shortcuts = def.shortcuts,
@@ -377,7 +410,7 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             d.apply_config(cfg)?;
             Ok(json!({"ok": true}))
         }
-        "shortcut_check" => Ok(d.probe_accelerator(req_s(p, "accelerator")?)),
+        "shortcut_check" => Ok(d.probe_accelerator(req_s(p, "accelerator")?, s(p, "own_id"))),
         "autostart_status" => Ok(crate::autostart::status()),
         "autostart_set" => {
             let en = b(p, "enabled", true);

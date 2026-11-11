@@ -386,7 +386,10 @@ impl Daemon {
     }
 
     /// Probe whether an accelerator is free by registering it temporarily.
-    pub fn probe_accelerator(&self, accel: &str) -> Value {
+    /// Check whether `accel` can be used as a global shortcut. `own_id` is
+    /// the shortcut being edited ("panel" or a shortcut id): its current
+    /// binding is not a conflict with itself.
+    pub fn probe_accelerator(&self, accel: &str, own_id: Option<&str>) -> Value {
         let a = self.adapter();
         let probe_id = format!("probe-{}", uuid::Uuid::new_v4());
         let parsed = fractile_core::accel::Accelerator::parse(accel);
@@ -396,12 +399,30 @@ impl Daemon {
         // known Fractile bindings
         let cfg = self.config();
         let p = parsed.unwrap();
-        for s in &cfg.shortcuts {
+        let same = |x: &str| fractile_core::accel::Accelerator::parse(x).map(|q| q.same_as(&p)).unwrap_or(false);
+        let mut ours: Vec<(String, String)> = vec![];
+        if let Some(x) = &cfg.general.panel_shortcut {
+            ours.push(("panel".into(), x.clone()));
+        }
+        for s in cfg.shortcuts.iter().filter(|s| s.scope == ShortcutScope::Global) {
             if let Some(x) = &s.accelerator {
-                if fractile_core::accel::Accelerator::parse(x).map(|q| q.same_as(&p)).unwrap_or(false) && s.scope == ShortcutScope::Global {
-                    return json!({"free": false, "verified": true, "reason": format!("already used by Fractile shortcut '{}'", s.name)});
-                }
+                ours.push((s.id.clone(), x.clone()));
             }
+        }
+        for (id, x) in &ours {
+            if !same(x) {
+                continue;
+            }
+            if Some(id.as_str()) == own_id {
+                let active = !self.hotkey_errors.lock().unwrap().contains_key(id);
+                return if active {
+                    json!({"free": true, "verified": true, "reason": "current binding (active)"})
+                } else {
+                    json!({"free": false, "verified": true, "reason": self.hotkey_errors.lock().unwrap().get(id).cloned().unwrap_or_default()})
+                };
+            }
+            let name = if id == "panel" { "Show/hide panel".to_string() } else { cfg.shortcuts.iter().find(|s| &s.id == id).map(|s| s.name.clone()).unwrap_or_default() };
+            return json!({"free": false, "verified": true, "reason": format!("already used by Fractile shortcut '{name}'")});
         }
         let desktop = desktop_binding_conflicts(&p);
         match a.register_hotkey(&probe_id, accel) {

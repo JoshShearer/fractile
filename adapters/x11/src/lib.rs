@@ -392,6 +392,38 @@ impl X11Adapter {
         Ok(last)
     }
 
+    /// Wait for the window manager to act on a move/resize request.
+    /// "No change yet" is not "settled": a busy WM (or a client slow to
+    /// acknowledge the configure) can take hundreds of milliseconds, and
+    /// treating the old geometry as the result makes the correction loop
+    /// overshoot. Returns the observed frame and whether it changed from
+    /// `before` (or already matches `target`).
+    fn settle_after(&self, win: u32, before: Rect, target: Rect, tol: i32, timeout: Duration) -> AResult<(Rect, bool)> {
+        let start = Instant::now();
+        let mut last = self.visible_frame(win)?.0;
+        let mut responded = last != before || last.max_edge_delta(&target) <= tol;
+        let mut stable = 0;
+        while start.elapsed() < timeout {
+            std::thread::sleep(Duration::from_millis(20));
+            let cur = self.visible_frame(win)?.0;
+            if cur != before || cur.max_edge_delta(&target) <= tol {
+                responded = true;
+            }
+            if cur == last {
+                stable += 1;
+                // Once the WM has responded, a short quiet period means done
+                // (some WMs and CSD clients configure in two steps).
+                if responded && stable >= 4 {
+                    return Ok((cur, true));
+                }
+            } else {
+                stable = 0;
+                last = cur;
+            }
+        }
+        Ok((last, responded))
+    }
+
     fn output_list(&self) -> AResult<Vec<Output>> {
         let a = &self.atoms;
         let current_desktop = self.prop32(self.root, a._NET_CURRENT_DESKTOP, AtomEnum::CARDINAL).first().copied().unwrap_or(0);
@@ -614,12 +646,18 @@ impl CompositorAdapter for X11Adapter {
             let rw = (target.w - n[0] - n[1] + g[0] + g[1] + corr[2]).max(1);
             let rh = (target.h - n[2] - n[3] + g[2] + g[3] + corr[3]).max(1);
             let flags: u32 = 1 /*NorthWest*/ | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (2 << 12) /*pager*/;
+            let before = self.visible_frame(win)?.0;
             self.send_client_message(win, a._NET_MOVERESIZE_WINDOW, [flags, rx as u32, ry as u32, rw as u32, rh as u32])?;
-            let obs = self.settle(win, Duration::from_millis(600))?;
+            let (obs, responded) = self.settle_after(win, before, target, tol, Duration::from_millis(1500))?;
             observed = Some(obs);
             let err = obs.max_edge_delta(&target);
             if err <= tol {
                 break;
+            }
+            if !responded {
+                // Nothing happened yet: resend the same request rather than
+                // "correcting" against a stale geometry.
+                continue;
             }
             corr[0] += target.x - obs.x;
             corr[1] += target.y - obs.y;

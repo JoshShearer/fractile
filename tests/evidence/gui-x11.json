@@ -1,0 +1,92 @@
+{
+  "suite": "gui-x11",
+  "when": "2026-11-10T23:02:30-0600",
+  "environment": "Xephyr nested GNOME Shell 46.0 (X11), PyQt6 UI",
+  "screenshots": "tests/evidence/gui/",
+  "results": [
+    {
+      "id": "G00",
+      "name": "test windows are up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G01",
+      "name": "hotkey starts the UI and shows the panel above all windows",
+      "ok": true,
+      "detail": "0.9s incl. UI start; stack top 0x1800006"
+    },
+    {
+      "id": "G02",
+      "name": "first-run wizard waits while the panel is open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G03",
+      "name": "dragging across the grid places the window exactly",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 767, 'x': 66, 'y': 32} got {'h': 1168, 'w': 767, 'x': 66, 'y': 32}"
+    },
+    {
+      "id": "G04",
+      "name": "panel closes after placing and focus returns to the window",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G05",
+      "name": "first-run wizard appears after the panel closes and saves on Finish",
+      "ok": true,
+      "detail": "first_run_complete=True shortcut=Ctrl+Alt+G"
+    },
+    {
+      "id": "G06",
+      "name": "arrow keys, Shift+arrows and Enter place the window",
+      "ok": true,
+      "detail": "want {'h': 584, 'w': 767, 'x': 577, 'y': 32} got {'h': 584, 'w': 767, 'x': 577, 'y': 32}"
+    },
+    {
+      "id": "G07",
+      "name": "Esc closes the panel without moving the window",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G08",
+      "name": "Alt+= / Alt+Shift+= change columns / rows and the size is kept",
+      "ok": true,
+      "detail": "(6, 6) -> (7, 7)"
+    },
+    {
+      "id": "G09",
+      "name": "Shift+drag places the window and keeps the panel open",
+      "ok": true,
+      "detail": "want {'h': 389, 'w': 512, 'x': 1088, 'y': 32} got {'h': 389, 'w': 512, 'x': 1088, 'y': 32} panel_open=True"
+    },
+    {
+      "id": "G10",
+      "name": "command palette 'left half' snaps the previously focused window",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 767, 'x': 66, 'y': 32} got {'h': 1168, 'w': 767, 'x': 66, 'y': 32}"
+    },
+    {
+      "id": "G11",
+      "name": "recovery dialog shows the plan and restores the snapshot",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 767, 'x': 66, 'y': 32} got {'h': 1168, 'w': 767, 'x': 66, 'y': 32}"
+    },
+    {
+      "id": "G12",
+      "name": "Fractile UI windows are flagged as own and never offered as targets",
+      "ok": true,
+      "detail": "1 own windows, flagged 2"
+    },
+    {
+      "id": "G13",
+      "name": "UI logged no Python errors during the run",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
