@@ -1,6 +1,6 @@
 {
   "suite": "settings-x11",
-  "when": "2026-11-11T03:02:50-0600",
+  "when": "2026-11-11T04:10:28-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
@@ -35,6 +35,12 @@
       "detail": "\u26a0 Global shortcuts need at least one modifier (Ctrl, Alt, Shift or Super). Try another combination, or Esc to keep the current one."
     },
     {
+      "id": "S14",
+      "name": "while the editor listens, global shortcuts are paused so the desktop passes their keys to it",
+      "ok": true,
+      "detail": "hotkeys_paused=True"
+    },
+    {
       "id": "S04",
       "name": "a combination Fractile already uses is reported by name (the panel shortcut)",
       "ok": true,
@@ -65,10 +71,16 @@
       "detail": "dialog=True modal=None add_button=True rows=14"
     },
     {
+      "id": "S15",
+      "name": "the pause ends when the editor closes",
+      "ok": true,
+      "detail": "hotkeys_paused=False"
+    },
+    {
       "id": "S10",
       "name": "after Apply the service saved and registered it; the table says active",
       "ok": true,
-      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-39f1aceb', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-d7f4ba32', 'name': 'Probe left half', 'scope': 'global'}] status=active"
     },
     {
       "id": "S13",
@@ -87,6 +99,18 @@
       "name": "pressing the shortcut created in Settings places the window (left half)",
       "ok": true,
       "detail": "want {'x': 66, 'y': 32, 'w': 767, 'h': 1168} got {'h': 1168, 'w': 767, 'x': 66, 'y': 32}"
+    },
+    {
+      "id": "S16",
+      "name": "an editor that disconnects while listening does not leave shortcuts paused",
+      "ok": true,
+      "detail": "during=True after_close=False"
+    },
+    {
+      "id": "S17",
+      "name": "a pause that is never ended times out and shortcuts come back",
+      "ok": true,
+      "detail": "after_timeout=False"
     }
   ]
 }

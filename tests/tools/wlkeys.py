@@ -4,6 +4,7 @@ RemoteDesktop D-Bus API on that session's private bus. Fractile itself never
 injects input; this exists so integration tests can press real shortcuts.
 
   wlkeys.py ctrl+alt+1 [more combos...]
+  wlkeys.py --stdin      one combination per input line; prints "ok" after each
 """
 import sys
 import time
@@ -38,7 +39,7 @@ def main():
     s.call_sync("NotifyKeyboardKeysym", GLib.Variant("(ub)", (KEYSYMS["shift"], True)), 0, 5000)
     s.call_sync("NotifyKeyboardKeysym", GLib.Variant("(ub)", (KEYSYMS["shift"], False)), 0, 5000)
     time.sleep(0.3)
-    for combo in sys.argv[1:]:
+    def press(combo):
         keys = [keysym(k) for k in combo.split("+")]
         for k in keys:
             s.call_sync("NotifyKeyboardKeysym", GLib.Variant("(ub)", (k, True)), 0, 5000)
@@ -47,6 +48,18 @@ def main():
             s.call_sync("NotifyKeyboardKeysym", GLib.Variant("(ub)", (k, False)), 0, 5000)
             time.sleep(0.02)
         time.sleep(0.15)
+
+    if sys.argv[1:] == ["--stdin"]:
+        # One virtual keyboard for the whole run: creating and removing the
+        # device for every combination makes Mutter drop keyboard focus.
+        print("ready", flush=True)
+        for line in sys.stdin:
+            if line.strip():
+                press(line.strip())
+            print("ok", flush=True)
+    else:
+        for combo in sys.argv[1:]:
+            press(combo)
     s.call_sync("Stop", None, 0, 5000)
 
 

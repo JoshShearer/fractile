@@ -37,6 +37,10 @@ class ShortcutEdit(QWidget):
         lay.addLayout(row)
         self.info = QLabel()
         self.info.setWordWrap(True)
+        # Room for a two-line message from the start: a wrapped label that
+        # grows later does not grow a shown dialog, and the rows below it
+        # (the grid picker) were squeezed.
+        self.info.setMinimumHeight(2 * self.info.fontMetrics().lineSpacing() + 2)
         lay.addWidget(self.info)
         self._render()
 
@@ -44,10 +48,36 @@ class ShortcutEdit(QWidget):
         self.capturing = self.btn.isChecked()
         if self.capturing:
             self.btn.setText("Press keys…  (Esc to cancel)")
+            self._pause(True)
             self.grabKeyboard()
         else:
             self.releaseKeyboard()
+            self._pause(False)
             self._render()
+
+    def _pause(self, on: bool) -> None:
+        # Global shortcuts are paused while listening, so the desktop hands
+        # the keys of an active Fractile shortcut to this editor (on Wayland
+        # an application cannot grab the keyboard). Only global scope: panel
+        # shortcuts are not registered with the desktop.
+        if self.scope != "global" and on:
+            return
+        self.app.bridge.try_call("hotkeys_pause" if on else "hotkeys_resume", {"seconds": 60} if on else {})
+
+    def setScope(self, scope: str) -> None:  # noqa: N802
+        if self.capturing and scope != "global":
+            self._pause(False)
+        self.scope = scope
+        if self.capturing and scope == "global":
+            self._pause(True)
+
+    def hideEvent(self, ev):  # noqa: N802
+        if self.capturing:
+            self.capturing = False
+            self.btn.setChecked(False)
+            self.releaseKeyboard()
+            self._pause(False)
+        super().hideEvent(ev)
 
     def keyPressEvent(self, ev):
         if not self.capturing:
@@ -67,6 +97,7 @@ class ShortcutEdit(QWidget):
         self.btn.setChecked(False)
         self.capturing = False
         self.releaseKeyboard()
+        self._pause(False)
         self.set_value(acc)
 
     def static_problem(self, acc: str) -> str | None:

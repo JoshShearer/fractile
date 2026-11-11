@@ -3,8 +3,9 @@
 
 Runs the real FractileApp, connected to the live service over the real socket,
 on the nested X display. Opens Settings the way `fractile settings` does, and
-types into the shortcut editor with real X key events (xdotool, sent by this
-test harness, not by Fractile). The editor holds an X keyboard grab while it
+types into the shortcut editor with real key events sent by this test harness,
+not by Fractile: xdotool on X11, Mutter's RemoteDesktop virtual keyboard on
+GNOME Wayland (tests/tools/wlkeys.py). The editor holds an X keyboard grab while it
 listens, so the keys reach it through the X server like a user's keys would.
 
 Prints one JSON object: {"results": [...], "shots": [...]}.
@@ -14,6 +15,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import select
 import subprocess
 import sys
 import time
@@ -54,8 +57,59 @@ def wait(fn, sec: float = 5.0):
     return fn()
 
 
+WAYLAND = os.environ.get("XDG_SESSION_TYPE") == "wayland"
+INJ: subprocess.Popen | None = None
+
+
+def _inj_wait(word: str, sec: float) -> bool:
+    """Wait for a line from the injector while the Qt loop keeps running."""
+    buf = b""
+    end = time.time() + sec
+    while time.time() < end:
+        if select.select([INJ.stdout], [], [], 0)[0]:
+            chunk = os.read(INJ.stdout.fileno(), 256)
+            if not chunk:
+                return False
+            buf += chunk
+            if word.encode() + b"\n" in buf:
+                return True
+        pump(0.02)
+    return False
+
+
+def start_injector() -> None:
+    """Wayland: one virtual keyboard for the whole run (Mutter RemoteDesktop
+    on the headless shell's private bus). Creating it moves keyboard focus, so
+    it is started before any window is focused."""
+    global INJ
+    if WAYLAND and INJ is None:
+        INJ = subprocess.Popen([sys.executable, str(ROOT / "tests" / "tools" / "wlkeys.py"), "--stdin"],
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        _inj_wait("ready", 10.0)
+
+
 def key(combo: str) -> None:
-    subprocess.run(["xdotool", "key", "--clearmodifiers", combo], timeout=10, check=False)
+    if WAYLAND:
+        # The Qt loop must keep dispatching while the keys go in; a blocking
+        # wait here lost the events.
+        start_injector()
+        INJ.stdin.write((combo.lower() + "\n").encode())
+        INJ.stdin.flush()
+        _inj_wait("ok", 15.0)
+    else:
+        subprocess.run(["xdotool", "key", "--clearmodifiers", combo], timeout=10, check=False)
+
+
+def harness_focus(app, title: str) -> None:
+    """Headless Mutter does not focus a new window without user input. On
+    Wayland the harness activates it through the service, as a user's click
+    would. (On X11 the window manager focuses new windows.)"""
+    if not WAYLAND:
+        return
+    win = wait(lambda: next((x for x in (app.bridge.try_call("list_windows", {"all": True}) or []) if x.get("title") == title), None), 5.0)
+    if win:
+        app.bridge.try_call("activate_window", {"window": win["id"]})
+        pump(0.5)
 
 
 def button(parent, text: str) -> QPushButton | None:
@@ -86,16 +140,27 @@ def drive_dialog(state: dict) -> None:
             d.reject()
         return
     state["dialog"] = True
+    harness_focus(state["app"], d.windowTitle())
     ed = d.keys
     msg = capture(ed, "g")
     check("S03", "a global shortcut without a modifier is refused and the editor keeps listening",
           "need at least one modifier" in msg and ed.capturing and ed.value is None, msg)
+    paused = (state["app"].bridge.try_call("status") or {}).get("hotkeys_paused")
+    check("S14", "while the editor listens, global shortcuts are paused so the desktop passes their keys to it",
+          paused is True and ed.capturing, f"hotkeys_paused={paused}")
     msg = capture(ed, "ctrl+alt+g")
     check("S04", "a combination Fractile already uses is reported by name (the panel shortcut)",
           msg.startswith("⚠") and "Show/hide panel" in msg and ed.value == "Ctrl+Alt+G", msg)
-    msg = capture(ed, "ctrl+alt+shift+k")
-    check("S05", "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",
-          msg.startswith("⚠") and "another application already uses" in msg and ed.value == "Ctrl+Alt+Shift+K", msg)
+    if WAYLAND:
+        # Ctrl+Alt+T is the terminal shortcut in GNOME's settings (media-keys);
+        # the service reads the desktop's bindings.
+        msg = capture(ed, "ctrl+alt+t")
+        check("S05", "a combination GNOME's settings assign is reported as taken, with where it is set",
+              msg.startswith("⚠") and "assigned in desktop settings" in msg and "terminal" in msg and ed.value == "Ctrl+Alt+T", msg)
+    else:
+        msg = capture(ed, "ctrl+alt+shift+k")
+        check("S05", "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",
+              msg.startswith("⚠") and "another application already uses" in msg and ed.value == "Ctrl+Alt+Shift+K", msg)
     msg = capture(ed, "ctrl+alt+shift+F9")
     check("S06", "a free combination is reported as available", msg.startswith("✓") and ed.value == "Ctrl+Alt+Shift+F9", msg)
     # Panel scope: navigation keys are reserved.
@@ -119,11 +184,13 @@ def drive_dialog(state: dict) -> None:
 
 
 def run(app: FractileApp, shot_dir: str) -> None:
+    start_injector()
     w = wait(lambda: app.settings_win if app.settings_win and app.settings_win.isVisible() else None, 10.0)
     if not check("S01", "Settings opens from the service request with all eight pages", w is not None and w.tabs.count() == 8,
                  str([w.tabs.tabText(i) for i in range(w.tabs.count())]) if w else "no window"):
         return
     pump(0.5)
+    harness_focus(app, w.windowTitle())
     for i in range(w.tabs.count()):
         w.tabs.setCurrentIndex(i)
         pump(0.4)
@@ -153,7 +220,7 @@ def run(app: FractileApp, shot_dir: str) -> None:
     w.open_page("shortcuts")
     pump(0.3)
     add = button(w.tabs.currentWidget(), "Add…")  # the Rules page has one too
-    state = {"shot_dir": shot_dir}
+    state = {"shot_dir": shot_dir, "app": app}
     n0 = len(w.cfg.get("shortcuts", []))
     QTimer.singleShot(400, lambda: drive_dialog(state))
     if add:
@@ -163,6 +230,8 @@ def run(app: FractileApp, shot_dir: str) -> None:
     check("S09", "the new shortcut appears in the table, pending until Apply",
           state.get("dialog") and len(w.cfg["shortcuts"]) == n0 + 1 and added and w.apply_b.isEnabled(),
           f"dialog={state.get('dialog')} modal={state.get('modal')} add_button={add is not None} rows={w.sc_table.rowCount()}")
+    after = (app.bridge.try_call("status") or {}).get("hotkeys_paused")
+    check("S15", "the pause ends when the editor closes", after is False, f"hotkeys_paused={after}")
     w.apply_b.click()
     pump(1.5)
     w.grab().save(f"{shot_dir}/15-shortcuts-applied.png")
@@ -212,6 +281,9 @@ def main() -> int:
 
     QTimer.singleShot(0, go)
     qapp.exec()
+    if INJ is not None:
+        INJ.stdin.close()
+        INJ.wait(10)
     print(json.dumps({"results": results, "shots": shots}))
     return 0
 

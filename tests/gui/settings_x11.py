@@ -22,6 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "integration"))
 sys.path.insert(0, str(ROOT / "tests" / "gui"))
+import pause_checks  # noqa: E402
+sys.path.insert(0, str(ROOT / "tests" / "gui"))
 from e2e_x11 import check, rect_eq, results  # noqa: E402
 from gui_x11 import SHOTS, GuiEnv  # noqa: E402
 
@@ -79,6 +81,7 @@ def run_all(e: GuiEnv) -> None:
     want = {"x": wa["x"], "y": wa["y"], "w": wa["w"] // 2, "h": wa["h"]}
     got = e.wait_for(lambda: (f := e.frame(wid)) and rect_eq(f, want, 2) and f, 8.0)
     check("S11", "pressing the shortcut created in Settings places the window (left half)", bool(got), f"want {want} got {e.frame(wid)}")
+    pause_checks.run(Path(e.env["FRACTILE_RUNTIME_DIR"]) / "fractile.sock", lambda: e.cli_json("status"), check)
 
 
 def main() -> int:

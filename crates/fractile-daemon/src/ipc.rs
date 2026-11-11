@@ -100,6 +100,10 @@ fn handle(d: Arc<Daemon>, s: UnixStream, pid: i32) {
             d.broadcast("capabilities_changed", json!({}));
         }
     }
+    // An editor that exits while listening must not leave shortcuts off.
+    if d.resume_hotkeys(Some(conn.id)) {
+        warn!(d.log, "shortcut editor connection closed during a pause; global shortcuts restored");
+    }
     if let Some(id) = conn.sub_id {
         d.subscribers.lock().unwrap().retain(|s| s.id != id);
         if conn.client == "ui" {
@@ -216,6 +220,7 @@ pub fn status(d: &Daemon) -> Value {
         "locked": d.is_locked(),
         "config_error": d.cfg_error.lock().unwrap().clone(),
         "hotkey_errors": d.hotkey_errors.lock().unwrap().clone(),
+        "hotkeys_paused": d.hotkeys_paused(),
         "integration": crate::bridge::get().map(|b| b.status()).unwrap_or(Value::Null),
     })
 }
@@ -480,6 +485,14 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             d.apply_config(cfg)?;
             Ok(json!({"ok": true}))
         }
+        // A shortcut editor is listening: pause global shortcuts so the
+        // compositor passes the keys to it (Wayland has no client grab).
+        "hotkeys_pause" => {
+            let secs = p.get("seconds").and_then(|v| v.as_u64()).unwrap_or(60).clamp(1, 300);
+            d.pause_hotkeys(c.id, secs);
+            Ok(json!({"paused": true, "seconds": secs}))
+        }
+        "hotkeys_resume" => Ok(json!({"resumed": d.resume_hotkeys(Some(c.id))})),
         "shortcut_check" => Ok(d.probe_accelerator(req_s(p, "accelerator")?, s(p, "own_id"))),
         "autostart_status" => Ok(crate::autostart::status()),
         "autostart_set" => {

@@ -200,7 +200,7 @@ class ShortcutDialog(QDialog):
         self._vis()
 
     def _scope_changed(self):
-        self.keys.scope = self.scope.currentData()
+        self.keys.setScope(self.scope.currentData())
         self.keys._render()
 
     def _vis(self):

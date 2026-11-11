@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
@@ -82,6 +82,9 @@ pub struct Daemon {
     pub last_report: Mutex<Option<Value>>,
     pub hotkey_errors: Mutex<BTreeMap<String, String>>,
     pub hotkey_actions: Mutex<HashMap<String, (String, ShortcutAction, bool)>>,
+    /// Global shortcuts paused while a shortcut editor listens:
+    /// (connection id, pause generation). See `pause_hotkeys`.
+    pub hotkey_pause: Mutex<Option<(u64, u64)>>,
     pub session_key: String,
     pub new_login: AtomicBool,
     /// The login flow of a new login has not finished deciding/starting its
@@ -130,6 +133,7 @@ impl Daemon {
             last_report: Mutex::new(None),
             hotkey_errors: Mutex::new(BTreeMap::new()),
             hotkey_actions: Mutex::new(HashMap::new()),
+            hotkey_pause: Mutex::new(None),
             session_key,
             new_login: AtomicBool::new(new_login),
             // Set from the start for a new login, so an exit snapshot cannot
@@ -415,6 +419,51 @@ impl Daemon {
         actions.clear();
     }
 
+    /// Pause every global shortcut while a shortcut editor listens for
+    /// keys. On Wayland a client cannot grab the keyboard, so the
+    /// compositor would otherwise act on Fractile's own active shortcuts (the
+    /// panel opens instead of the editor seeing Ctrl+Alt+G). The pause ends
+    /// with `resume_hotkeys`, when that connection closes, or after `secs`.
+    pub fn pause_hotkeys(self: &Arc<Self>, conn: u64, secs: u64) -> u64 {
+        static GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let gen = GEN.fetch_add(1, Ordering::SeqCst);
+        *self.hotkey_pause.lock().unwrap() = Some((conn, gen));
+        self.unregister_all_hotkeys();
+        info!(self.log, "global shortcuts paused while a shortcut editor listens (up to {secs} s)");
+        let d = self.clone();
+        std::thread::Builder::new()
+            .name("hotkey-pause".into())
+            .spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(secs));
+                if d.hotkey_pause.lock().unwrap().map(|(_, g)| g) == Some(gen) {
+                    warn!(d.log, "shortcut editor pause timed out; global shortcuts restored");
+                    d.resume_hotkeys(None);
+                }
+            })
+            .ok();
+        gen
+    }
+
+    /// End a pause. `conn` = Some(id) ends it only if that connection made
+    /// it (a disconnect or a resume from another editor leaves others alone).
+    pub fn resume_hotkeys(&self, conn: Option<u64>) -> bool {
+        {
+            let mut p = self.hotkey_pause.lock().unwrap();
+            match (*p, conn) {
+                (None, _) => return false,
+                (Some((c, _)), Some(want)) if c != want => return false,
+                _ => *p = None,
+            }
+        }
+        self.register_hotkeys();
+        info!(self.log, "global shortcuts resumed");
+        true
+    }
+
+    pub fn hotkeys_paused(&self) -> bool {
+        self.hotkey_pause.lock().unwrap().is_some()
+    }
+
     pub fn register_hotkeys(&self) {
         let cfg = self.config();
         let adapter = self.adapter();
@@ -423,6 +472,10 @@ impl Daemon {
             let _ = adapter.unregister_hotkey(id);
         }
         actions.clear();
+        if self.hotkeys_paused() {
+            // A config change during the pause takes effect on resume.
+            return;
+        }
         let mut errors = BTreeMap::new();
         if !adapter.capabilities().supports(Operation::RegisterHotkey) {
             errors.insert("*".into(), "global shortcuts are not available with this adapter".into());
