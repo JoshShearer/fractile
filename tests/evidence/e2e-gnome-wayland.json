@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-11T06:43:07-0600",
+  "when": "2026-11-11T10:44:42-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:309329598 gnome:309329597"
+      "detail": "gnome:3066320939 gnome:3066320938"
     },
     {
       "id": "W03",
@@ -61,7 +61,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "973 ms incl. key injection"
+      "detail": "972 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -73,13 +73,13 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1789 ms"
+      "detail": "1769 ms"
     },
     {
       "id": "W12",
       "name": "shortcut starts the Wayland UI; the panel is shown, focused and inside the work area",
       "ok": true,
-      "detail": "1.0s incl. UI start; panel {'h': 386, 'w': 427, 'x': 586, 'y': 423} own=True"
+      "detail": "1.0s incl. UI start; panel {'h': 386, 'w': 427, 'x': 800, 'y': 32} own=True"
     },
     {
       "id": "W13",
@@ -91,7 +91,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:309329598"
+      "detail": "active gnome:3066320939"
     },
     {
       "id": "W15",
@@ -127,7 +127,7 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot 58cd6f8f-05f6-4f60-854f-baf8d46e4f59 (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot d1b8f713-e91a-4ff9-b347-3493a9fd79a7 (4 windows)"
     },
     {
       "id": "W23",
@@ -139,7 +139,7 @@
       "id": "W24",
       "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
       "ok": true,
-      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:309329603 closed while being placed']"
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:3066320944 closed while being placed']"
     },
     {
       "id": "W18",

@@ -131,6 +131,21 @@ desktops only. See PLATFORM_MATRIX.md.
   resolved to depended on hash order, so a restore could launch a different
   entry. The user's own entries win, then the entry named after the class.
 - The shortcut dialog clipped the grid under a two-line message.
+- Started by the systemd user unit (the default autostart), the service is
+  outside any login session and has no `XDG_SESSION_ID`, so every login of a
+  boot had the same session key. After a log-out and log-in nothing was
+  restored, and the lock state was unknown. The service now asks logind for
+  the user's graphical session (`User.Display`) when the environment does not
+  name one. Found in a real log-out and log-in in the Ubuntu VM (V06); the
+  simulated relogins set `XDG_SESSION_ID` and could not catch it.
+- On GNOME no logout snapshot was saved: gnome-session stops GNOME Shell
+  before systemd stops the service, so the capture at SIGTERM found the
+  extension gone. Fractile now registers with gnome-session and takes the
+  logout snapshot when the session ends (EndSession), before the shell stops;
+  it answers at once when asked whether the logout may go ahead. If a capture
+  at exit still fails because the compositor is gone, the layout last seen in
+  the session (at most about 10 s old) is saved instead, and the log says so
+  (V06 in the Ubuntu VM).
 - In the "Restore your windows from last time?" dialog, focus started on the
   first row's checkbox. In the Ubuntu 24.04 GNOME session, pressing Enter to
   accept toggled that checkbox, and nothing was restored. The dialog now
@@ -141,8 +156,15 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Known issues and limits
 
-- Not validated on real logins, real logout/reboot, mixed DPI, monitor hot-plug,
-  the tray, Plasma X11, or GNOME 45/47/48.
+- Real logins, log-out and reboot are validated on Ubuntu 24.04 GNOME
+  Wayland only (VM). X11 and KDE logins are simulated. Mixed DPI and monitor
+  disconnect/reconnect are validated on headless GNOME (virtual monitors
+  changed through DisplayConfig), not with physical monitors. The tray is
+  validated on GNOME with the AppIndicator extension only.
+- On Plasma and other desktops without gnome-session, the logout snapshot is
+  taken at SIGTERM. If the compositor is already gone by then, the layout
+  last seen (up to about 10 s old) is saved. Not tested on a real Plasma
+  log-out.
 - COSMIC: no window control (platform limitation).
 - Google Chrome and Chromium incognito windows cannot be detected (no marker
   in the title or the window properties) and are recorded in snapshots like

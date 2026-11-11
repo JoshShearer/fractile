@@ -16,23 +16,34 @@ cannot show.
 | ID | Where | Desktop | Used by |
 |---|---|---|---|
 | E1 | Pop!_OS 24.04 host, kernel 7.2.6, NVIDIA RTX 3080 | GNOME Shell 46.0 on X11, nested in Xephyr 1600x1200, private D-Bus | X11 E2E, GUI, Settings, perf/soak |
-| E2 | same host | GNOME Shell 46.0 `--headless --wayland --no-x11`, one virtual 1600x1200 monitor | GNOME Wayland E2E |
-| E3 | same host | as E2 with two virtual monitors (1600x1200 + 1280x1024, scale 1) | multi-monitor E2E |
+| E2 | same host | GNOME Shell 46.0 `--headless --wayland --no-x11`, one virtual 1600x1200 monitor | GNOME Wayland E2E, Settings, tray |
+| E3 | same host | as E2 with two virtual monitors (1600x1200 + 1280x1024); scale and enabled state changed at runtime through Mutter DisplayConfig | multi-monitor and display-change E2E |
 | E4 | archlinux:latest container on the host kernel | KWin 6.8.2 `--virtual`, Wayland, no Xwayland | KWin E2E |
 | E5 | ubuntu:24.04 container | Openbox on Xvfb | .deb install, lifecycle, T22 |
 | E6 | archlinux:latest container | Openbox on Xvfb | PKGBUILD build, install, lifecycle |
+| E7 | ubuntu:24.04 container | kwin_x11 4:5.27.11 (Plasma X11) on Xvfb, no plasmashell | X11 E2E under KWin |
+| E8 | fedora:39 / 41 / 42 containers | GNOME Shell 45.10 / 47.10 / 48.8 headless Wayland | the five GNOME Wayland suites |
+| E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0 Wayland, real GDM logins | VM E2E (`tests/vm/`) |
 
 ## Results
 
 | Suite | Command | Env | Result | Evidence |
 |---|---|---|---|---|
-| Rust unit, property and restore-simulation tests | `cargo test --workspace` | host | 75 passed, 0 failed | (console) |
-| X11 E2E | `python3 tests/integration/e2e_x11.py` | E1 | 34/34 | `tests/evidence/e2e-x11.json` |
-| GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/01-10` |
-| Settings and shortcut editor | `python3 tests/gui/settings_x11.py` | E1 | 14/14 | `tests/evidence/settings-x11.json`, screenshots `tests/evidence/gui/14,15,20-27` |
-| GNOME Wayland E2E | `python3 tests/integration/e2e_gnome_wayland.py` | E2 | 24/24 | `tests/evidence/e2e-gnome-wayland.json` |
+| Rust unit, property and restore-simulation tests | `cargo test --workspace` | host | all pass | (console) |
+| X11 E2E | `python3 tests/integration/e2e_x11.py` | E1 | 39/39 | `tests/evidence/e2e-x11.json` |
+| X11 E2E under Plasma X11 | `bash tests/kwin-x11/e2e-kwin-x11-in-container.sh` | E7 | 39/39 | `tests/evidence/e2e-x11-kwin.json` |
+| Real apps (T14: browsers, editors, terminals) | `python3 tests/integration/e2e_x11_apps.py` | E1 | 13/13, Chrome incognito recorded as a known limitation | `tests/evidence/e2e-x11-apps.json` |
+| GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/` |
+| Settings and shortcut editor (X11) | `python3 tests/gui/settings_x11.py` | E1 | 18/18 | `tests/evidence/settings-x11.json` |
+| Recovery dialog keys | `python3 tests/gui/recovery_keys.py` | host (offscreen Qt) | 3/3 | `tests/evidence/recovery-keys.json` |
+| GNOME Wayland E2E | `python3 tests/integration/e2e_gnome_wayland.py` | E2 | 25/25 | `tests/evidence/e2e-gnome-wayland.json` |
 | GNOME Wayland multi-monitor | `python3 tests/integration/e2e_gnome_wayland_multimon.py` | E3 | 8/8 | `tests/evidence/e2e-gnome-wayland-multimon.json` |
+| GNOME Wayland display changes (mixed DPI, disconnect/reconnect) | `python3 tests/integration/e2e_gnome_wayland_displays.py` | E3 | 10/10 | `tests/evidence/e2e-gnome-wayland-displays.json` |
+| Settings on GNOME Wayland | `python3 tests/gui/settings_gnome_wayland.py` | E2 | 18/18 | `tests/evidence/settings-gnome-wayland.json` |
+| Tray on GNOME Wayland (AppIndicator extension) | `python3 tests/gui/tray_gnome_wayland.py` | E2 | 12/12 | `tests/evidence/tray-gnome-wayland.json` |
+| GNOME 45 / 47 / 48 (all five GNOME Wayland suites) | `bash tests/gnome/e2e-gnome-in-container.sh fedora:39` (`:41`, `:42`) | E8 | all pass on each | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 19/19 | `tests/evidence/e2e-kwin-wayland.json` |
+| Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` | E9 | 7/7 | `tests/evidence/vm-ubuntu24.04-wayland.json`, screenshots `tests/evidence/vm/` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
 | .deb package lifecycle | `bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb` | E5 | passed | `tests/evidence/package-deb-ubuntu24.04.log` |
 | Arch package lifecycle | `bash packaging/test/arch-in-container.sh` | E6 | passed | `tests/evidence/package-arch.log` |
@@ -76,6 +87,12 @@ not include the compositor's paint.
 | Integration with the wrong adapter API showed only "not connected" | T19 work | no reason shown | W23 PASS |
 | KDE kept Fractile's shortcuts after exit | K17 | ghost bindings in kglobalshortcutsrc | K17 PASS |
 | Automatic snapshot store grew between periodic ticks | soak P07 | growth with every restore | bounded (P07) |
+| Under the systemd user unit every login of a boot had the same session key (no `XDG_SESSION_ID`), so no login restore ran after a log-out, and the lock state was unknown | VM V06 | guest DB: both sessions keyed `<boot>:nosession`; no login flow at the second login | each login keyed by its logind session (User.Display); V06 PASS |
+| On GNOME no logout snapshot: gnome-session stops GNOME Shell before systemd stops the service | VM V06 | "exit capture failed: ... extension is not connected"; "no snapshot from the previous session" | snapshot taken at gnome-session's EndSession (15 windows); V06 PASS |
+| Enter in the restore prompt unticked the focused row instead of restoring | VM V05 | Enter toggled the focused row checkbox; nothing was restored | focus on "Restore selected"; R01-R03 and V05 PASS |
+| GNOME 45: a frame rescaled while crossing monitors of another scale was learned as the window's minimum | GNOME 45 display suite (D02) | learned minimum 2272 px; later placements too large | re-requested, never learned; D02 PASS 3/3 |
+| GNOME 47: a window a pixel or two over the cell was left on the wrong monitor | GNOME 47 display suite (D02) | D02 FAIL | D02 PASS |
+| GNOME 47: the first placement of a new window was undone by Mutter | GNOME 47 E2E (W04) | `e2e-gnome-wayland-gnome47-before-fix.json` | W04 PASS |
 
 ## Security checks (T22, T26)
 
@@ -93,11 +110,14 @@ not include the compositor's paint.
 
 ## What is not covered
 
-- Real logins, logouts and reboots (T10), and a 24-hour soak (T27): the soak
-  is 20 minutes plus 10 simulated relogins and 6 logouts during a restore.
-- Mixed DPI (T08), monitor hot-plug at runtime (T13), the tray (DV-19),
-  Plasma X11, GNOME 45/47/48.
-- Settings and the shortcut editor on Wayland (the probe runs on X11 only).
+- Real logins on X11 and KDE (simulated relogins only), a power-loss
+  interruption, and physical monitors (mixed DPI and disconnect/reconnect ran
+  on virtual monitors through DisplayConfig).
+- A real Plasma log-out (the logout snapshot there is taken at SIGTERM).
+- The tray outside GNOME with the AppIndicator extension.
 - COSMIC: BLOCKED BY PLATFORM (docs/compatibility/cosmic.md).
-- Pop!_OS host package install (no root on the test host); Ubuntu 24.04 in a
-  container instead.
+- Pop!_OS host package install (no root on the test host): dependency
+  resolution was simulated (`tests/evidence/package-deb-popos24.04-simulate.log`);
+  the real install ran on Ubuntu 24.04 (container and VM).
+- The 24-hour soak (T27) is running; until it finishes, the soak evidence is
+  the 20-minute run.

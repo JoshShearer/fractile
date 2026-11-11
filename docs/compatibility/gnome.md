@@ -14,12 +14,30 @@ Fractile controls windows on GNOME in two different ways, depending on the sessi
 | GNOME Shell 46.0, X11, nested (Xephyr + `gnome-shell --x11`, real Mutter as WM), Pop!_OS 24.04 host | all functional checks pass | `tests/evidence/e2e-x11.json`, `gui-x11.json`, `perf-x11.json` |
 | GNOME Shell 46.0, Wayland, headless (`gnome-shell --headless --wayland --no-x11`, one 1600x1200 virtual monitor) | all checks pass | `tests/evidence/e2e-gnome-wayland.json` |
 | Same, two virtual monitors 1600x1200 + 1280x1024 | all checks pass | `tests/evidence/e2e-gnome-wayland-multimon.json` |
+| Same, monitors changed at runtime through Mutter DisplayConfig: scale 2 + scale 1 (mixed DPI), monitor disabled and re-enabled | 10/10 | `tests/evidence/e2e-gnome-wayland-displays.json` |
+| Same, tray: Ubuntu AppIndicators extension + the PyQt6 UI | 12/12 | `tests/evidence/tray-gnome-wayland.json` |
+| GNOME Shell 45.10 (Fedora 39), 47.10 (Fedora 41), 48.8 (Fedora 42), each headless in a container (`tests/gnome/e2e-gnome-in-container.sh`): the functional, two-monitor, display-change (mixed DPI, disconnect/reconnect), Settings and tray suites | all pass on all three | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
+| Ubuntu 24.04.5 desktop (GNOME Shell 46.0, Wayland) in a QEMU/KVM VM: real GDM login, `apt install` of the .deb, start from the app menu, real log-out and log-in, reboot and restore (`tests/vm/vm-e2e.sh wayland`) | 7/7 | `tests/evidence/vm-ubuntu24.04-wayland.json`, screenshots in `tests/evidence/vm/` |
 
-**Not tested:** a real (non-nested, non-headless) GNOME login; GNOME 45, 47 or 48
-(the extension's metadata declares 45-48, but only 46 was exercised); mixed-DPI
-monitors (the virtual monitors are all scale 1); fractional scaling; monitor
-hot-plug during a session; the tray icon (stock GNOME has no tray without the
-AppIndicator extension); real logout and reboot.
+Version differences found by these runs, and handled:
+
+- **GNOME 47** lists a new window before Mutter has placed it. Fractile offers
+  new windows only once Mutter has shown them, so its first placement is not
+  undone.
+- **GNOME 45** (Mutter physical layout mode) briefly rescales a window's frame
+  while it moves to a monitor of another scale. Fractile requests the placement
+  again and does not take the rescaled frame as the window's minimum size.
+- **GNOME 47** (logical layout mode) does not move a window whose minimum is a
+  pixel or two over the cell. Fractile learns that minimum when the move was
+  skipped, and the next placement fits.
+
+At log-out, gnome-session stops GNOME Shell before systemd stops the
+Fractile service, so Fractile registers with gnome-session and saves the
+logout snapshot when the session ends, before the shell goes.
+
+**Not tested:** fractional scaling; a physical monitor hot-plug (the display
+changes above are made through DisplayConfig on virtual monitors); a
+non-Ubuntu real login.
 
 ## Setting it up on Wayland
 

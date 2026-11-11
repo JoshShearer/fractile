@@ -43,7 +43,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | DV-15 | Local shortcuts only while the panel is open | VERIFIED (G16) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-16 | Global shortcuts; reject and explain conflicts | VERIFIED (X09, X10, X11) | VERIFIED (W09) | VERIFIED (K09) | BLOCKED BY PLATFORM |
 | DV-17 | Repeated shortcut cycles monitors | NOT TESTED | VERIFIED (M04) | NOT TESTED | BLOCKED BY PLATFORM |
-| DV-18 | Start at login | PARTIAL: systemd unit enable (Ubuntu container) and XDG entry (Arch container) verified; no real login | PARTIAL: same | PARTIAL: same | BLOCKED BY PLATFORM |
+| DV-18 | Start at login | PARTIAL: systemd unit enable (Ubuntu container) and XDG entry (Arch container) verified; no real login | VERIFIED (Ubuntu 24.04 VM, real GDM logins): the first start from the app menu turns autostart on (systemd unit enabled, V02); after a real log-out and log-in the unit starts the service and it controls windows (V03) | PARTIAL: systemd unit enable and XDG entry verified in containers; no real login | BLOCKED BY PLATFORM |
 | DV-19 | Optional tray icon | NOT TESTED | VERIFIED with the Ubuntu AppIndicators extension (the tray Ubuntu and Pop!_OS ship): icon appears at service start with no window (Y01-Y03, screenshot 30-tray-topbar), its menu works (Y04-Y06), click opens the panel (Y07), the setting turns it off and on (Y08). Stock GNOME has no tray: the background UI then exits and the panel still opens (Y10, Y11) | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-20 | Show/hide shortcut with focus return | VERIFIED (G01, G04) | VERIFIED (W12, W14) | PARTIAL: shown and focused (K12); focus return not run | BLOCKED BY PLATFORM |
 | DV-21 | Live preview, non-interactive | VERIFIED (G14) | NOT TESTED (drawn by the extension) | NOT TESTED (drawn by the UI) | BLOCKED BY PLATFORM |
@@ -75,7 +75,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | RS-14 | Never close or replace windows | VERIFIED (by design; no close call exists in the restore engine) | |
 | RS-15 | Atomic, checksummed, backed-up store; corrupt latest falls back | VERIFIED (unit) | `corrupt_latest_falls_back_to_previous_good`, `refuses_newer_schema` |
 | RS-16 | Rolling retention (10 min, 30 recent, 7 daily) | VERIFIED | `retention_keeps_recent_daily_and_manual`, P07 |
-| RS-17 | Logout/shutdown capture without depending on it | VERIFIED | X22, W22 (logind PrepareForShutdown with a delay inhibitor) |
+| RS-17 | Logout/shutdown capture without depending on it | VERIFIED | X22, W22 (logind PrepareForShutdown with a delay inhibitor); on GNOME the logout snapshot is taken at gnome-session's EndSession, before GNOME Shell stops (VM V06; at SIGTERM the extension is already gone), with the layout last seen as the fallback |
 | RS-18 | Unclean-session flag and policy | PARTIAL: unit (`sessions_detect_unclean`); no power-cut test | |
 | RS-19 | Lock-screen redaction | VERIFIED (GW) | W21 |
 | RS-20 | Private windows excluded | PARTIAL: VERIFIED (X11) for Firefox 159: a real private window ("... Mozilla Firefox Private Browsing") is left out of the snapshot while the two normal windows are recorded (A01e). NOT MET for Google Chrome 157: its incognito window has no marker in the title or in any X11 property, so it is recorded like a normal window; recorded as a known limitation (`known_limitations` in the evidence) and documented in the user guide with the workaround (turn off stored titles) | `e2e-x11-apps.json` |
@@ -137,7 +137,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | T07 | Multi-monitor selection and cycle | VERIFIED (GW); NOT TESTED (X11, KW) | M01-M05 |
 | T08 | 100 placements on mixed DPI | VERIFIED (GW): 100 placements alternating a scale-2 and a scale-1 monitor, exact, no drift (D02); scale changed at runtime (D01); snapshot restore across both (D03). X11 and KW not run | D01-D03, M06 |
 | T09 | Named layout; launch missing apps | PARTIAL: layout (X26) and approved launch on restore (X18); layout launch-missing mode not run | |
-| T10 | Reboot restore of 10 apps / 15 windows | NOT TESTED: no real reboot. Simulated relogins: X27, X28, P08 (3 windows, 10 relogins); simulated restore of 10 apps / 15 windows with no duplicates (`restore_many_apps_without_duplicates`) | |
+| T10 | Reboot restore of 10 apps / 15 windows | VERIFIED (GW, Ubuntu 24.04.5 VM, GNOME 46.0): 10 apps / 15 windows on a 4x4 grid; after a real reboot and GDM login Fractile asks first and Enter restores all 15 where they were, no duplicates (V05); with asking off, after a real log-out and log-in all 15 come back automatically (V06). X11 and KW: simulated relogins only (X27, X28, P08) | `vm-ubuntu24.04-wayland.json`, `tests/evidence/vm/` |
 | T11 | App open before restore: reuse | VERIFIED | X13, X19, X27 |
 | T12 | Two windows of one app | VERIFIED (X11): two windows of one app are listed separately and each returns to its own place, nothing duplicated (X30a, X30); real browsers and VS Code with two windows each (A01-A03); unit/sim (`two_windows_same_app_distinguished_by_title`, `indistinguishable_windows_use_ordinal_and_flag`) | X30, A01-A03 |
 | T13 | Monitor disconnect/reconnect | VERIFIED (GW): disconnect at runtime (D04-D06), reconnect with the same stable id; windows go back when the return option is on (D07) and stay put when it is off, the default (D08). X11 and KW not run | D04-D09 |
@@ -152,7 +152,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | T22 | Permission boundary / IPC abuse | VERIFIED: other uid refused (root and a second user, Ubuntu container), non-compositor same-uid refused (SEC5, SEC6), hello required (SEC2), no command execution from imports (SEC3, SEC7) | |
 | T23 | Session locked | VERIFIED (GW, through logind LockedHint from a test logind) | W21; real lock screen not run |
 | T24 | Arch packaging, clean install | VERIFIED (container) | `package-arch.log` |
-| T25 | Ubuntu/Pop!_OS packaging, clean install | VERIFIED (Ubuntu 24.04 container); Pop!_OS install NOT TESTED (no root on the test host) | `package-deb-ubuntu24.04.log` |
+| T25 | Ubuntu/Pop!_OS packaging, clean install | VERIFIED (Ubuntu 24.04 container; and `apt install` on a real Ubuntu 24.04.5 desktop VM, dependencies from the Ubuntu archive, V01); Pop!_OS install NOT TESTED (no root on the test host) | `package-deb-ubuntu24.04.log` |
 | T26 | Malicious import | VERIFIED | SEC3, SEC4, SEC7 |
 | T27 | 24 h soak; repeated relogins | PARTIAL: 20-minute soak, 10 simulated relogins and 6 logouts during a restore all pass (P06, P08, P09); not 24 h, not real logins | `perf-x11.json` |
 | T28 | Uninstall/reinstall, config policy | VERIFIED (Ubuntu and Arch containers) | package logs |

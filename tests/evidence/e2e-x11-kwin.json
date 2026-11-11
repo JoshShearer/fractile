@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-11T10:41:06+0000",
-  "environment": "xvfb with  (Plasma X11 window manager, no plasmashell)",
+  "when": "2026-11-11T14:58:42+0000",
+  "environment": "xvfb with kwin_x11 4:5.27.11-0ubuntu3 (Plasma X11 window manager, no plasmashell)",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 152"
+      "detail": "pid 154"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "51 ms incl. polling"
+      "detail": "48 ms incl. polling"
     },
     {
       "id": "X10",
@@ -97,7 +97,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1753 ms"
+      "detail": "1752 ms"
     },
     {
       "id": "X14",
@@ -223,7 +223,7 @@
       "id": "X30",
       "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
       "ok": true,
-      "detail": "retitled True; Doc 1 at {'h': 1200, 'w': 800, 'x': 0, 'y': 0} want {'h': 1200, 'w': 800, 'x': 0, 'y': 0}; Doc 2 at {'h': 1200, 'w': 800, 'x': 800, 'y': 0} want {'h': 1200, 'w': 800, 'x': 800, 'y': 0}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2167, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 600, \"w\": 800, \"x\": 800, \"y\": 600}, \"record_"
+      "detail": "retitled True; Doc 1 at {'h': 1200, 'w': 800, 'x': 0, 'y': 0} want {'h': 1200, 'w': 800, 'x': 0, 'y': 0}; Doc 2 at {'h': 1200, 'w': 800, 'x': 800, 'y': 0} want {'h': 1200, 'w': 800, 'x': 800, 'y': 0}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2168, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 600, \"w\": 800, \"x\": 800, \"y\": 600}, \"record_"
     },
     {
       "id": "X31",
