@@ -84,6 +84,9 @@ pub struct Daemon {
     pub hotkey_actions: Mutex<HashMap<String, (String, ShortcutAction, bool)>>,
     pub session_key: String,
     pub new_login: AtomicBool,
+    /// The login flow of a new login has not finished deciding/starting its
+    /// restore yet (no restore job exists until it does).
+    pub login_restore_pending: AtomicBool,
     pub env: Environment,
     pub log: Arc<Logger>,
     pub shutdown: AtomicBool,
@@ -125,6 +128,9 @@ impl Daemon {
             hotkey_actions: Mutex::new(HashMap::new()),
             session_key,
             new_login: AtomicBool::new(new_login),
+            // Set from the start for a new login, so an exit snapshot cannot
+            // slip in before the login flow has decided; login_flow clears it.
+            login_restore_pending: AtomicBool::new(new_login),
             env,
             log,
             shutdown: AtomicBool::new(false),
@@ -496,6 +502,13 @@ impl Daemon {
     /// Locked per logind (LockedHint) or per the compositor integration.
     /// While locked Fractile moves, activates and captures nothing on its
     /// own (SRS T23).
+    /// A restore is running or the login restore is about to start. While
+    /// true, automatic snapshots are not taken: they would record a
+    /// half-restored desktop over the layout the user wants back.
+    pub fn restore_in_progress(&self) -> bool {
+        self.login_restore_pending.load(std::sync::atomic::Ordering::SeqCst) || self.restore.lock().unwrap().is_some()
+    }
+
     pub fn is_locked(&self) -> bool {
         self.locked.load(std::sync::atomic::Ordering::SeqCst) || self.adapter().session_locked() == Some(true)
     }

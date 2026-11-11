@@ -34,6 +34,19 @@ pub fn capture_now(d: &Daemon, mode: SnapshotMode, name: Option<String>) -> R<Sn
     Ok(capture(&input, &cfg, mode, name))
 }
 
+/// Store an automatic snapshot (periodic, logout, shutdown, pre-restore) and
+/// apply rolling retention right away, so frequent restores or logouts cannot
+/// grow the store between periodic ticks. Manual saves are never pruned.
+fn save_automatic(d: &Daemon, s: &fractile_core::snapshot::Snapshot) -> Result<(), String> {
+    let cfg = d.config();
+    let mut st = d.store.lock().unwrap();
+    st.save_snapshot(s, false)?;
+    if let Err(e) = st.prune(cfg.session.max_recent, cfg.session.daily_history_days) {
+        warn!(d.log, "snapshot retention failed: {e}");
+    }
+    Ok(())
+}
+
 pub fn save_snapshot(d: &Daemon, name: Option<String>, mode: SnapshotMode) -> R<String> {
     if d.config().session.policy == RestorePolicy::Off && mode != SnapshotMode::Manual {
         return Err(err("disabled", "session snapshots are turned off"));
@@ -205,7 +218,7 @@ fn start_job(d: &Arc<Daemon>, src: Source, req: &RestoreRequest, source_label: &
     if !has_baseline && !matches!(src, Source::Snapshot(ref s) if s.mode == SnapshotMode::PreRestore) {
         if let Ok(mut base) = capture_now(d, SnapshotMode::PreRestore, None) {
             base.diagnostics.push(format!("baseline for restore run {run_id}"));
-            let _ = d.store.lock().unwrap().save_snapshot(&base, false);
+            let _ = save_automatic(d, &base);
             let _ = d.store.lock().unwrap().meta_set(&format!("baseline:{run_id}"), &base.snapshot_id);
             let _ = d.store.lock().unwrap().meta_set("last_baseline", &base.snapshot_id);
         }
@@ -416,18 +429,20 @@ pub fn autosave_loop(d: Arc<Daemon>) {
         if d.is_locked() && cfg.session.skip_capture_when_locked {
             continue;
         }
+        if d.restore_in_progress() {
+            continue;
+        }
         match capture_now(&d, SnapshotMode::Periodic, None) {
             Ok(s) if s.windows.is_empty() => {}
             Ok(s) => {
                 let prev = d.store.lock().unwrap().latest_fingerprint();
                 if prev.as_deref() != Some(s.content_fingerprint().as_str()) {
-                    if let Err(e) = d.store.lock().unwrap().save_snapshot(&s, false) {
+                    if let Err(e) = save_automatic(&d, &s) {
                         error!(d.log, "autosave failed: {e}");
                     } else {
                         info!(d.log, "autosave {} ({} windows)", s.snapshot_id, s.windows.len());
                     }
                 }
-                let _ = d.store.lock().unwrap().prune(cfg.session.max_recent, cfg.session.daily_history_days);
             }
             Err(e) => warn!(d.log, "autosave capture failed: {}", e.message),
         }
@@ -482,6 +497,15 @@ pub fn wait_for_readiness(d: &Daemon, timeout: Duration) -> bool {
 
 /// Login flow: decide whether/how to restore according to policy.
 pub fn login_flow(d: Arc<Daemon>) {
+    // Clears login_restore_pending on every return path, after a login
+    // restore (if any) has registered its job.
+    struct PendingDone(Arc<Daemon>);
+    impl Drop for PendingDone {
+        fn drop(&mut self) {
+            self.0.login_restore_pending.store(false, Ordering::SeqCst);
+        }
+    }
+    let _pending = PendingDone(d.clone());
     let cfg = d.config();
     let key = d.session_key.clone();
     let store_prev = d.store.lock().unwrap().previous_session(&key).ok().flatten();
@@ -509,9 +533,11 @@ pub fn login_flow(d: Arc<Daemon>) {
         d.request_ui("notice", json!({"level": "warning", "message": "Automatic restore was paused after repeated failures. Open Session Restore settings to retry."}));
         return;
     }
-    if !wait_for_readiness(&d, Duration::from_secs(cfg.session.readiness_timeout_s)) {
-        warn!(d.log, "desktop did not settle within {}s; restoring anyway", cfg.session.readiness_timeout_s);
-    }
+    let settle = || {
+        if !wait_for_readiness(&d, Duration::from_secs(cfg.session.readiness_timeout_s)) {
+            warn!(d.log, "desktop did not settle within {}s; restoring anyway", cfg.session.readiness_timeout_s);
+        }
+    };
     let unclean = store_prev.as_ref().map(|p| !p.clean).unwrap_or(false);
     let since = store_prev.as_ref().map(|p| p.started_at.clone());
     let pick = |modes: &[SnapshotMode]| -> Option<Snapshot> {
@@ -526,6 +552,7 @@ pub fn login_flow(d: Arc<Daemon>) {
     };
     match policy {
         RestorePolicy::Named => {
+            settle();
             if let Some(name) = cfg.session.named_layout.clone() {
                 if cfg.session.confirm_before_restore {
                     d.request_ui("show_recovery", json!({"layout": name, "reason": "named_layout"}));
@@ -534,13 +561,27 @@ pub fn login_flow(d: Arc<Daemon>) {
                 }
             }
         }
-        RestorePolicy::Ask => ask("ask_each_login", pick(&[SnapshotMode::Logout, SnapshotMode::Shutdown, SnapshotMode::Periodic]).as_ref()),
+        RestorePolicy::Ask => {
+            settle();
+            ask("ask_each_login", pick(&[SnapshotMode::Logout, SnapshotMode::Shutdown, SnapshotMode::Periodic]).as_ref())
+        }
         RestorePolicy::LastClean | RestorePolicy::LastKnown => {
             let snap = if policy == RestorePolicy::LastClean && !unclean {
                 pick(&[SnapshotMode::Logout, SnapshotMode::Shutdown]).or_else(|| pick(&[SnapshotMode::Periodic]))
             } else {
                 pick(&[SnapshotMode::Logout, SnapshotMode::Shutdown, SnapshotMode::Periodic])
             };
+            // The previous session may have ended (cleanly) before its own
+            // login restore finished: no exit snapshot is taken of a
+            // half-restored desktop, so it left none. That session never
+            // got past the layout it was restoring, so restore that again.
+            let snap = snap.or_else(|| {
+                let prev = store_prev.as_ref()?;
+                let id = d.store.lock().unwrap().meta_get(&format!("login_source:{}", prev.session_key)).ok().flatten()?;
+                let s = d.store.lock().unwrap().get_snapshot(&id).ok()?;
+                info!(d.log, "previous session left no snapshot of its own (it ended during its login restore); using the snapshot it restored from, {id}");
+                Some(s)
+            });
             let Some(snap) = snap else {
                 info!(d.log, "no snapshot from the previous session to restore");
                 return;
@@ -559,12 +600,19 @@ pub fn login_flow(d: Arc<Daemon>) {
             info!(d.log, "login restore decision={decision} unclean={unclean} snapshot={}", snap.snapshot_id);
             match decision {
                 "restore" => {
+                    // Recorded before waiting, so a logout during the wait
+                    // or the restore still knows what this session wanted.
                     let _ = d.store.lock().unwrap().session_mark_restored(&key);
+                    let _ = d.store.lock().unwrap().meta_set(&format!("login_source:{key}"), &snap.snapshot_id);
+                    settle();
                     if let Err(e) = start_snapshot(&d, &snap.snapshot_id, &RestoreRequest::default(), "login", false) {
                         warn!(d.log, "login restore failed to start: {}", e.message);
                     }
                 }
-                "ask" => ask(if unclean { "unclean_shutdown" } else { "confirm" }, Some(&snap)),
+                "ask" => {
+                    settle();
+                    ask(if unclean { "unclean_shutdown" } else { "confirm" }, Some(&snap))
+                }
                 _ => {}
             }
         }
@@ -576,9 +624,11 @@ pub fn login_flow(d: Arc<Daemon>) {
 pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
     let cfg = d.config();
     let auto = matches!(cfg.session.policy, RestorePolicy::LastClean | RestorePolicy::LastKnown | RestorePolicy::Ask);
-    if auto && d.restore.lock().unwrap().is_none() && !(d.is_locked() && cfg.session.skip_capture_when_locked) {
+    if auto && d.restore_in_progress() {
+        info!(d.log, "{mode:?} snapshot skipped: a restore was still in progress (the next login restores what it was restoring)");
+    } else if auto && !(d.is_locked() && cfg.session.skip_capture_when_locked) {
         match capture_now(d, mode, None) {
-            Ok(s) if !s.windows.is_empty() => match d.store.lock().unwrap().save_snapshot(&s, false) {
+            Ok(s) if !s.windows.is_empty() => match save_automatic(d, &s) {
                 Ok(()) => info!(d.log, "{mode:?} snapshot {} saved ({} windows)", s.snapshot_id, s.windows.len()),
                 Err(e) => error!(d.log, "exit snapshot failed: {e}"),
             },

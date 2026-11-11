@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -130,13 +131,24 @@ class Env:
         return None
 
     def xdo(self, *args):
-        subprocess.run(["xdotool", *args], env=self.env, check=False, capture_output=True)
+        # bounded: xdotool's --sync waits forever if the WM adjusts the result
+        try:
+            subprocess.run(["xdotool", *args], env=self.env, check=False, capture_output=True, timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
 
     def cleanup(self):
         self.stop_daemon()
         for p in self.procs:
             if p.poll() is None:
                 p.terminate()
+        for p in self.procs:
+            try:
+                p.wait(5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+        shutil.rmtree(self.env["FRACTILE_RUNTIME_DIR"], ignore_errors=True)
+        shutil.rmtree(self.base, ignore_errors=True)
 
 
 def rect_eq(a, b, tol=0):
@@ -441,6 +453,25 @@ def run_all(e: Env) -> None:
     n = sum(1 for w in e.cli_json("list-windows") if w.get("app_id") == "org.fractile.Launchme")
     check("X27", "new login with 'restore last session': missing app relaunched and both windows placed; a same-session restart adds nothing",
           bool(back) and g_back and n == 1, f"launchme {back and back[0]['frame']} want {want_l}; editor back {g_back}; instances after restart {n}")
+
+    # log out while the login restore is still running, then log in again:
+    # no exit snapshot is taken of a half-restored desktop, so the next login
+    # must restore the layout that session was restoring (not nothing)
+    gx = str(int(g.split(":")[1], 16))
+    e.cli_json("snap", "top-right-quarter", "--window", g)
+    want_g = e.frame(g)
+    e.stop_daemon(signal.SIGTERM)  # clean logout: snapshot with the editor top right
+    e.xdo("windowmove", gx, "100", "600")
+    e.env["XDG_SESSION_ID"] = f"e2e-quick-{os.getpid()}"
+    e.start_daemon()
+    e.stop_daemon(signal.SIGTERM)  # logged out again while the login restore waits for the desktop to settle
+    skipped = "snapshot skipped: a restore was still in progress" in (e.base / "daemon.out").read_text()
+    e.xdo("windowmove", gx, "100", "600")
+    e.env["XDG_SESSION_ID"] = f"e2e-after-quick-{os.getpid()}"
+    e.start_daemon()
+    again = e.wait_for(lambda: rect_eq(e.frame(g), want_g, 2), 15.0, 0.3)
+    check("X28", "logging out during the login restore: the next login restores that layout again",
+          skipped and again, f"exit snapshot of the half-restored desktop skipped: {skipped}; editor back {again} at {e.frame(g)} want {want_g}")
 
     # no-WM / unsupported desktop honesty
     env2 = dict(e.env)
