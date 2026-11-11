@@ -624,9 +624,34 @@ pub fn login_flow(d: Arc<Daemon>) {
 pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
     let cfg = d.config();
     let auto = matches!(cfg.session.policy, RestorePolicy::LastClean | RestorePolicy::LastKnown | RestorePolicy::Ask);
-    if auto && d.restore_in_progress() {
-        info!(d.log, "{mode:?} snapshot skipped: a restore was still in progress (the next login restores what it was restoring)");
-    } else if auto && !(d.is_locked() && cfg.session.skip_capture_when_locked) {
+    // A restore still running when the session ends: stop it first so the
+    // windows hold still, and so the run ends as cancelled rather than being
+    // left "running" (which counts as a crash for the failure breaker).
+    let job = d.restore.lock().unwrap().as_ref().map(|j| (j.run_id.clone(), j.cancel.clone()));
+    if let Some((run_id, cancel)) = &job {
+        cancel.store(true, Ordering::SeqCst);
+        let t = std::time::Instant::now();
+        while d.restore.lock().unwrap().is_some() && t.elapsed() < Duration::from_secs(3) {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        if d.restore.lock().unwrap().is_some() {
+            let _ = d.store.lock().unwrap().run_finish(run_id, "cancelled", "the session ended during the restore");
+        }
+    }
+    if !auto || (d.is_locked() && cfg.session.skip_capture_when_locked) {
+        // nothing to capture
+    } else if let Some((run_id, _)) = &job {
+        match capture_interrupted(d, mode, run_id) {
+            Ok(s) if !s.windows.is_empty() => match save_automatic(d, &s) {
+                Ok(()) => info!(d.log, "{mode:?} snapshot {} saved ({} windows; the session ended during restore {run_id}, so windows it had not finished keep their restore targets)", s.snapshot_id, s.windows.len()),
+                Err(e) => error!(d.log, "exit snapshot failed: {e}"),
+            },
+            Ok(_) => {}
+            Err(e) => warn!(d.log, "exit capture failed: {}", e.message),
+        }
+    } else if d.restore_in_progress() {
+        info!(d.log, "{mode:?} snapshot skipped: the login restore had not started yet (the next login restores what it was going to restore)");
+    } else {
         match capture_now(d, mode, None) {
             Ok(s) if !s.windows.is_empty() => match save_automatic(d, &s) {
                 Ok(()) => info!(d.log, "{mode:?} snapshot {} saved ({} windows)", s.snapshot_id, s.windows.len()),
@@ -637,6 +662,43 @@ pub fn capture_at_exit(d: &Daemon, mode: SnapshotMode) {
         }
     }
     let _ = d.store.lock().unwrap().session_end(&d.session_key, true);
+}
+
+/// Exit snapshot of a session that ended during restore `run_id`: live state
+/// for what the restore finished, restore targets for what it had not (see
+/// restore::interrupted_overlay). A layout run has no snapshot to fall back
+/// on, but the layout itself is kept, so its exit snapshot is the live state.
+fn capture_interrupted(d: &Daemon, mode: SnapshotMode, run_id: &str) -> R<Snapshot> {
+    d.require(Operation::ListWindows)?;
+    let mut windows = d.windows()?;
+    let outputs = d.outputs()?;
+    let workspaces = d.adapter().get_workspaces().unwrap_or_default();
+    let caps = d.caps();
+    let cfg = d.config();
+    let run = d.store.lock().unwrap().run_get(run_id).ok().flatten();
+    let mut extra = vec![];
+    if let Some((source, Some(sid), _, _)) = run {
+        if source != "layout" {
+            let src = d.store.lock().unwrap().get_snapshot(&sid);
+            match src {
+                Ok(src) => {
+                    let items = d.store.lock().unwrap().items(run_id).unwrap_or_default();
+                    let journal: Vec<(String, ItemStatus, Option<String>)> = items.into_iter().map(|(r, st, w, ..)| (r, ItemStatus::parse(&st), w)).collect();
+                    let before: Vec<Rect> = windows.iter().map(|w| w.frame).collect();
+                    extra = fractile_session::restore::interrupted_overlay(&src, &cfg, &journal, &mut windows);
+                    let moved: Vec<&str> = windows.iter().zip(before).filter(|(w, b)| w.frame != *b).map(|(w, _)| w.id.as_str()).collect();
+                    info!(d.log, "interrupted restore {run_id}: journal {:?}; set to their restore targets {:?}; carried over without a window {}",
+                        journal.iter().map(|(r, s, w)| format!("{r}={}@{}", s.as_str(), w.as_deref().unwrap_or("-"))).collect::<Vec<_>>(), moved, extra.len());
+                }
+                Err(e) => warn!(d.log, "interrupted restore source {sid} unreadable ({e}); capturing the live state only"),
+            }
+        }
+    }
+    let input = CaptureInput { windows: &windows, outputs: &outputs, workspaces: &workspaces, caps: &caps, desktop: &d.env.current_desktop };
+    let mut s = capture(&input, &cfg, mode, None);
+    s.diagnostics.push(format!("session ended during restore {run_id}; {} records not yet restored were carried over", extra.len()));
+    s.windows.extend(extra);
+    Ok(s)
 }
 
 /// Monitor hot-plug: optional restore of the last snapshot's layout for the

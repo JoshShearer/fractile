@@ -426,3 +426,63 @@ fn cancellation() {
     assert!(t.elapsed() < Duration::from_secs(2));
     assert_eq!(rep.items[0].status, ItemStatus::Cancelled);
 }
+
+/// Session ends during a restore: finished windows keep their live geometry
+/// (the user's later change survives), unfinished ones keep their target,
+/// a record with no window is kept, and no app is recorded twice.
+#[test]
+fn interrupted_restore_overlay() {
+    let outs = vec![out("A", 0, 2560)];
+    let sim = Sim::new(outs.clone());
+    let w_done = sim.open("done.desktop", "d");
+    let w_pend = sim.open("pend.desktop", "p");
+    let w_unreached = sim.open("unreached.desktop", "u");
+    let t_done = Rect::new(0, 32, 600, 600);
+    let t_pend = Rect::new(600, 32, 700, 500);
+    let t_unr = Rect::new(1300, 32, 500, 400);
+    let t_missing = Rect::new(1800, 32, 400, 400);
+    let recs = vec![
+        rec("r0", "done.desktop", "d", 0, "A", t_done, WA_A),
+        rec("r1", "pend.desktop", "p", 0, "A", t_pend, WA_A),
+        rec("r2", "unreached.desktop", "u", 0, "A", t_unr, WA_A),
+        rec("r3", "missing.desktop", "m", 0, "A", t_missing, WA_A),
+    ];
+    let s = snapshot(outs, recs);
+    // r0 was placed, then the user moved it; r1 was matched but cancelled
+    // before placing; r2 and r3 were never reached.
+    let user_rect = Rect::new(50, 60, 900, 700);
+    let journal = vec![("r0".to_string(), ItemStatus::AlreadyPresent, Some(w_done.clone())), ("r1".to_string(), ItemStatus::Cancelled, Some(w_pend.clone()))];
+    let mut windows = sim.windows.borrow().clone();
+    windows.iter_mut().find(|w| w.id == w_done).unwrap().frame = user_rect;
+    let left = interrupted_overlay(&s, &Config::default(), &journal, &mut windows);
+    let f = |id: &str| windows.iter().find(|w| w.id == id).unwrap().frame;
+    assert_eq!(f(&w_done), user_rect, "a finished window keeps the user's change");
+    assert_eq!(f(&w_pend), t_pend, "a cancelled window keeps its target");
+    assert_eq!(f(&w_unreached), t_unr, "an unreached but open window keeps its target");
+    assert_eq!(left.len(), 1, "only the app with no window is appended: {left:?}");
+    assert_eq!(left[0].record_id, "r3");
+    assert_eq!(windows.len(), 3);
+}
+
+/// A restore cancelled before it reached an open window reports that window
+/// CANCELLED (not finished), even for a window with no desktop id.
+#[test]
+fn cancel_before_placing_reports_cancelled() {
+    let outs = vec![out("A", 0, 2560)];
+    let sim = Sim::new(outs.clone());
+    sim.open("x.desktop", "x");
+    let w = sim.windows.borrow()[0].clone();
+    let mut r = rec("r0", "x.desktop", "x", 0, "A", Rect::new(0, 32, 600, 600), WA_A);
+    r.desktop_file_id = None;
+    r.app_id = w.app_id.clone();
+    let cfg = Config::default();
+    let s = snapshot(outs, vec![r]);
+    let o = opts(&cfg);
+    sim.windows.borrow_mut()[0].desktop_file_id = None;
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    assert_eq!(p.items[0].action, PlannedAction::AlreadyOpen);
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(true));
+    assert!(rep.cancelled);
+    assert_eq!(rep.items[0].status, ItemStatus::Cancelled, "{:?}", rep.items[0]);
+    assert_eq!(sim.persisted.borrow().get("r0").map(|i| i.status), Some(ItemStatus::Cancelled));
+}

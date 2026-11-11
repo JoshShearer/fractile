@@ -609,6 +609,13 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
         if live[i].status != ItemStatus::Pending {
             continue;
         }
+        // Cancelled during phase A: what was not reached is cancelled, not
+        // judged (a later attempt or the exit snapshot still owes it).
+        if cancel.load(Ordering::SeqCst) {
+            live[i].status = ItemStatus::Cancelled;
+            emit(&live, i, "cancelled");
+            continue;
+        }
         match item.action {
             PlannedAction::WillReopen | PlannedAction::AlreadyOpen | PlannedAction::AlreadyDone => {}
             _ => continue,
@@ -862,4 +869,58 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
         })
         .collect();
     RunReport { run_id: opts.run_id.clone(), items, cancelled: cancel.load(Ordering::SeqCst), timed_out, launches: launches_total, duration_ms: start.elapsed().as_millis() as u64, warnings }
+}
+
+/// The session is ending while a restore of `source` is still running.
+/// Windows the restore already finished keep their live geometry (including
+/// any change the user made since). Records the restore had not finished
+/// (pending, launching, cancelled, or not reached yet) keep their target: a
+/// matching live window gets the target geometry, workspace and state
+/// written into `windows` before capture, and a record with no window left
+/// is returned so the caller can append it to the exit snapshot. Matching
+/// uses the restore matcher, so one app never ends up recorded twice.
+///
+/// `journal` is the run's persisted items: (record_id, status, window_id).
+pub fn interrupted_overlay(source: &Snapshot, cfg: &Config, journal: &[(String, ItemStatus, Option<String>)], windows: &mut [WindowInfo]) -> Vec<WindowRecord> {
+    let by_rec: HashMap<&str, (ItemStatus, Option<&str>)> = journal.iter().map(|(r, s, w)| (r.as_str(), (*s, w.as_deref()))).collect();
+    let unfinished = |s: Option<ItemStatus>| matches!(s, None | Some(ItemStatus::Pending | ItemStatus::Launching | ItemStatus::Cancelled));
+    // Windows the restore is done with belong to their current state.
+    let mut claimed: HashSet<String> = journal.iter().filter(|(_, s, _)| !unfinished(Some(*s))).filter_map(|(_, _, w)| w.clone()).collect();
+    let targets = targets_from_snapshot(source, cfg);
+    let open: Vec<&Target> = targets.iter().filter(|t| unfinished(by_rec.get(t.record.record_id.as_str()).map(|x| x.0))).collect();
+    let apply = |w: &mut WindowInfo, t: &Target| {
+        w.frame = t.record.absolute_geometry;
+        if t.record.output_stable_id.is_some() {
+            w.output_id = t.record.output_stable_id.clone();
+        }
+        if t.workspace.is_some() {
+            w.workspace = t.workspace;
+        }
+        if let Some(st) = t.state {
+            w.state = st;
+        }
+    };
+    let mut rest: Vec<&Target> = vec![];
+    for t in open {
+        // The restore already matched this record to a window: keep that pairing.
+        let known = by_rec.get(t.record.record_id.as_str()).and_then(|x| x.1).filter(|w| !claimed.contains(*w));
+        match known.and_then(|wid| windows.iter_mut().find(|w| w.id == wid)) {
+            Some(w) => {
+                claimed.insert(w.id.clone());
+                apply(w, t);
+            }
+            None => rest.push(t),
+        }
+    }
+    let mut leftover = vec![];
+    for (t, (_, win, _)) in rest.iter().zip(assign_targets(&rest, windows, &claimed)) {
+        match win.and_then(|wid| windows.iter_mut().find(|w| w.id == wid)) {
+            Some(w) if !claimed.contains(&w.id) => {
+                claimed.insert(w.id.clone());
+                apply(w, t);
+            }
+            _ => leftover.push(t.record.clone()),
+        }
+    }
+    leftover
 }

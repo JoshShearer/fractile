@@ -515,7 +515,13 @@ impl X11Adapter {
                         let _ = self.conn.ungrab_key(keycode, self.root, ModMask::from(mods | u));
                     }
                     let _ = self.conn.flush();
-                    return Err(AdapterError::Conflict(format!("key combination already grabbed by another client ({e:?})")));
+                    // Shown to the user in the shortcut editor: say what it means.
+                    let why = match &e {
+                        x11rb::errors::ReplyError::X11Error(x) if x.error_kind == x11rb::protocol::ErrorKind::Access => "another application already uses this key combination".to_string(),
+                        x11rb::errors::ReplyError::X11Error(x) => format!("the X server refused the key grab ({:?})", x.error_kind),
+                        other => format!("the X server refused the key grab ({other})"),
+                    };
+                    return Err(AdapterError::Conflict(why));
                 }
             } else {
                 let _ = self.conn.ungrab_key(keycode, self.root, m);

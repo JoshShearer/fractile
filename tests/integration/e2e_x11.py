@@ -454,9 +454,11 @@ def run_all(e: Env) -> None:
     check("X27", "new login with 'restore last session': missing app relaunched and both windows placed; a same-session restart adds nothing",
           bool(back) and g_back and n == 1, f"launchme {back and back[0]['frame']} want {want_l}; editor back {g_back}; instances after restart {n}")
 
-    # log out while the login restore is still running, then log in again:
-    # no exit snapshot is taken of a half-restored desktop, so the next login
-    # must restore the layout that session was restoring (not nothing)
+    # log out before the login restore has started (it waits for the desktop
+    # to settle), then log in again: no exit snapshot is taken of the
+    # unrestored desktop, so the next login must restore the layout that
+    # session was going to restore (not nothing). Logging out while a restore
+    # is running is soak check P09.
     gx = str(int(g.split(":")[1], 16))
     e.cli_json("snap", "top-right-quarter", "--window", g)
     want_g = e.frame(g)
@@ -465,13 +467,13 @@ def run_all(e: Env) -> None:
     e.env["XDG_SESSION_ID"] = f"e2e-quick-{os.getpid()}"
     e.start_daemon()
     e.stop_daemon(signal.SIGTERM)  # logged out again while the login restore waits for the desktop to settle
-    skipped = "snapshot skipped: a restore was still in progress" in (e.base / "daemon.out").read_text()
+    skipped = "snapshot skipped: the login restore had not started yet" in (e.base / "daemon.out").read_text()
     e.xdo("windowmove", gx, "100", "600")
     e.env["XDG_SESSION_ID"] = f"e2e-after-quick-{os.getpid()}"
     e.start_daemon()
     again = e.wait_for(lambda: rect_eq(e.frame(g), want_g, 2), 15.0, 0.3)
     check("X28", "logging out during the login restore: the next login restores that layout again",
-          skipped and again, f"exit snapshot of the half-restored desktop skipped: {skipped}; editor back {again} at {e.frame(g)} want {want_g}")
+          skipped and again, f"exit snapshot of the unrestored desktop skipped: {skipped}; editor back {again} at {e.frame(g)} want {want_g}")
 
     # no-WM / unsupported desktop honesty
     env2 = dict(e.env)

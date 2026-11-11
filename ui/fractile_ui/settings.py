@@ -59,6 +59,9 @@ def setp(d: dict, path: str, value):
     cur[parts[-1]] = value
 
 
+PANEL_ROW = "__panel__"  # table row for general.panel_shortcut
+
+
 class Binder:
     def __init__(self, win: "SettingsWindow"):
         self.win = win
@@ -542,6 +545,17 @@ class SettingsWindow(QWidget):
         errs = (self.app.bridge.try_call("status") or {}).get("hotkey_errors") or {}
         t = self.sc_table
         t.setRowCount(0)
+        # The panel shortcut lives under General; show it here too so the
+        # list answers "which keys does Fractile use?" (read-only row).
+        pk = getp(self.cfg, "general.panel_shortcut")
+        t.insertRow(0)
+        vals = ["Show the panel", pk or "-", "Global", "Set under General",
+                ("⚠ " + errs["panel"]) if "panel" in errs else ("active" if pk else "no keys set")]
+        for c, val in enumerate(vals):
+            it = QTableWidgetItem(val)
+            it.setData(Qt.ItemDataRole.UserRole, PANEL_ROW)
+            it.setToolTip("The panel shortcut is set on the General page. Edit… opens it.")
+            t.setItem(0, c, it)
         for s in self.cfg.get("shortcuts", []):
             r = t.rowCount()
             t.insertRow(r)
@@ -574,6 +588,11 @@ class SettingsWindow(QWidget):
             self._update_dirty()
 
     def _sc_edit(self):
+        r = self.sc_table.currentRow()
+        if r >= 0 and self.sc_table.item(r, 0).data(Qt.ItemDataRole.UserRole) == PANEL_ROW:
+            self.open_page("general")
+            self.panel_key.btn.setFocus()
+            return
         i = self._sel_shortcut()
         if i is None:
             return
