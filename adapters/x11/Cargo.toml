@@ -1,0 +1,12 @@
+[package]
+name = "fractile-adapter-x11"
+description = "EWMH/RandR X11 compositor adapter for Fractile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+fractile-core.workspace = true
+x11rb.workspace = true
+sha2.workspace = true
+hex.workspace = true

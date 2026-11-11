@@ -1,0 +1,11 @@
+[package]
+name = "fractile-ipc"
+description = "Versioned local IPC protocol (UNIX socket, JSON lines, peer credential checks)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+libc.workspace = true
