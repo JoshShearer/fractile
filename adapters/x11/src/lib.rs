@@ -549,7 +549,7 @@ impl CompositorAdapter for X11Adapter {
         use SupportLevel::*;
         // Everything except outputs, key grabs and our own overlay needs an
         // EWMH window manager. Checked live: the WM may start after us.
-        let has_wm = self.prop32(self.root, self.atoms._NET_SUPPORTING_WM_CHECK, AtomEnum::WINDOW).first().is_some();
+        let has_wm = !self.prop32(self.root, self.atoms._NET_SUPPORTING_WM_CHECK, AtomEnum::WINDOW).is_empty();
         if !has_wm {
             let why = "no EWMH window manager is running on this X display (_NET_SUPPORTING_WM_CHECK is missing)".to_string();
             let mut ops = BTreeMap::new();

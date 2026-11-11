@@ -71,7 +71,7 @@ pub fn output_for_rect<'a>(outputs: &'a [Output], r: &Rect) -> Option<&'a Output
 }
 
 /// Next output after `current` in deterministic order (wraps).
-pub fn next_output<'a>(outputs: &'a [Output], current: &str, step: i32) -> Option<Output> {
+pub fn next_output(outputs: &[Output], current: &str, step: i32) -> Option<Output> {
     let ord = ordered(outputs);
     if ord.is_empty() {
         return None;

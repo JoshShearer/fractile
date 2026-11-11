@@ -159,6 +159,67 @@ impl Accelerator {
         s
     }
 
+    /// Qt key code (key | modifier flags), as KDE's KGlobalAccel expects.
+    pub fn to_qt_key(&self) -> Option<i32> {
+        const KEYPAD: i32 = 0x2000_0000;
+        let k = self.key.as_str();
+        let base: i32 = match k {
+            "space" => 0x20,
+            "plus" => 0x2b,
+            "minus" => 0x2d,
+            "equal" => 0x3d,
+            "Return" => 0x0100_0004,
+            "Escape" => 0x0100_0000,
+            "Tab" => 0x0100_0001,
+            "BackSpace" => 0x0100_0003,
+            "Insert" => 0x0100_0006,
+            "Delete" => 0x0100_0007,
+            "Home" => 0x0100_0010,
+            "End" => 0x0100_0011,
+            "Left" => 0x0100_0012,
+            "Up" => 0x0100_0013,
+            "Right" => 0x0100_0014,
+            "Down" => 0x0100_0015,
+            "Prior" => 0x0100_0016,
+            "Next" => 0x0100_0017,
+            "KP_Add" => 0x2b | KEYPAD,
+            "KP_Subtract" => 0x2d | KEYPAD,
+            "KP_Enter" => 0x0100_0005 | KEYPAD,
+            "grave" => 0x60,
+            "comma" => 0x2c,
+            "period" => 0x2e,
+            "slash" => 0x2f,
+            "semicolon" => 0x3b,
+            "bracketleft" => 0x5b,
+            "bracketright" => 0x5d,
+            _ => {
+                if let Some(n) = k.strip_prefix("KP_") {
+                    (n.as_bytes()[0] as i32) | KEYPAD
+                } else if let Some(n) = k.strip_prefix('F').and_then(|n| n.parse::<i32>().ok()) {
+                    0x0100_0030 + n - 1
+                } else if k.len() == 1 {
+                    k.to_ascii_uppercase().as_bytes()[0] as i32
+                } else {
+                    return None;
+                }
+            }
+        };
+        let mut v = base;
+        if self.mods.shift {
+            v |= 0x0200_0000;
+        }
+        if self.mods.ctrl {
+            v |= 0x0400_0000;
+        }
+        if self.mods.alt {
+            v |= 0x0800_0000;
+        }
+        if self.mods.super_ {
+            v |= 0x1000_0000;
+        }
+        Some(v)
+    }
+
     pub fn has_modifier(&self) -> bool {
         self.mods.shift || self.mods.ctrl || self.mods.alt || self.mods.super_
     }
@@ -171,6 +232,16 @@ impl Accelerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn qt_key_codes() {
+        // Values from Qt's Qt::Key / Qt::KeyboardModifier enums.
+        assert_eq!(Accelerator::parse("Ctrl+Alt+1").unwrap().to_qt_key(), Some(0x0400_0000 | 0x0800_0000 | 0x31));
+        assert_eq!(Accelerator::parse("Super+Left").unwrap().to_qt_key(), Some(0x1000_0000 | 0x0100_0012));
+        assert_eq!(Accelerator::parse("Ctrl+Alt+G").unwrap().to_qt_key(), Some(0x0c00_0047));
+        assert_eq!(Accelerator::parse("Shift+F5").unwrap().to_qt_key(), Some(0x0200_0000 | 0x0100_0034));
+        assert_eq!(Accelerator::parse("Alt+KP_Add").unwrap().to_qt_key(), Some(0x0800_0000 | 0x2000_0000 | 0x2b));
+    }
 
     #[test]
     fn parse_forms() {

@@ -219,7 +219,7 @@ fn print_plan(v: &Value) {
     if let Some(s) = v.get("snapshot") {
         println!("Snapshot {} ({}, {} windows, {})", sv(&s["id"]), sv(&s["mode"]), sv(&s["windows"]), sv(&s["created_at"]));
     }
-    println!("{:<18} {:<28} {:<14} {}", "ACTION", "WINDOW", "CONTENT", "DETAIL");
+    println!("{:<18} {:<28} {:<14} DETAIL", "ACTION", "WINDOW", "CONTENT");
     for i in v["items"].as_array().cloned().unwrap_or_default() {
         let content = if i["restore_content"] == "application_managed" { "app-managed" } else { "frame only" };
         println!("{:<18} {:<28} {:<14} {}", sv(&i["action"]), sv(&i["label"]).chars().take(28).collect::<String>(), content, sv(&i["reason"]));
@@ -413,7 +413,7 @@ fn main() {
             if json_out {
                 pretty(&v);
             } else {
-                println!("{:<14} {:<28} {:<22} {:<5} {}", "ID", "APP", "GEOMETRY", "WS", "TITLE");
+                println!("{:<14} {:<28} {:<22} {:<5} TITLE", "ID", "APP", "GEOMETRY", "WS");
                 for w in v.as_array().cloned().unwrap_or_default() {
                     let app = w["desktop_file_id"].as_str().or(w["wm_class"].as_str()).or(w["app_id"].as_str()).unwrap_or("?");
                     let mut flags = String::new();
@@ -625,7 +625,7 @@ fn main() {
             if json_out {
                 pretty(&v)
             } else {
-                println!("{:<38} {:<26} {:<11} {:>4} {:>4}  {}", "ID", "CREATED", "MODE", "WIN", "APPS", "NAME");
+                println!("{:<38} {:<26} {:<11} {:>4} {:>4}  NAME", "ID", "CREATED", "MODE", "WIN", "APPS");
                 for s in v.as_array().cloned().unwrap_or_default() {
                     let flags = format!("{}{}", if s["pinned"] == true { "[pinned] " } else { "" }, if s["checksum_ok"] == false { "[CORRUPT] " } else { "" });
                     println!("{:<38} {:<26} {:<11} {:>4} {:>4}  {}{}", sv(&s["id"]), sv(&s["created_at"]).chars().take(25).collect::<String>(), sv(&s["mode"]), sv(&s["window_count"]), sv(&s["app_count"]), flags, s["name"].as_str().unwrap_or(""));

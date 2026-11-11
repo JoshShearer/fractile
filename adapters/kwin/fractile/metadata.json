@@ -1,0 +1,14 @@
+{
+    "KPlugin": {
+        "Id": "fractile",
+        "Name": "Fractile",
+        "Description": "Compositor integration for Fractile (grid window placement and session restore). Lets the Fractile service list, move and focus windows on Plasma Wayland. Talks only to the Fractile service on the session bus, which verifies it is KWin.",
+        "Version": "0.9.0",
+        "License": "GPL-3.0-or-later",
+        "Authors": [{"Name": "Fractile maintainers", "Email": "maintainers@fractile.invalid"}],
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "KWin/Script"
+}

@@ -1,0 +1,115 @@
+{
+  "suite": "e2e-kwin-wayland",
+  "when": "2026-11-11T06:17:09+0000",
+  "environment": "kwin 6.8.2 --virtual (Wayland, no Xwayland) in an archlinux container (render device: nvidia); Fractile KWin script",
+  "results": [
+    {
+      "id": "K00",
+      "name": "before the script loads, Fractile reports no window control and says why",
+      "ok": true,
+      "detail": "The Fractile KWin script is not connected. Install it with kpackagetool6 and enable it in System Settings > Window Management > KWin Scripts."
+    },
+    {
+      "id": "K01",
+      "name": "KWin script attaches over D-Bus; window control available on KWin Wayland",
+      "ok": true,
+      "detail": "KWin 6"
+    },
+    {
+      "id": "SEC6",
+      "name": "a non-KWin process cannot attach, poll for calls or inject events over D-Bus",
+      "ok": true,
+      "detail": "Error org.freedesktop.DBus.Error.AccessDenied: only the compositor (kwin_wayland or kwin_x11) may attach; peer runs /usr/bin/dbus-send"
+    },
+    {
+      "id": "K02",
+      "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
+      "ok": true,
+      "detail": "org.fractile.TestGtk / org.fractile.TestQt"
+    },
+    {
+      "id": "K03",
+      "name": "outputs are listed with a stable id and a work area",
+      "ok": true,
+      "detail": "conn-Virtual-0-1600x1200 {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "K04",
+      "name": "grid placements land on the requested rectangle (GTK4)",
+      "ok": true,
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+    },
+    {
+      "id": "K05",
+      "name": "grid placement on a Qt Wayland window",
+      "ok": true,
+      "detail": "err=0px"
+    },
+    {
+      "id": "K06",
+      "name": "1x1 selection fills the work area exactly",
+      "ok": true,
+      "detail": "{'h': 1200, 'w': 1600, 'x': 0, 'y': 0} vs {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "K07",
+      "name": "undo restores the previous geometry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "K08",
+      "name": "activating a window focuses it",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "K09",
+      "name": "shortcut registered with KDE (KGlobalAccel) and its activation places the focused window",
+      "ok": true,
+      "detail": "registered=True errors={} frame={'h': 1200, 'w': 533, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "K10",
+      "name": "workspaces are listed and a window can be moved between them",
+      "ok": true,
+      "detail": "2 workspaces"
+    },
+    {
+      "id": "K11",
+      "name": "snapshot restore puts KWin windows back exactly",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "K12",
+      "name": "panel shortcut starts the Wayland UI; panel shown, focused, inside the work area and flagged own",
+      "ok": true,
+      "detail": "{'h': 360, 'w': 352, 'x': 624, 'y': 420}"
+    },
+    {
+      "id": "K13",
+      "name": "Fractile UI windows are never offered as placement targets",
+      "ok": true,
+      "detail": "1 own"
+    },
+    {
+      "id": "K14",
+      "name": "script unloaded: no window control and placement refused; reloaded: control returns",
+      "ok": true,
+      "detail": "place exit 5"
+    },
+    {
+      "id": "K15",
+      "name": "daemon restart: the script re-attaches without user action",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "K16",
+      "name": "UI logged no Python errors",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-10T23:52:21-0600",
+  "when": "2026-11-11T00:18:15-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
   "results": [
     {
       "id": "T01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 1159918"
+      "detail": "pid 1374424"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "T09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "50 ms incl. polling"
+      "detail": "51 ms incl. polling"
     },
     {
       "id": "T10",
@@ -97,7 +97,7 @@
       "id": "T13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1759 ms"
+      "detail": "1756 ms"
     },
     {
       "id": "T14",

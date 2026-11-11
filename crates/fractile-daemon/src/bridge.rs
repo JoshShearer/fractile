@@ -2,13 +2,19 @@
 //! only reachable from inside the compositor (GNOME Shell extension, KWin
 //! script).
 //!
-//! The integration does not export a new D-Bus API (which any process on the
-//! session bus could call). Instead it connects *to* Fractile's private 0600
-//! socket like any other client, says `hello`, then `bridge_attach`. The
-//! daemon sends requests down that connection as `bridge_call` events and the
-//! integration answers with `bridge_result`; it pushes window/output/hotkey
-//! changes with `bridge_event`. The attaching peer must be the compositor
-//! process itself (checked via SO_PEERCRED pid and /proc/<pid>/comm).
+//! GNOME: the extension exports no D-Bus API (which any process on the
+//! session bus could call). It connects *to* Fractile's private 0600 socket
+//! like any other client, says `hello`, then `bridge_attach`. The daemon sends
+//! requests down that connection as `bridge_call` events and the integration
+//! answers with `bridge_result`; it pushes window/output/hotkey changes with
+//! `bridge_event`.
+//!
+//! KWin: scripts can only make outgoing D-Bus calls, so the daemon serves
+//! `io.fractile.Bridge` (see kwin_dbus.rs) and the script long-polls it for
+//! calls. Every D-Bus method authenticates the caller by its bus-verified pid.
+//!
+//! Either way the peer must be the compositor process itself: its executable
+//! (not its settable comm name) must be a root-owned compositor binary.
 
 use fractile_core::adapter::{AResult, AdapterError, AdapterEvent, Capabilities, CompositorAdapter, Operation, PlacementOutcome, SupportLevel, Workspace, ADAPTER_API_VERSION};
 use fractile_core::geometry::Rect;
@@ -36,12 +42,75 @@ pub fn install(b: Arc<BridgeAdapter>) -> Arc<BridgeAdapter> {
     b
 }
 
+/// How calls reach the integration.
+#[derive(Clone)]
+pub enum Transport {
+    /// GNOME: JSON lines on the integration's own socket connection.
+    Socket(Arc<Mutex<UnixStream>>),
+    /// KWin: queued for the script's next long-poll.
+    Queue(async_channel::Sender<Value>),
+}
+
 struct Attached {
     conn_id: u64,
     peer_pid: i32,
-    writer: Arc<Mutex<UnixStream>>,
+    transport: Transport,
     caps: Capabilities,
     info: Value,
+}
+
+/// Global shortcuts handled outside the integration (KWin: KGlobalAccel).
+pub trait HotkeyService: Send + Sync {
+    fn register(&self, binding_id: &str, accel: &fractile_core::accel::Accelerator) -> AResult<()>;
+    fn unregister(&self, binding_id: &str) -> AResult<()>;
+}
+
+/// The peer must be running a root-owned, not group/world-writable
+/// compositor binary. /proc/<pid>/comm can be set by any same-uid process
+/// (PR_SET_NAME); the executable cannot be faked without running the real
+/// binary.
+///
+/// KWin is installed with the cap_sys_nice file capability, which makes it
+/// non-dumpable: its /proc/<pid>/exe cannot be read even by the same user.
+/// For such a peer the check is instead: process name is an allowed
+/// compositor *and* it holds cap_sys_nice in its permitted set. An ordinary
+/// same-uid process can rename itself but cannot acquire that capability
+/// without executing a binary that grants it.
+pub fn verify_compositor_peer(pid: i32, allowed: &[&str]) -> Result<String, String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let exe = match std::fs::read_link(format!("/proc/{pid}/exe")) {
+        Ok(e) => e,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => return verify_privileged_peer(pid, allowed),
+        Err(e) => return Err(format!("cannot inspect peer process {pid}: {e}")),
+    };
+    let shown = exe.to_string_lossy().to_string();
+    let path = shown.trim_end_matches(" (deleted)");
+    let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    if !allowed.contains(&name.as_str()) {
+        return Err(format!("only the compositor ({}) may attach; peer runs {path}", allowed.join(" or ")));
+    }
+    // Stat through /proc so a binary replaced by an upgrade still resolves.
+    let md = std::fs::metadata(format!("/proc/{pid}/exe")).map_err(|e| format!("cannot stat peer executable: {e}"))?;
+    if md.uid() != 0 || md.permissions().mode() & 0o022 != 0 {
+        return Err(format!("peer executable {path} is not a root-owned system binary"));
+    }
+    Ok(path.to_string())
+}
+
+const CAP_SYS_NICE: u32 = 23;
+
+fn verify_privileged_peer(pid: i32, allowed: &[&str]) -> Result<String, String> {
+    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).map_err(|e| format!("cannot inspect peer process {pid}: {e}"))?;
+    let field = |k: &str| status.lines().find_map(|l| l.strip_prefix(k).map(|v| v.trim().to_string()));
+    let name = field("Name:").unwrap_or_default();
+    if !allowed.contains(&name.as_str()) {
+        return Err(format!("only the compositor ({}) may attach; peer is '{name}'", allowed.join(" or ")));
+    }
+    let prm = field("CapPrm:").and_then(|v| u64::from_str_radix(&v, 16).ok()).unwrap_or(0);
+    if prm & (1 << CAP_SYS_NICE) == 0 {
+        return Err(format!("peer '{name}' is not the system compositor (its executable is unreadable and it holds no compositor capability)"));
+    }
+    Ok(format!("{name} (privileged, cap_sys_nice)"))
 }
 
 pub struct BridgeAdapter {
@@ -59,6 +128,7 @@ pub struct BridgeAdapter {
     events: Mutex<Option<Sender<AdapterEvent>>>,
     own: Mutex<Vec<String>>,
     timeout: Duration,
+    hotkeys: Mutex<Option<Arc<dyn HotkeyService>>>,
 }
 
 #[derive(Deserialize)]
@@ -101,8 +171,24 @@ impl BridgeAdapter {
             events: Mutex::new(None),
             own: Mutex::new(vec![]),
             timeout: Duration::from_secs(5),
+            hotkeys: Mutex::new(None),
         }
     }
+
+    /// Route global shortcuts to `svc` instead of the integration.
+    pub fn set_hotkey_service(&self, svc: Arc<dyn HotkeyService>) {
+        *self.hotkeys.lock().unwrap() = Some(svc);
+    }
+
+    pub fn allowed_peers(&self) -> &[&'static str] {
+        &self.allowed_peers
+    }
+
+    /// Emit an event that did not come from the integration (KGlobalAccel).
+    pub fn inject_event(&self, ev: AdapterEvent) {
+        self.emit(ev);
+    }
+
 
     pub fn is_attached(&self) -> bool {
         self.attached.lock().unwrap().is_some()
@@ -116,7 +202,7 @@ impl BridgeAdapter {
     }
 
     /// Validate and accept an integration connection.
-    pub fn attach(&self, conn_id: u64, peer_pid: i32, writer: Arc<Mutex<UnixStream>>, p: &Value) -> Result<(), String> {
+    pub fn attach(&self, conn_id: u64, peer_pid: i32, transport: Transport, p: &Value) -> Result<(), String> {
         let kind = p.get("kind").and_then(|v| v.as_str()).unwrap_or("");
         if kind != self.kind {
             return Err(format!("this session expects a '{}' integration, not '{kind}'", self.kind));
@@ -125,11 +211,7 @@ impl BridgeAdapter {
         if api != ADAPTER_API_VERSION as u64 {
             return Err(format!("integration speaks adapter API {api}, Fractile needs {ADAPTER_API_VERSION}; update the extension/script"));
         }
-        let comm = std::fs::read_to_string(format!("/proc/{peer_pid}/comm")).unwrap_or_default();
-        let comm = comm.trim();
-        if !self.allowed_peers.iter().any(|a| *a == comm) {
-            return Err(format!("only the compositor may attach as the {} integration (peer is '{comm}')", self.kind));
-        }
+        verify_compositor_peer(peer_pid, &self.allowed_peers)?;
         let mut ops = BTreeMap::new();
         for op in Operation::ALL {
             ops.insert(op, SupportLevel::Unsupported("not offered by this integration version".into()));
@@ -162,7 +244,7 @@ impl BridgeAdapter {
                 return Err("another integration is already attached".into());
             }
         }
-        *a = Some(Attached { conn_id, peer_pid, writer, caps, info: p.clone() });
+        *a = Some(Attached { conn_id, peer_pid, transport, caps, info: p.clone() });
         Ok(())
     }
 
@@ -220,20 +302,23 @@ impl BridgeAdapter {
     }
 
     fn call_t(&self, op: &str, args: Value, timeout: Duration) -> AResult<Value> {
-        let writer = match &*self.attached.lock().unwrap() {
-            Some(a) => a.writer.clone(),
+        let transport = match &*self.attached.lock().unwrap() {
+            Some(a) => a.transport.clone(),
             None => return Err(AdapterError::Unsupported(self.hint.clone())),
         };
         let id = self.next.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = channel();
         self.pending.lock().unwrap().insert(id, tx);
-        let msg = json!({"event": "bridge_call", "data": {"call": id, "op": op, "args": args}});
-        let mut line = msg.to_string();
-        line.push('\n');
-        let sent = {
-            let mut w = writer.lock().unwrap();
-            let _ = w.set_write_timeout(Some(Duration::from_secs(2)));
-            w.write_all(line.as_bytes())
+        let data = json!({"call": id, "op": op, "args": args});
+        let sent = match transport {
+            Transport::Socket(writer) => {
+                let mut line = json!({"event": "bridge_call", "data": data}).to_string();
+                line.push('\n');
+                let mut w = writer.lock().unwrap();
+                let _ = w.set_write_timeout(Some(Duration::from_secs(2)));
+                w.write_all(line.as_bytes())
+            }
+            Transport::Queue(q) => q.try_send(data).map_err(|e| std::io::Error::new(std::io::ErrorKind::BrokenPipe, e.to_string())),
         };
         if let Err(e) = sent {
             self.pending.lock().unwrap().remove(&id);
@@ -256,7 +341,13 @@ impl BridgeAdapter {
 impl CompositorAdapter for BridgeAdapter {
     fn capabilities(&self) -> Capabilities {
         if let Some(a) = &*self.attached.lock().unwrap() {
-            return a.caps.clone();
+            let mut caps = a.caps.clone();
+            // Shortcuts registered by the daemon itself (KGlobalAccel on
+            // KDE) do not go through the integration.
+            if self.hotkeys.lock().unwrap().is_some() {
+                caps.operations.insert(Operation::RegisterHotkey, SupportLevel::Full);
+            }
+            return caps;
         }
         let mut ops = BTreeMap::new();
         for op in Operation::ALL {
@@ -345,10 +436,16 @@ impl CompositorAdapter for BridgeAdapter {
 
     fn register_hotkey(&self, binding_id: &str, accelerator: &str) -> AResult<()> {
         let a = fractile_core::accel::Accelerator::parse(accelerator).map_err(AdapterError::Rejected)?;
+        if let Some(h) = self.hotkeys.lock().unwrap().clone() {
+            return h.register(binding_id, &a);
+        }
         self.call("grab_accelerator", json!({"binding_id": binding_id, "accelerator": a.to_gtk()})).map(|_| ())
     }
 
     fn unregister_hotkey(&self, binding_id: &str) -> AResult<()> {
+        if let Some(h) = self.hotkeys.lock().unwrap().clone() {
+            return h.unregister(binding_id);
+        }
         if !self.is_attached() {
             return Ok(());
         }

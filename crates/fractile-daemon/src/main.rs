@@ -6,6 +6,8 @@ mod logging;
 mod autostart;
 mod backend;
 mod bridge;
+mod kglobalaccel;
+mod kwin_dbus;
 mod daemon;
 mod ipc;
 mod logind;
@@ -183,6 +185,17 @@ fn main() {
     };
     let d = Arc::new(Daemon::new(cfg, cfg_path, cfg_error, store, adapter, env, log.clone(), key, new_login, tiling));
     d.register_ui(vec![], None);
+    if let Some(b) = bridge::get().filter(|b| b.kind == "kwin") {
+        // KDE global shortcuts go through KGlobalAccel, the script only
+        // handles window management.
+        match kglobalaccel::KGlobalAccel::connect(b.clone()) {
+            Ok(k) => b.set_hotkey_service(k),
+            Err(e) => warn!(log, "KGlobalAccel unavailable, no global shortcuts: {e}"),
+        }
+        if let Err(e) = kwin_dbus::start(d.clone(), b) {
+            error!(log, "cannot serve {} for the KWin script: {e}", kwin_dbus::BUS_NAME);
+        }
+    }
     d.register_hotkeys();
 
     // IPC

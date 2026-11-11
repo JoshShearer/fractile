@@ -143,9 +143,7 @@ impl Layout {
                 }
             }
             // dependency cycle detection
-            if let Err(e) = launch_order(&v.entries) {
-                return Err(e);
-            }
+            launch_order(&v.entries)?;
         }
         Ok(())
     }

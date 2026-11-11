@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-10T23:51:20-0600",
+  "when": "2026-11-11T00:17:47-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -13,13 +13,13 @@
       "id": "SEC5",
       "name": "a non-compositor process cannot attach as the integration or inject events",
       "ok": true,
-      "detail": "attach: only the compositor may attach as the gnome integration (peer is 'python3'); event: not the attached integration"
+      "detail": "attach: only the compositor (gnome-shell) may attach; peer runs /usr/bin/python3.12; event: not the attached integration"
     },
     {
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:3956963901 gnome:3956963900"
+      "detail": "gnome:1938720879 gnome:1938720878"
     },
     {
       "id": "W03",
@@ -61,7 +61,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "970 ms incl. key injection"
+      "detail": "971 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -73,7 +73,7 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1736 ms"
+      "detail": "1742 ms"
     },
     {
       "id": "W12",
@@ -91,7 +91,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:3956963901"
+      "detail": "active gnome:1938720879"
     },
     {
       "id": "W15",

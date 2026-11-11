@@ -66,13 +66,20 @@ class CompositorOverlay:
         self.bridge = bridge
         self._visible = False
         self._last = None
+        self._unsupported = False
 
     def show_target(self, r: dict, _screen, label: str = "") -> None:
         key = (r["x"], r["y"], r["w"], r["h"], label)
         if self._visible and key == self._last:
             return
+        if self._unsupported:
+            return
         rect = {k: r[k] for k in ("x", "y", "w", "h")}
         self._visible = self.bridge.try_call("overlay_show", {"rect": rect, "label": label}) is not None
+        if not self._visible:
+            # e.g. KWin: scripts cannot draw. The panel's own grid still
+            # shows the selection; stop asking.
+            self._unsupported = True
         self._last = key if self._visible else None
 
     def hide(self) -> None:

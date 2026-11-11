@@ -29,6 +29,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 libc = "0.2"
 rusqlite = { version = "0.32", features = ["bundled", "backup"] }
 x11rb = { version = "0.13", features = ["randr", "allow-unsafe-code"] }
+async-channel = "2"
+async-io = "2"
+futures-lite = "2"
 zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
 signal-hook = "0.3"
 proptest = "1"

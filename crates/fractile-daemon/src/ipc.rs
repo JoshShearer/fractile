@@ -338,7 +338,7 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
         }
         "bridge_attach" => {
             let b = crate::bridge::get().ok_or_else(|| err("unsupported", "this session does not use a compositor integration"))?;
-            b.attach(c.id, c.pid, c.writer.clone(), p).map_err(|e| err("denied", e))?;
+            b.attach(c.id, c.pid, crate::bridge::Transport::Socket(c.writer.clone()), p).map_err(|e| err("denied", e))?;
             info!(d.log, "{} integration attached from pid {}", b.kind, c.pid);
             // Hotkey grabs are calls over this same connection, so they must
             // not run on this reader thread.

@@ -22,3 +22,6 @@ libc.workspace = true
 regex.workspace = true
 signal-hook.workspace = true
 zbus.workspace = true
+async-channel.workspace = true
+async-io.workspace = true
+futures-lite.workspace = true
