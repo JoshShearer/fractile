@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Real login / log-out / reboot test (SRS T10) in an Ubuntu 24.04 desktop VM.
-#   tests/vm/vm-e2e.sh wayland|x11 [path/to/fractile.deb]
+#   tests/vm/vm-e2e.sh wayland|x11|plasma-x11 [path/to/fractile.deb]
 #   tests/vm/vm-e2e.sh provision        (only build the cached base image)
 # Needs docker and read/write access to /dev/kvm; no root. The first run
 # downloads Ubuntu's cloud image (about 600 MB, checksum verified) and installs
 # the desktop into a cached base image (docker volume fractile-vm-cache,
 # about 8 GB). Each run then uses a throwaway copy-on-write disk.
 set -euo pipefail
-what=${1:?wayland, x11 or provision}
+what=${1:?wayland, x11, plasma-x11 or provision}
 root=$(cd "$(dirname "$0")/../.." && pwd)
 deb=${2:-$(ls "$root"/packaging/build/fractile_*_amd64.deb | tail -1)}
 deb=$(realpath "$deb")

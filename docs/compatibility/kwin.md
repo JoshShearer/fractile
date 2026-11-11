@@ -3,21 +3,34 @@
 | Session | Adapter | How |
 |---|---|---|
 | Plasma on **Wayland** | `kwin` (bridge) | The Fractile KWin script runs inside KWin and long-polls the Fractile service over the session bus (`io.fractile.Bridge1`). Global shortcuts go through KDE's KGlobalAccel. |
-| Plasma on **X11** | `kwin` bridge if the script is enabled, otherwise `x11` | **NOT TESTED** |
+| Plasma on **X11** | `x11` | The Fractile service talks to the X server directly (EWMH, ICCCM, RandR). Tested with Plasma 5.27 (kwin_x11), the Plasma that has an X11 session. |
 
 ## Tested
 
 | Environment | Result | Evidence |
 |---|---|---|
 | KWin 6.8.2, `kwin_wayland --virtual` (no Xwayland), in an `archlinux:latest` container with the host's NVIDIA render node passed in | all checks pass | `tests/evidence/e2e-kwin-wayland.json` (`tests/kwin/e2e-kwin-in-container.sh`) |
+| kwin_x11 5.27.11 on Xvfb (no plasmashell), Ubuntu 24.04 container: the X11 suite | 39/39 | `tests/evidence/e2e-x11-kwin.json` (`tests/kwin-x11/e2e-kwin-x11-in-container.sh`) |
+| Ubuntu 24.04.5 with kde-plasma-desktop (plasma-workspace 5.27.12, kwin-x11 5.27.11) in a QEMU/KVM VM, the Plasma X11 session started by GDM: `apt install`, start from the app menu, real log-out (Plasma's own) and log-in, real reboot, restore of 10 apps / 15 windows | 7/7 | `tests/evidence/vm-ubuntu24.04-plasma-x11.json` (`tests/vm/vm-e2e.sh plasma-x11`) |
 
 This is a real KWin running real native Wayland GTK4 and Qt clients, the real
 Fractile UI and real KGlobalAccel. It is **not** a full Plasma desktop: there is no
 plasmashell, no Plasma panel and no System Settings, and there was no login.
 
-**Not tested:** a real Plasma login; Plasma on X11; KWin versions other than 6.8.2;
-multiple monitors on KWin; System Settings' KWin Scripts page (the instructions
-below are from KDE's documentation, not from a run); logout and reboot.
+Plasma 5.27 leaves `graphical-session.target` active across a log-out and
+stops `plasma-workspace.target` instead, so `fractile.service` is bound to
+both. At a Plasma log-out systemd stops the service while KWin and the X
+server are still up, and the logout snapshot is taken then. Apps that take
+part in KDE's own session management (most KDE apps) may already have closed
+by then; Plasma's own session restore reopens those, and Fractile places what
+is already open instead of launching it twice (seen in the VM run: 5 windows
+were reopened by Plasma, 10 by Fractile).
+
+**Not tested:** a real Plasma 6 login (Plasma 6 has no X11 session, and the
+Wayland session needs the KWin script; only the headless KWin run above
+covers it); KWin versions other than 6.8.2 and 5.27.11; multiple monitors on
+KWin; System Settings' KWin Scripts page (the instructions below are from
+KDE's documentation, not from a run).
 
 ## Setting it up
 

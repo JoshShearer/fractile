@@ -146,6 +146,13 @@ desktops only. See PLATFORM_MATRIX.md.
   at exit still fails because the compositor is gone, the layout last seen in
   the session (at most about 10 s old) is saved instead, and the log says so
   (V06 in the Ubuntu VM).
+- On Plasma 5.27 a log-out does not stop `graphical-session.target`, so
+  the service kept running after the X server had gone, and the next login
+  started no new one (no window control until a reboot). The unit is now also
+  bound to `plasma-workspace.target` (stopped at every Plasma log-out, started
+  at every login), autostart adds the new link on upgrade, and the service
+  exits, saving the layout last seen, when its X display closes (V03 in the
+  Plasma VM).
 - In the "Restore your windows from last time?" dialog, focus started on the
   first row's checkbox. In the Ubuntu 24.04 GNOME session, pressing Enter to
   accept toggled that checkbox, and nothing was restored. The dialog now
@@ -157,14 +164,15 @@ desktops only. See PLATFORM_MATRIX.md.
 ### Known issues and limits
 
 - Real logins, log-out and reboot are validated on Ubuntu 24.04 GNOME
-  (Wayland and Xorg sessions, VM) only. KDE logins are simulated. Mixed DPI and monitor
+  (Wayland and Xorg sessions) and Plasma 5.27 X11, in a VM. Plasma 6 / KWin
+  Wayland has no real login test. Mixed DPI and monitor
   disconnect/reconnect are validated on headless GNOME (virtual monitors
   changed through DisplayConfig), not with physical monitors. The tray is
   validated on GNOME with the AppIndicator extension only.
 - On Plasma and other desktops without gnome-session, the logout snapshot is
-  taken at SIGTERM. If the compositor is already gone by then, the layout
-  last seen (up to about 10 s old) is saved. Not tested on a real Plasma
-  log-out.
+  taken when systemd stops the service. Apps in KDE's own session management
+  may have closed by then (Plasma reopens those itself). If the display is
+  already gone, the layout last seen (up to about 10 s old) is saved.
 - COSMIC: no window control (platform limitation).
 - Google Chrome and Chromium incognito windows cannot be detected (no marker
   in the title or the window properties) and are recorded in snapshots like

@@ -55,6 +55,8 @@ def session_env() -> dict:
 
 
 ENV = session_env()
+PLASMA = "KDE" in ENV.get("XDG_CURRENT_DESKTOP", "").split(":")
+SHELL = "plasmashell" if PLASMA else "gnome-shell"
 
 
 def run(*args, timeout=60) -> subprocess.CompletedProcess:
@@ -89,7 +91,7 @@ def wait_for(fn, timeout, step=0.5):
 
 
 def shell_running() -> bool:
-    return run("pgrep", "-u", str(UID), "-x", "gnome-shell").returncode == 0
+    return run("pgrep", "-u", str(UID), "-x", SHELL).returncode == 0
 
 
 def graphical_session() -> str | None:
@@ -106,7 +108,7 @@ def graphical_session() -> str | None:
 
 def cmd_session() -> dict:
     st = try_cli("status")
-    pids = run("pgrep", "-u", str(UID), "-x", "gnome-shell").stdout.split()
+    pids = run("pgrep", "-u", str(UID), "-x", SHELL).stdout.split()
     loginctl = run("loginctl", "list-sessions", "--no-legend").stdout.strip()
     return {
         "shell_running": bool(pids),
@@ -126,9 +128,13 @@ def cmd_session() -> dict:
 def cmd_setup() -> dict:
     from fractile_ui.ipc import Client
     out = {}
-    # The extension: what the docs tell the user to do (or the Extensions app).
-    out["extension"] = run("gnome-extensions", "enable", "fractile@fractile.io").returncode
-    out["extension_info"] = run("gnome-extensions", "info", "fractile@fractile.io").stdout.strip().splitlines()[-3:]
+    if PLASMA:
+        # Plasma X11 needs no integration: the service talks to the X server.
+        out["extension"] = "n/a"
+    else:
+        # The extension: what the docs tell the user to do (or the Extensions app).
+        out["extension"] = run("gnome-extensions", "enable", "fractile@fractile.io").returncode
+        out["extension_info"] = run("gnome-extensions", "info", "fractile@fractile.io").stdout.strip().splitlines()[-3:]
     # What the first-run wizard writes on Finish, and the Applications page.
     c = Client("vm-setup")
     try:
@@ -148,7 +154,7 @@ def cmd_setup() -> dict:
 
 
 def launch(desktop_id: str) -> int:
-    """Start an app the way the GNOME app menu does: its desktop entry, in a
+    """Start an app the way the app menu does: its desktop entry, in a
     scope of its own under the user manager. (Running gtk-launch as a
     transient systemd-run service is wrong: when gtk-launch exits, systemd
     stops the unit and kills the app it just started.)"""
@@ -202,6 +208,14 @@ def cmd_state() -> dict:
 
 
 def cmd_logout() -> dict:
+    if PLASMA:
+        # What "Log Out" in the Plasma menu does, without its confirmation:
+        # org.kde.Shutdown (Plasma 5.25+), else ksmserver itself.
+        p = run("dbus-send", "--session", "--print-reply", "--dest=org.kde.Shutdown", "/Shutdown", "org.kde.Shutdown.logout")
+        if p.returncode != 0:
+            p = run("dbus-send", "--session", "--print-reply", "--dest=org.kde.ksmserver", "/KSMServer",
+                    "org.kde.KSMServerInterface.logout", "int32:0", "int32:0", "int32:0")
+        return {"rc": p.returncode, "stderr": p.stderr.strip()}
     p = run("gnome-session-quit", "--logout", "--no-prompt")
     return {"rc": p.returncode, "stderr": p.stderr.strip()}
 

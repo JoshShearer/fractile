@@ -23,7 +23,7 @@ cannot show.
 | E6 | archlinux:latest container | Openbox on Xvfb | PKGBUILD build, install, lifecycle |
 | E7 | ubuntu:24.04 container | kwin_x11 4:5.27.11 (Plasma X11) on Xvfb, no plasmashell | X11 E2E under KWin |
 | E8 | fedora:39 / 41 / 42 containers | GNOME Shell 45.10 / 47.10 / 48.8 headless Wayland | the five GNOME Wayland suites |
-| E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0, Wayland and Xorg sessions, real GDM logins | VM E2E (`tests/vm/`) |
+| E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0 (Wayland and Xorg sessions) and Plasma 5.27 X11 (kde-plasma-desktop), real GDM logins | VM E2E (`tests/vm/`) |
 
 ## Results
 
@@ -43,7 +43,7 @@ cannot show.
 | Tray on GNOME Wayland (AppIndicator extension) | `python3 tests/gui/tray_gnome_wayland.py` | E2 | 12/12 | `tests/evidence/tray-gnome-wayland.json` |
 | GNOME 45 / 47 / 48 (all five GNOME Wayland suites) | `bash tests/gnome/e2e-gnome-in-container.sh fedora:39` (`:41`, `:42`) | E8 | all pass on each | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 19/19 | `tests/evidence/e2e-kwin-wayland.json` |
-| Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` | E9 | 7/7 on Wayland, 7/7 on Xorg | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, screenshots `tests/evidence/vm/` |
+| Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` / `plasma-x11` | E9 | 7/7 on GNOME Wayland, 7/7 on GNOME Xorg, 7/7 on Plasma 5.27 X11 | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, screenshots `tests/evidence/vm/` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
 | .deb package lifecycle | `bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb` | E5 | passed | `tests/evidence/package-deb-ubuntu24.04.log` |
 | Arch package lifecycle | `bash packaging/test/arch-in-container.sh` | E6 | passed | `tests/evidence/package-arch.log` |
@@ -88,6 +88,7 @@ not include the compositor's paint.
 | KDE kept Fractile's shortcuts after exit | K17 | ghost bindings in kglobalshortcutsrc | K17 PASS |
 | Automatic snapshot store grew between periodic ticks | soak P07 | growth with every restore | bounded (P07) |
 | Under the systemd user unit every login of a boot had the same session key (no `XDG_SESSION_ID`), so no login restore ran after a log-out, and the lock state was unknown | VM V06 | guest DB: both sessions keyed `<boot>:nosession`; no login flow at the second login | each login keyed by its logind session (User.Display); V06 PASS |
+| Plasma 5.27 log-out left the service running without its X display, and the next login started no new one | VM V03 (plasma-x11) | after log-out and log-in: unit active, `window_control` false, log "The X11 server closed the connection" (`tests/evidence/vm/plasma-x11-00-no-control-before-fix.png`) | unit bound to plasma-workspace.target; the service exits when its display closes; V03-V06 PASS |
 | On GNOME no logout snapshot: gnome-session stops GNOME Shell before systemd stops the service | VM V06 | "exit capture failed: ... extension is not connected"; "no snapshot from the previous session" | snapshot taken at gnome-session's EndSession (15 windows); V06 PASS |
 | Enter in the restore prompt unticked the focused row instead of restoring | VM V05 | Enter toggled the focused row checkbox; nothing was restored | focus on "Restore selected"; R01-R03 and V05 PASS |
 | GNOME 45: a frame rescaled while crossing monitors of another scale was learned as the window's minimum | GNOME 45 display suite (D02) | learned minimum 2272 px; later placements too large | re-requested, never learned; D02 PASS 3/3 |
@@ -110,10 +111,9 @@ not include the compositor's paint.
 
 ## What is not covered
 
-- Real logins on KDE (simulated relogins only), a power-loss
+- A real login on Plasma 6 / KWin Wayland, a power-loss
   interruption, and physical monitors (mixed DPI and disconnect/reconnect ran
   on virtual monitors through DisplayConfig).
-- A real Plasma log-out (the logout snapshot there is taken at SIGTERM).
 - The tray outside GNOME with the AppIndicator extension.
 - COSMIC: BLOCKED BY PLATFORM (docs/compatibility/cosmic.md).
 - Pop!_OS host package install (no root on the test host): dependency

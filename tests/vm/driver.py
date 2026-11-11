@@ -7,7 +7,10 @@ Test infrastructure only; runs inside tests/vm/Dockerfile.
      ubuntu-desktop-minimal and the test apps, installed by cloud-init.
   2. Per run, a fresh copy-on-write disk on that base, and one session type
      (Wayland or X11) set for the test user, with GDM automatic login and
-     timed login (so a log-out is followed by a new login).
+     timed login (so a log-out is followed by a new login). For plasma-x11 a
+     second cached base adds kde-plasma-desktop (Plasma 5.27, as Kubuntu
+     24.04), and GDM starts the Plasma X11 session; logging out is Plasma's
+     own (ksmserver).
   3. apt installs the .deb; Fractile is started from the app menu entry and
      set up the way the first-run wizard and Settings do it; one real
      log-out/log-in loads the GNOME extension (Wayland needs that).
@@ -19,7 +22,7 @@ Test infrastructure only; runs inside tests/vm/Dockerfile.
      checked the same way.
 
 Evidence: /evidence/vm-ubuntu24.04-<session>.json and /evidence/vm/*.png.
-Usage: driver.py --session wayland|x11 --deb /src/packaging/build/fractile_*.deb
+Usage: driver.py --session wayland|x11|plasma-x11 --deb /src/packaging/build/fractile_*.deb
 """
 from __future__ import annotations
 
@@ -40,6 +43,11 @@ SUMS_URL = "https://cloud-images.ubuntu.com/noble/current/SHA256SUMS"
 SSH_PORT = 2222
 QMP = "/tmp/qmp.sock"
 GUEST_TOOL = "/src/tests/vm/guest/vmctl.py"
+# session -> (GDM session name, logind session type, the shell process)
+SESSIONS = {"wayland": ("ubuntu", "wayland", "gnome-shell"), "x11": ("ubuntu-xorg", "x11", "gnome-shell"),
+            "plasma-x11": ("plasma", "x11", "plasmashell")}
+PLASMA_VERSIONS = "dpkg-query -W -f='${Package} ${Version}; ' plasma-workspace kwin-x11"
+APT = ("sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 -o Acquire::http::Timeout=60")
 APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-editor gnome-calculator "
              "gnome-system-monitor gnome-characters gnome-clocks baobab gnome-disk-utility gnome-font-viewer")
 
@@ -58,6 +66,8 @@ def say(msg: str) -> None:
 def check(tid: str, name: str, ok: bool, detail: str = "") -> bool:
     results.append({"id": tid, "name": name, "ok": bool(ok), "detail": detail})
     print(f"{'PASS' if ok else 'FAIL'} {tid} {name} :: {detail}", flush=True)
+    if not ok:
+        hold("fail")
     return ok
 
 
@@ -170,6 +180,40 @@ def ensure_base() -> Path:
     tmp.rename(base)
     say("base image ready")
     return base
+
+
+def ensure_plasma_base() -> Path:
+    """The desktop base plus kde-plasma-desktop, GDM kept as the display
+    manager, and the Plasma screen locker off (as the GNOME base turns its
+    own off): an idle lock would make Fractile skip its captures."""
+    out = CACHE / "base-plasma.qcow2"
+    if out.exists():
+        return out
+    base = ensure_base()
+    say("provisioning the Plasma image: kde-plasma-desktop on the desktop base")
+    vm = VM(base, "plasma-provision")
+    try:
+        if not vm.wait_ssh(600):
+            raise SystemExit("the Plasma provisioning VM did not come up")
+        steps = [
+            "echo 'gdm3 shared/default-x-display-manager select gdm3' | sudo debconf-set-selections",
+            f"for i in 1 2 3; do {APT} update -q && {APT} install -y kde-plasma-desktop > /tmp/plasma.log 2>&1 && break; sleep 30; done; tail -3 /tmp/plasma.log",
+            "test -e /usr/share/xsessions/plasma.desktop",
+            "echo /usr/sbin/gdm3 | sudo tee /etc/X11/default-display-manager >/dev/null",
+            "sudo systemctl disable sddm 2>/dev/null; sudo ln -sf /lib/systemd/system/gdm3.service /etc/systemd/system/display-manager.service",
+            "printf '[Daemon]\\nAutolock=false\\nLockOnResume=false\\nTimeout=0\\n' | sudo tee /etc/xdg/kscreenlockerrc >/dev/null",
+        ]
+        for c in steps:
+            p = vm.ssh(c, timeout=3600)
+            if p.returncode != 0:
+                raise SystemExit(f"Plasma provisioning step failed: {c} -> {p.returncode}: {(p.stdout + p.stderr).strip()[-600:]}")
+        vm.stop()
+    finally:
+        if vm.p.poll() is None:
+            vm.p.kill()
+    subprocess.run(["mv", str(vm.disk), str(out)], check=True)
+    say("Plasma image ready")
+    return out
 
 
 # ---------------------------------------------------------------- VM control
@@ -337,7 +381,7 @@ def compare(before: list[dict], after: list[dict], tol=4) -> tuple[bool, list[st
 
 
 def gdm_and_session(vm: VM, session: str) -> None:
-    xs = "ubuntu" if session == "wayland" else "ubuntu-xorg"
+    xs = SESSIONS[session][0]
     # Timed login only: it logs in at boot and again after every log-out.
     # With automatic login enabled as well, the first run saw GDM 46 log
     # "conversation gdm-autologin started more than once" and the session's
@@ -353,7 +397,9 @@ def gdm_and_session(vm: VM, session: str) -> None:
 
 
 def run(session: str, deb: str) -> None:
-    base = ensure_base()
+    base = ensure_plasma_base() if session == "plasma-x11" else ensure_base()
+    _xs, stype, shell = SESSIONS[session]
+    plasma = session == "plasma-x11"
     vm = VM(base, f"run-{session}")
     try:
         if not check("V00", "the VM boots and answers over ssh", vm.wait_ssh(600)):
@@ -361,7 +407,7 @@ def run(session: str, deb: str) -> None:
         gdm_and_session(vm, session)
         vm.scp(deb, "/tmp/fractile.deb")
         vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
-        rel = vm.ssh(". /etc/os-release; echo $PRETTY_NAME; gnome-shell --version; uname -r").stdout.strip().replace("\n", "; ")
+        rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {PLASMA_VERSIONS if plasma else 'gnome-shell --version'}; uname -r").stdout.strip().replace("\n", "; ")
         inst = vm.ssh(
             # The VM's user-mode network has no IPv6, and archive.ubuntu.com
             # resolves to IPv6 first: IPv4 only, and the whole install retried
@@ -377,21 +423,21 @@ def run(session: str, deb: str) -> None:
         vm.ssh("sudo systemctl reboot", timeout=20)
         vm.wait_down()
         vm.wait_ssh(600)
-        s1 = wait_session_shell(vm, session)
+        s1 = wait_session_shell(vm, stype)
         hold("login")
         # The user starts Fractile from the app menu, then sets it up.
         vm.vmctl("launch io.fractile.Fractile.desktop")
         up = wait_for(lambda: vm.ssh("test -S /run/user/$(id -u)/fractile/fractile.sock").returncode == 0, 60)
         setup = vm.vmctl("setup")
         check("V02", f"started from the app menu in a real {session} login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
-              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and setup.get("extension") == 0,
+              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and (plasma or setup.get("extension") == 0),
               f"session {s1.get('session_type')}, service socket {bool(up)}; {json.dumps(setup)[:400]}")
 
         # One real log-out and log-in (loads the extension on Wayland).
-        shell_before = vm.ssh("pgrep -u tester -x gnome-shell").stdout.strip()
+        shell_before = vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()
         lo = vm.vmctl("logout")
-        relog = wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh("pgrep -u tester -x gnome-shell").stdout.strip()), 180, 3)
-        s2 = wait_session(vm, session)
+        relog = wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()), 180, 3)
+        s2 = wait_session(vm, stype)
         st2 = s2.get("status") or {}
         check("V03", "after a real log-out and the next login, the systemd user unit started the service and it controls windows",
               bool(relog) and s2.get("unit_active") == "active" and bool(st2.get("window_control")),
@@ -413,7 +459,7 @@ def run(session: str, deb: str) -> None:
         vm.ssh("sudo systemctl reboot", timeout=20)
         vm.wait_down()
         vm.wait_ssh(600)
-        s3 = wait_session(vm, session)
+        s3 = wait_session(vm, stype)
         hold("after-reboot")
         # The default asks first: the user answers the "Restore your windows
         # from last time?" dialog with Enter (its default button).
@@ -433,10 +479,10 @@ def run(session: str, deb: str) -> None:
         vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set session.confirm_before_restore false", check_rc=True)
 
         # Real log-out and timed re-login.
-        shell_before = vm.ssh("pgrep -u tester -x gnome-shell").stdout.strip()
+        shell_before = vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()
         lo = vm.vmctl("logout")
-        relog = wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh("pgrep -u tester -x gnome-shell").stdout.strip()), 180, 3)
-        wait_session(vm, session)
+        relog = wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()), 180, 3)
+        wait_session(vm, stype)
         after2 = wait_restore_done(vm, not_run=runs[0].get("run_id"))
         shot = vm.screenshot(f"{session}-03-after-logout")
         decision = vm.ssh("grep -E 'starting pid|login session|login restore|snapshot|capture|previous session|stopping|SIGTERM|signal' ~/.local/state/fractile/fractile.log | tail -14").stdout.strip()
@@ -494,17 +540,17 @@ def wait_session_shell(vm: VM, session: str, timeout=300) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--session", choices=["wayland", "x11"], required=True)
+    ap.add_argument("--session", choices=sorted(SESSIONS), required=True)
     ap.add_argument("--deb", required=True)
     ap.add_argument("--provision-only", action="store_true")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
-    ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end"])
+    ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail"])
     a = ap.parse_args()
     global HOLD, HOLD_AT
     HOLD = min(a.hold, 2400)
     HOLD_AT = a.hold_at
     if a.provision_only:
-        ensure_base()
+        ensure_plasma_base() if a.session == "plasma-x11" else ensure_base()
         return 0
     try:
         run(a.session, a.deb)
@@ -513,7 +559,7 @@ def main() -> int:
         traceback.print_exc()
         check("VXX", "run crashed", False, repr(ex))
     ev = {"suite": f"vm-ubuntu24.04-{a.session}", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-          "environment": f"Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM automatic and timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
+          "environment": f"Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}
     out = EVID / f"vm-ubuntu24.04-{a.session}.json"
     out.write_text(json.dumps(ev, indent=2) + "\n")
