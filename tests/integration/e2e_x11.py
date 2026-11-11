@@ -344,6 +344,69 @@ def run_all(e: Env) -> None:
     check("X23", "corrupt config: service starts on defaults, reports it, keeps the file", st["config_error"] is not None and cfgp.read_text().startswith("this is"), st["config_error"] and st["config_error"][:60])
     cfgp.unlink()
 
+    # margins and gaps (DV-22, DV-23), checked with independent arithmetic
+    c = e.client()
+    c.call("set_config", {"patch": {"appearance": {"spacing": {"margins_enabled": True, "gaps_enabled": True}}}})
+    c.close()
+    e.cli_json("snap", "left-half", "--window", g)
+    e.cli_json("snap", "right-half", "--window", q)
+    fg, fq = e.frame(g), e.frame(q)
+    m = gap = 10
+    ok = (fg["x"] == wa["x"] + m and fg["y"] == wa["y"] + m and fg["h"] == wa["h"] - 2 * m and fq["y"] == wa["y"] + m and fq["h"] == wa["h"] - 2 * m
+          and fq["x"] + fq["w"] == wa["x"] + wa["w"] - m and fq["x"] - (fg["x"] + fg["w"]) == gap and abs(fg["w"] - fq["w"]) <= 1)
+    check("X25", "10px margins and a 10px gap: halves sit exactly inside the work area with the gap between them", ok, f"work area {wa}; left {fg}; right {fq}")
+    c = e.client()
+    c.call("set_config", {"patch": {"appearance": {"spacing": {"margins_enabled": False, "gaps_enabled": False}}}})
+    c.close()
+
+    # named layout: save, disturb, apply
+    e.cli_json("snap", "top-left-quarter", "--window", g)
+    e.cli_json("snap", "bottom-right-quarter", "--window", q)
+    want_g, want_q = e.frame(g), e.frame(q)
+    e.run("layout", "save", "two-up")
+    e.cli_json("snap", "center", "--window", g)
+    e.cli_json("snap", "center", "--window", q)
+    ap = e.run("layout", "apply", "two-up", "--mode", "position_existing")
+    check("X26", "a named layout puts existing windows back exactly", ap.returncode == 0 and rect_eq(e.frame(g), want_g, 2) and rect_eq(e.frame(q), want_q, 2),
+          f"{e.frame(g)} {e.frame(q)}")
+
+    # hostile layout import (T26): no command fields survive, policies demoted, nothing runs
+    mark = e.base / "PWNED"
+    lay = e.cli_json("layout", "export", "two-up")
+    for v in lay["variants"]:
+        for en in v["entries"]:
+            en["exec"] = f"touch {mark}"
+            en["command"] = ["sh", "-c", f"touch {mark}"]
+            if en.get("launch"):
+                en["launch"]["policy"] = "always"
+                en["launch"]["exec"] = f"sh -c 'touch {mark}'"
+    lay["name"] = "hostile"
+    lay["post_apply"] = f"touch {mark}"
+    f = e.base / "hostile.json"
+    f.write_text(json.dumps(lay))
+    imp = e.run("layout", "import", str(f))
+    shown = e.cli_json("layout", "export", "hostile") if imp.returncode == 0 else {}
+    text = json.dumps(shown)
+    pols = {en["launch"]["policy"] for v in shown.get("variants", []) for en in v["entries"] if en.get("launch")}
+    for w in e.cli_json("list-windows"):
+        if w.get("app_id") == "org.fractile.Launchme":
+            os.kill(w["pid"], signal.SIGTERM)
+    time.sleep(1)
+    ap = e.run("layout", "apply", "hostile", "--mode", "launch_missing")
+    time.sleep(3)
+    relaunched = any(w.get("app_id") == "org.fractile.Launchme" for w in e.cli_json("list-windows"))
+    bad = json.loads(f.read_text())
+    bad["name"] = "hostile2"
+    for v in bad["variants"]:
+        for en in v["entries"]:
+            if en.get("launch"):
+                en["launch"]["desktop_id"] = "../../../usr/bin/sh"
+    f.write_text(json.dumps(bad))
+    rej = e.run("layout", "import", str(f))
+    check("SEC7", "hostile layout import: command fields dropped, launches demoted to ask, nothing executed or launched; path-like ids rejected",
+          imp.returncode == 0 and "touch" not in text and pols <= {"ask"} and not mark.exists() and not relaunched and rej.returncode != 0,
+          f"import {imp.returncode}, policies {pols}, apply exit {ap.returncode}, relaunched {relaunched}, path-like import exit {rej.returncode}")
+
     # no-WM / unsupported desktop honesty
     env2 = dict(e.env)
     env2.update(XDG_SESSION_TYPE="wayland", WAYLAND_DISPLAY="wayland-fake", XDG_CURRENT_DESKTOP="Hyprland")

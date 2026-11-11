@@ -2,6 +2,7 @@
 restore and approve launches per app, then runs it with progress."""
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QProgressBar, QPushButton, QTableWidget, QTableWidgetItem,
                              QVBoxLayout)
 
@@ -22,7 +23,10 @@ DEFAULT_ON = {"already_open", "will_reopen"}
 
 class RecoveryDialog(QDialog):
     def __init__(self, app, data: dict):
-        super().__init__(None)
+        # A top-level window, not a dialog: a parentless dialog is transient for
+        # the whole client group on X11 and the WM would stack it above the
+        # placement panel.
+        super().__init__(None, Qt.WindowType.Window)
         self.app = app
         self.data = data or {}
         self.layout_name = self.data.get("layout")

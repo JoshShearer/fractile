@@ -77,6 +77,14 @@ class GuiEnv(Env):
                 return None
         return self.wait_for(read, timeout)
 
+    def xgeom(self, xid: int) -> dict | None:
+        out = subprocess.run(["xdotool", "getwindowgeometry", "--shell", str(xid)], env=self.env, capture_output=True, text=True).stdout
+        kv = dict(line.split("=", 1) for line in out.split() if "=" in line)
+        try:
+            return {"x": int(kv["X"]), "y": int(kv["Y"]), "w": int(kv["WIDTH"]), "h": int(kv["HEIGHT"])}
+        except KeyError:
+            return None
+
     def cell_center(self, g: dict, col: int, row: int) -> tuple[int, int]:
         cw, ch = g["w"] / g["cols"], g["h"] / g["rows"]
         return int(g["x"] + (col + 0.5) * cw), int(g["y"] + (row + 0.5) * ch)
@@ -164,10 +172,15 @@ def run_all(e: GuiEnv) -> None:
     e.xdo("mousemove", str(x1), str(y1))
     time.sleep(0.5)
     e.shot("02-drag-preview")
-    e.xdo("mouseup", "1")
     want = expected(e, g["cols"], g["rows"], 0, 0, 2, g["rows"] - 1)
+    pv = e.visible_named("Fractile preview")
+    pg = e.xgeom(pv[0]) if pv else None
+    not_moved_yet = not rect_eq(e.frame(wid), want)  # the window starts elsewhere
+    e.xdo("mouseup", "1")
     got = e.wait_for(lambda: (lambda f: f if rect_eq(f, want) else None)(e.frame(wid)), 4.0) or e.frame(wid)
     check("G03", "dragging across the grid places the window exactly", rect_eq(got, want), f"want {want} got {got}")
+    check("G14", "during the drag a non-interactive preview shows the exact target and the window has not moved yet",
+          bool(pg) and rect_eq(pg, want, 1) and not_moved_yet, f"preview {pg} want {want}")
     hidden = e.wait_for(lambda: not e.visible_named("Fractile panel"), 3.0)
     check("G04", "panel closes after placing and focus returns to the window", hidden and e.wait_for(lambda: e.active_xid() == xid, 3.0))
 
@@ -285,6 +298,55 @@ def run_all(e: GuiEnv) -> None:
     check("G12", "Fractile UI windows are flagged as own and never offered as targets", bool(own) and not (set(own) & listed) and set(own) <= flagged,
           f"{len(own)} own windows, flagged {len(flagged)}")
     e.shot("08-dashboard")
+
+    # G15: 10x10 grid, hold Alt for 20x20 subdivision, drag half cells
+    e.run("config", "set", "appearance.default_grid", '{"cols": 10, "rows": 10}')
+    e.run("config", "set", "appearance.reset_grid_on_open", "true")
+    e.xdo("windowactivate", "--sync", str(xid))
+    time.sleep(0.3)
+    g = open_panel()
+    if g and (g[0]["cols"], g[0]["rows"]) == (10, 10):
+        g = g[0]
+        sub = dict(g, cols=20, rows=20)
+        ax, ay = e.cell_center(sub, 1, 1)
+        bx, by = e.cell_center(sub, 12, 14)
+        e.xdo("keydown", "alt")
+        time.sleep(0.3)
+        e.xdo("mousemove", str(ax), str(ay), "mousedown", "1")
+        time.sleep(0.15)
+        e.xdo("mousemove", str(bx), str(by))
+        time.sleep(0.3)
+        e.shot("09-subdivided-drag")
+        e.xdo("mouseup", "1")
+        time.sleep(0.1)
+        e.xdo("keyup", "alt")
+        want = expected(e, 20, 20, 1, 1, 12, 14)
+        got = e.wait_for(lambda: (lambda f: f if rect_eq(f, want) else None)(e.frame(wid)), 4.0) or e.frame(wid)
+        check("G15", "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly", rect_eq(got, want), f"want {want} got {got}")
+    else:
+        check("G15", "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly", False, f"panel grid {g and (g[0]['cols'], g[0]['rows'])}")
+    e.run("config", "set", "appearance.default_grid", '{"cols": 6, "rows": 6}')
+    time.sleep(0.5)
+
+    # G16: panel-local shortcut acts only while the panel is open (DV-15)
+    e.cli_json("snap", "center", "--window", wid)
+    e.xdo("windowactivate", "--sync", str(xid))
+    time.sleep(0.3)
+    open_panel()
+    e.shot("10-local-shortcut")
+    e.xdo("key", "ctrl+Left")
+    want = expected(e, 2, 1, 0, 0, 0, 0)
+    got = e.wait_for(lambda: (lambda f: f if rect_eq(f, want) else None)(e.frame(wid)), 4.0) or e.frame(wid)
+    in_panel = rect_eq(got, want)
+    closed = e.wait_for(lambda: not e.visible_named("Fractile panel"), 3.0)
+    e.cli_json("snap", "center", "--window", wid)
+    centered = e.frame(wid)
+    e.xdo("windowactivate", "--sync", str(xid))
+    time.sleep(0.3)
+    e.xdo("key", "ctrl+Left")
+    time.sleep(0.8)
+    check("G16", "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
+          in_panel and closed and rect_eq(e.frame(wid), centered), f"in panel {got}; after close {e.frame(wid)} (centered {centered})")
 
     log = e.ui_log.read_text() if e.ui_log.exists() else ""
     tb = [line for line in log.splitlines() if "Traceback" in line or "Error" in line]

@@ -2,6 +2,7 @@
 policy and autostart. Nothing is changed until Finish."""
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QCheckBox, QLabel, QRadioButton, QVBoxLayout, QWizard, QWizardPage
 
 from .widgets import ShortcutEdit
@@ -11,7 +12,10 @@ CANDIDATES = ["Super+Alt+G", "Ctrl+Alt+G", "Super+Alt+Space", "Ctrl+Alt+Shift+G"
 
 class FirstRunWizard(QWizard):
     def __init__(self, app):
-        super().__init__(None)
+        # A top-level window, not a dialog: a parentless dialog is transient for
+        # the whole client group on X11 and the WM would stack it above the
+        # placement panel.
+        super().__init__(None, Qt.WindowType.Window)
         self.app = app
         self.setWindowTitle("Welcome to Fractile")
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
