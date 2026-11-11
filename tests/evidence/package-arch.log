@@ -1,0 +1,41 @@
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+==> Finished making: fractile 0.9.0-1 (Wed Nov 11 07:21:54 2026)
+== built fractile-0.9.0-1-x86_64.pkg.tar.zst
+== integrations shipped:
+fractile /usr/share/gnome-shell/extensions/fractile@fractile.io/metadata.json
+fractile /usr/share/kwin/scripts/fractile/metadata.json
+Name            : fractile
+Version         : 0.9.0-1
+Depends On      : gcc-libs  glibc  python  python-pyqt6
+fractile 0.9.0
+fractiled 0.9.0
+fractile-ui 0.9.0
+Fractile 0.9.0 running (pid 8738, up 1s)
+Session:           / 
+Adapter:          x11
+Window control:   available
+Global shortcuts: available
+Restore policy:   manual
+ID             APP                          GEOMETRY               WS    TITLE
+x11:0x40000a   XEyes                        302x213+50+50          0     xeyes
+placed x11:0x40000a requested 640x400+640+400 observed 640x400+640+400 (error 0px, 1 attempt(s))
+saved snapshot 315624be-8031-4ddb-8775-50b17d26cda9
+autostart enabled (via xdg)
+== UI started without Python errors
+Fractile service stopping.
+== removed cleanly
+== T28 lifecycle: per-user data survives remove, reinstall picks it up, purge-data removes it
+   user data kept after remove
+   snapshot still listed after reinstall
+   setting kept after reinstall
+This removes, for user builder:
+  /home/builder/.config/fractile
+  /home/builder/.local/share/fractile
+  /home/builder/.local/state/fractile
+  /home/builder/.config/autostart/io.fractile.Fractile.desktop
+Snapshot or layout exports you saved elsewhere are not touched.
+Fractile user data removed.
+   purge-data stopped the service and removed config, data, logs and autostart
+== lifecycle complete

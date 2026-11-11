@@ -57,9 +57,12 @@ pub fn status() -> Value {
 fn xdg_entry() -> String {
     let exe = std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| "fractiled".into());
     // Exec has no field codes and no shell; the path is quoted per the spec.
+    // TryExec: if the package is removed, the session skips this entry
+    // instead of failing to start a missing binary at every login.
+    let tryexec = exe.clone();
     let quoted = if exe.chars().any(|c| c.is_whitespace() || "\"`$\\".contains(c)) { format!("\"{}\"", exe.replace('\\', "\\\\").replace('"', "\\\"").replace('`', "\\`").replace('$', "\\$")) } else { exe };
     format!(
-        "[Desktop Entry]\nType=Application\nName=Fractile\nComment=Window grid placement and session restore\nExec={quoted} --autostart\nIcon=io.fractile.Fractile\nTerminal=false\nNoDisplay=true\nX-GNOME-Autostart-enabled=true\nX-GNOME-Autostart-Phase=Applications\nX-KDE-autostart-phase=2\n"
+        "[Desktop Entry]\nType=Application\nName=Fractile\nComment=Window grid placement and session restore\nTryExec={tryexec}\nExec={quoted} --autostart\nIcon=io.fractile.Fractile\nTerminal=false\nNoDisplay=true\nX-GNOME-Autostart-enabled=true\nX-GNOME-Autostart-Phase=Applications\nX-KDE-autostart-phase=2\n"
     )
 }
 
@@ -98,5 +101,16 @@ pub fn reconcile(d: &Daemon) {
     match set(want) {
         Ok(v) => info!(d.log, "autostart set to {want} via {}", v["mode"]),
         Err(e) => warn!(d.log, "autostart change failed: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn xdg_entry_is_skipped_once_the_binary_is_gone() {
+        let e = super::xdg_entry();
+        let exe = std::env::current_exe().unwrap();
+        assert!(e.lines().any(|l| l == format!("TryExec={}", exe.display())), "{e}");
+        assert!(e.lines().any(|l| l.starts_with("Exec=") && l.ends_with(" --autostart")));
     }
 }

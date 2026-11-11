@@ -1,0 +1,90 @@
+== installed: fractile 0.9.0-1 install ok installed
+== integrations shipped, not enabled:
+/usr/share/gnome-shell/extensions/fractile@fractile.io/:
+extension.js
+metadata.json
+stylesheet.css
+
+/usr/share/kwin/scripts/fractile/contents/code/:
+main.js
+== root refused:
+fractiled: refusing to run as root. Fractile is a per-user service.
+fractile 0.9.0
+fractiled 0.9.0
+fractile-ui 0.9.0
+Failed to connect to system bus: No such file or directory
+== unit verifies
+== headless check (no display):
+{
+  "backend": "unsupported",
+  "capabilities": {
+    "adapter": "none",
+    "adapter_version": "0.9.0",
+    "api_version": 1,
+    "compositor": "",
+    "compositor_version": null,
+    "notes": [],
+    "operations": {
+      "activate": {
+        "level": "unsupported",
+        "note": "no graphical session: neither WAYLAND_DISPLAY nor DISPLAY is set (started outside a desktop login?)"
+      },
+   
+== service on Xvfb with openbox (an EWMH window manager):
+Fractile 0.9.0 running (pid 5269, up 1s)
+Session:           / 
+Adapter:          x11
+Window control:   available
+Global shortcuts: available
+Restore policy:   manual
+Fractile 0.9.0 diagnostics
+OS: Ubuntu 24.04.5 LTS
+Session:  desktop= gnome-shell=-
+Adapter: x11 0.9.0 (compositor Openbox)
+  activate               partial: subject to window-manager focus-stealing prevention
+  get_active_window      full
+  get_geometry           full
+  get_outputs            full
+  get_permissions        full
+  get_workspaces         full
+  list_windows           full
+  move_resize            partial: EWMH request; window manager and size hints may adjust; result is verified
+ID             APP                          GEOMETRY               WS    TITLE
+x11:0x40000a   XEyes                        302x225+50+50          0     xeyes
+placed x11:0x40000a requested 640x400+0+0 observed 640x400+0+0 (error 0px, 1 attempt(s))
+== placed: {'h': 400, 'w': 640, 'x': 0, 'y': 0}
+saved snapshot fd92fd4e-b0a5-4ca7-804c-6da4e7000737
+ID                                     CREATED                    MODE         WIN APPS  NAME
+fd92fd4e-b0a5-4ca7-804c-6da4e7000737   2026-11-11T07:17:29.47082  manual         1    1  [pinned] container-test
+autostart enabled (via systemd)
+== autostart via the systemd user unit
+== UI started without Python errors
+Fractile service stopping.
+== removed cleanly
+== T28 lifecycle: per-user data survives remove, reinstall picks it up, purge-data removes it
+   user data kept after remove
+   snapshot still listed after reinstall
+   setting kept after reinstall
+This removes, for user u:
+  /home/u/.config/fractile
+  /home/u/.local/share/fractile
+  /home/u/.local/state/fractile
+  systemd user unit enablement (systemctl --user disable fractile.service)
+Snapshot or layout exports you saved elsewhere are not touched.
+(dry run: nothing removed)
+fractile: refusing to purge without --yes when not run from a terminal
+This removes, for user u:
+  /home/u/.config/fractile
+  /home/u/.local/share/fractile
+  /home/u/.local/state/fractile
+  systemd user unit enablement (systemctl --user disable fractile.service)
+Snapshot or layout exports you saved elsewhere are not touched.
+This removes, for user u:
+  /home/u/.config/fractile
+  /home/u/.local/share/fractile
+  /home/u/.local/state/fractile
+  systemd user unit enablement (systemctl --user disable fractile.service)
+Snapshot or layout exports you saved elsewhere are not touched.
+Fractile user data removed.
+   purge-data stopped the service and removed config, data, logs and the autostart entry
+== purged; lifecycle complete

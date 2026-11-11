@@ -99,6 +99,7 @@ impl AppIndex {
     ///    this very process (the variable is inherited by children)
     /// 4. Exec program name == executable name, never for interpreters or
     ///    generic launchers (python3, sh, env, java, ...)
+    ///
     /// Process-derived evidence (2-4) can be inherited from a parent such as a
     /// terminal, which is why the window's own claims win.
     pub fn enrich(&self, w: &mut WindowInfo) {

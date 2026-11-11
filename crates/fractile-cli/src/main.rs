@@ -62,6 +62,8 @@ Configuration
   shortcut-check ACCELERATOR      e.g. \"Ctrl+Alt+G\"
   autostart [on|off|status]
   list-apps                       installed applications and launch policies
+  purge-data [--dry-run] [--yes]  remove this user's Fractile config, snapshots, layouts,
+                                  logs and autostart entry (uninstalling the package keeps them)
   version
 
 Fractile restores window placement. It cannot restore unsaved document
@@ -818,6 +820,12 @@ fn main() {
                 1
             }
         }
+        "purge-data" => {
+            let dry = a.flag("--dry-run");
+            let yes = a.flag("--yes");
+            a.finish();
+            purge_data(dry, yes)
+        }
         "autostart" => {
             let sub = a.pos().unwrap_or_else(|| "status".into());
             a.finish();
@@ -851,4 +859,91 @@ fn main() {
         other => usage_err(&format!("unknown command '{other}'")),
     };
     exit(code)
+}
+
+/// Remove every piece of per-user Fractile state. Package removal never
+/// touches home directories, so this is the explicit, user-run counterpart.
+/// Exports the user saved elsewhere are theirs and are not touched.
+fn purge_data(dry: bool, yes: bool) -> i32 {
+    use fractile_core::paths;
+    use std::io::{BufRead, IsTerminal, Write};
+    use std::path::PathBuf;
+    let cfg_home = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()).map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".config"));
+    let xdg_entry = cfg_home.join("autostart").join("io.fractile.Fractile.desktop");
+    let unit_link = cfg_home.join("systemd/user/graphical-session.target.wants/fractile.service");
+    let mut targets: Vec<PathBuf> = vec![paths::config_dir(), paths::data_dir(), paths::state_dir()];
+    let cf = paths::config_file();
+    if !cf.starts_with(paths::config_dir()) {
+        targets.push(cf);
+    }
+    // Only an autostart entry Fractile wrote (its own Exec line).
+    let ours = std::fs::read_to_string(&xdg_entry).map(|t| t.lines().any(|l| l.starts_with("Exec=") && l.contains("--autostart"))).unwrap_or(false);
+    if ours {
+        targets.push(xdg_entry.clone());
+    }
+    let present: Vec<&PathBuf> = targets.iter().filter(|p| p.symlink_metadata().is_ok()).collect();
+    let unit_enabled = unit_link.symlink_metadata().is_ok();
+    println!("This removes, for user {}:", std::env::var("USER").unwrap_or_default());
+    for p in &present {
+        println!("  {}", p.display());
+    }
+    if unit_enabled {
+        println!("  systemd user unit enablement (systemctl --user disable fractile.service)");
+    }
+    if present.is_empty() && !unit_enabled {
+        println!("  nothing: no Fractile data found");
+        return 0;
+    }
+    println!("Snapshot or layout exports you saved elsewhere are not touched.");
+    if dry {
+        println!("(dry run: nothing removed)");
+        return 0;
+    }
+    if !yes {
+        if !std::io::stdin().is_terminal() {
+            eprintln!("fractile: refusing to purge without --yes when not run from a terminal");
+            return 2;
+        }
+        print!("Type 'purge' to continue: ");
+        let _ = std::io::stdout().flush();
+        let mut line = String::new();
+        let _ = std::io::stdin().lock().read_line(&mut line);
+        if line.trim() != "purge" {
+            println!("Cancelled; nothing removed.");
+            return 1;
+        }
+    }
+    // Stop a running service first so it cannot write the files back.
+    if let Ok(mut c) = Client::connect(&paths::socket_path(), "cli") {
+        let _ = c.call("quit", json!({}));
+        drop(c);
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while paths::socket_path().exists() && std::time::Instant::now() < end {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
+    let mut rc = 0;
+    if unit_enabled {
+        match std::process::Command::new("systemctl").args(["--user", "disable", "fractile.service"]).output() {
+            Ok(o) if o.status.success() => {}
+            _ => {
+                // systemd not reachable: drop the enablement link directly
+                if let Err(e) = std::fs::remove_file(&unit_link) {
+                    eprintln!("fractile: could not disable the user unit: {e}");
+                    rc = 1;
+                }
+            }
+        }
+    }
+    for p in present {
+        // remove_dir_all does not follow symlinks; a symlinked dir loses only the link
+        let r = if p.symlink_metadata().map(|m| m.is_dir()).unwrap_or(false) { std::fs::remove_dir_all(p) } else { std::fs::remove_file(p) };
+        if let Err(e) = r {
+            eprintln!("fractile: could not remove {}: {e}", p.display());
+            rc = 1;
+        }
+    }
+    println!("{}", if rc == 0 { "Fractile user data removed." } else { "Some items could not be removed (see above)." });
+    rc
 }
