@@ -1,6 +1,6 @@
 {
   "suite": "gui-x11",
-  "when": "2026-11-11T02:13:13-0600",
+  "when": "2026-11-11T03:27:24-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
@@ -104,7 +104,7 @@
       "id": "G17",
       "name": "relaunching from the app menu shows the panel for the focused window; no second UI stays running",
       "ok": true,
-      "detail": "exit 0; ui pids [2375015] -> [2375015]; got {'h': 194, 'w': 255, 'x': 66, 'y': 32}"
+      "detail": "exit 0; ui pids [2925249] -> [2925249]; got {'h': 194, 'w': 255, 'x': 66, 'y': 32}"
     },
     {
       "id": "G13",

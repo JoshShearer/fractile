@@ -1,0 +1,159 @@
+{
+  "suite": "perf-x11",
+  "when": "2026-11-11T02:55:44-0600",
+  "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM, PyQt6 UI; fractiled debug build; CPU AMD Ryzen Threadripper 1920X 12-Core Processor, 24 threads",
+  "metrics": {
+    "idle": {
+      "seconds": 5,
+      "rss_mib": 18.9,
+      "threads": 9,
+      "fds": 16,
+      "cpu_pct_median": 0.0,
+      "cpu_pct_mean": 0.0,
+      "cpu_pct_max": 0.0,
+      "ui_rss_mib": 65.2
+    },
+    "placement": {
+      "n": 200,
+      "service_p50_ms": 106,
+      "service_p95_ms": 119,
+      "client_rtt_p50_ms": 108.8,
+      "client_rtt_p95_ms": 122.0,
+      "within_tolerance": 200
+    },
+    "panel": {
+      "n": 5,
+      "missed": 0,
+      "p50_ms": 15.0,
+      "p95_ms": 17.8,
+      "max_ms": 17.8
+    },
+    "soak": {
+      "minutes": 0.2,
+      "cycles": 3,
+      "errors": 0,
+      "rss_mib_start": 19.6,
+      "rss_mib_end": 19.6,
+      "rss_mib_max": 19.6,
+      "fds_start_end": [
+        16,
+        16
+      ],
+      "threads_start_end": [
+        9,
+        9
+      ],
+      "zombie_children": 0,
+      "snapshots_by_mode": {
+        "pre_restore": 4,
+        "manual": 4
+      },
+      "trace": [
+        {
+          "t": 5.4,
+          "rss_kib": 20084,
+          "fds": 16,
+          "threads": 9
+        },
+        {
+          "t": 8.8,
+          "rss_kib": 20092,
+          "fds": 16,
+          "threads": 9
+        },
+        {
+          "t": 12.3,
+          "rss_kib": 20120,
+          "fds": 16,
+          "threads": 9
+        }
+      ]
+    },
+    "relogins": {
+      "n": 4,
+      "restored": 4,
+      "ghost_pids": [],
+      "duplicate_windows": 0,
+      "ui_processes_after": 0,
+      "misses": [],
+      "service_ready_ms_p50": 106,
+      "service_ready_ms_max": 108
+    },
+    "mid_restore_logouts": {
+      "n": 6,
+      "during_restore": 3,
+      "user_snaps_kept": 3,
+      "all_back": false,
+      "breaker_tripped": true,
+      "runs_ended_cancelled": 0,
+      "misses": [
+        "x11:0x1000005 at {'h': 437, 'w': 500, 'x': 600, 'y': 500} want {'h': 584, 'w': 767, 'x': 833, 'y': 616}",
+        "x11:0xe00006 at {'h': 437, 'w': 500, 'x': 640, 'y': 493} want {'h': 584, 'w': 767, 'x': 66, 'y': 32}",
+        "x11:0x1200005 at {'h': 437, 'w': 500, 'x': 680, 'y': 560} want {'h': 584, 'w': 767, 'x': 833, 'y': 32}"
+      ],
+      "last_run": "{\"running\": null, \"last_run\": {\"run_id\": \"49b2952c-1e51-44b9-8bd9-439c8d6b1fab\", \"source\": \"login\", \"state\": \"running\", \"summary\": null}}"
+    }
+  },
+  "results": [
+    {
+      "id": "P00",
+      "name": "test windows are up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P01",
+      "name": "UI starts and the panel appears on the global hotkey",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P02",
+      "name": "idle resident memory of fractiled < 75 MiB (UI excluded)",
+      "ok": true,
+      "detail": "18.9 MiB RSS, 9 threads, 16 fds; UI process 65.2 MiB (not counted)"
+    },
+    {
+      "id": "P03",
+      "name": "idle CPU median < 0.5% of one core",
+      "ok": true,
+      "detail": "median 0.0%, mean 0.0%, max 0.0% over 5 s"
+    },
+    {
+      "id": "P04",
+      "name": "placement P95 < 250 ms (request to geometry read back from the WM)",
+      "ok": true,
+      "detail": "service p50 106 / p95 119 ms; client round trip p50 108.8 / p95 122.0 ms; 200/200 within tolerance"
+    },
+    {
+      "id": "P05",
+      "name": "panel P95 < 150 ms after the hotkey (warm service; until the panel window is viewable)",
+      "ok": true,
+      "detail": "p50 15.0 / p95 17.8 / max 17.8 ms over 5 presses, 0 missed"
+    },
+    {
+      "id": "P06",
+      "name": "0.2-minute soak: service alive, no errors, RSS growth < 5 MiB, fds and threads flat, no zombie children",
+      "ok": true,
+      "detail": "3 cycles (~30 placements, 3 saves+restores); RSS 19.6 -> 19.6 MiB (max 19.6); fds [16, 16], threads [9, 9]; 0 errors"
+    },
+    {
+      "id": "P07",
+      "name": "automatic snapshots stay bounded by retention during the soak (max_recent=20); manual saves are kept by design",
+      "ok": true,
+      "detail": "4 automatic after 3 restores (each writes a pre-restore baseline); by mode {'pre_restore': 4, 'manual': 4}"
+    },
+    {
+      "id": "P08",
+      "name": "4 simulated relogins: every one restores the window, no ghost service/UI processes, no duplicate windows, at most one UI",
+      "ok": true,
+      "detail": "restored 4/4; ghosts []; duplicate windows 0; UI processes 0; service ready p50 106 ms"
+    },
+    {
+      "id": "P09",
+      "name": "6 logouts during the login restore: the next login restores the layout including the user's change, and automatic restore is never paused",
+      "ok": false,
+      "detail": "3/6 logouts while the restore ran; 3 user re-snaps; all back False; breaker tripped True; runs ended cancelled 0; misses [\"x11:0x1000005 at {'h': 437, 'w': 500, 'x': 600, 'y': 500} want {'h': 584, 'w': 767, 'x': 833, 'y': 616}\", \"x11:0xe00006 at {'h': 437, 'w': 500, 'x': 640, 'y': 493} want {'h': 584, 'w': 767, 'x': 66, 'y': 32}\", \"x11:0x1200005 at {'h': 437, 'w': 500, 'x': 680, 'y': 560} want {'h': 584, 'w': 767, 'x': 833, 'y': 32}\"]"
+    }
+  ]
+}
