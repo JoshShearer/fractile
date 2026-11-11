@@ -53,9 +53,9 @@ ID             APP                          GEOMETRY               WS    TITLE
 x11:0x40000a   XEyes                        302x225+50+50          0     xeyes
 placed x11:0x40000a requested 640x400+0+0 observed 640x400+0+0 (error 0px, 1 attempt(s))
 == placed: {'h': 400, 'w': 640, 'x': 0, 'y': 0}
-saved snapshot 7ae6fbae-c717-4765-9c01-ace639fbb79e
+saved snapshot 41208a20-8280-4d86-b5f6-e60b57207550
 ID                                     CREATED                    MODE         WIN APPS  NAME
-7ae6fbae-c717-4765-9c01-ace639fbb79e   2026-11-11T09:29:35.27034  manual         1    1  [pinned] container-test
+41208a20-8280-4d86-b5f6-e60b57207550   2026-11-11T18:08:23.35521  manual         1    1  [pinned] container-test
 autostart enabled (via systemd)
 == autostart via the systemd user unit
 == UI started without Python errors
@@ -78,13 +78,13 @@ This removes, for user u:
   systemd user unit enablement (systemctl --user disable fractile.service)
 Snapshot or layout exports you saved elsewhere are not touched.
 (dry run: nothing removed)
-fractile: refusing to purge without --yes when not run from a terminal
 This removes, for user u:
   /home/u/.config/fractile
   /home/u/.local/share/fractile
   /home/u/.local/state/fractile
   systemd user unit enablement (systemctl --user disable fractile.service)
 Snapshot or layout exports you saved elsewhere are not touched.
+fractile: refusing to purge without --yes when not run from a terminal
 This removes, for user u:
   /home/u/.config/fractile
   /home/u/.local/share/fractile

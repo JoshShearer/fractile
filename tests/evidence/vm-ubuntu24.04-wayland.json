@@ -1,7 +1,7 @@
 {
   "suite": "vm-ubuntu24.04-wayland",
-  "when": "2026-11-11T16:55:36+0000",
-  "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM automatic and timed login, wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "when": "2026-11-11T18:18:49+0000",
+  "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
       "id": "V00",
@@ -43,10 +43,8 @@
       "id": "V06",
       "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/wayland-03-after-logout.png; log: 2026-11-11T16:51:56.751 Info snapshot 6dce6e25-61e0-4209-b470-24f5c03eaa9d saved mode=Manual windows=15\n2026-11-11T16:51:57.217 Info Shutdown snapshot 21f5bdfe-ed2f-46c1-a80f-a764f6b96f4c saved (15 windows)\n2026-11-11T16:51:57.243 Info signal 15: ending session\n2026-11-11T16:51:57.243 Info Logout: the exit snapshot was already taken when the session manager ended the session\n2026-11-11T16:54:18.754 Info fractiled 0.9.0 starting pid=2480 autostart=true\n2026-11-11T16:54:18.781 Info login session 5 (from the user's graphical session (logind User.Display))\n2026-11-11T16:54:19.316 Info login restore decision=ask unclean=false snapshot=21f5bdfe-ed2f-46c1-a80f-a764f6b96f4c\n2026-11-11T16:54:43.593 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-11T16:54:43.604 Info Logout snapshot 0d171ef3-ec01-476c-b4f3-25aee109d4e6 saved (15 windows)\n2026-11-11T16:54:43.683 Info signal 15: ending session\n2026-11-11T16:54:43.683 Info Logout: the exit snapshot was already taken when the session manager ended the session\n2026-11-11T16:54:53.121 Info fractiled 0.9.0 starting pid=5231 autostart=true\n2026-11-11T16:54:53.131 Info login session 19 (from the user's graphical session (logind User.Display))\n2026-11-11T16:54:53.679 Info login restore decision=restore unclean=false snapshot=0d171ef3-ec01-476c-b4f3-25aee109d4e6"
+      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/wayland-03-after-logout.png; log: 2026-11-11T18:15:24.700 Info snapshot 57ad0fe2-26f4-4444-8439-0f48601794dc saved mode=Manual windows=15\n2026-11-11T18:15:25.759 Info Shutdown snapshot 1607cb64-7e00-4f1c-b491-345cf4855ce6 saved (15 windows)\n2026-11-11T18:15:25.794 Info signal 15: ending session\n2026-11-11T18:15:25.794 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-11T18:17:48.602 Info fractiled 0.9.0 starting pid=2281 autostart=true\n2026-11-11T18:17:48.647 Info login session 2 (from the user's graphical session (logind User.Display))\n2026-11-11T18:17:49.184 Info login restore decision=ask unclean=false snapshot=1607cb64-7e00-4f1c-b491-345cf4855ce6\n2026-11-11T18:18:18.483 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-11T18:18:18.494 Info Logout snapshot fcfdea61-322a-4260-91ed-a322ced7ead2 saved (15 windows)\n2026-11-11T18:18:18.585 Info signal 15: ending session\n2026-11-11T18:18:18.585 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-11T18:18:28.634 Info fractiled 0.9.0 starting pid=5196 autostart=true\n2026-11-11T18:18:28.649 Info login session 19 (from the user's graphical session (logind User.Display))\n2026-11-11T18:18:29.180 Info login restore decision=restore unclean=false snapshot=fcfdea61-322a-4260-91ed-a322ced7ead2"
     }
   ],
-  "log": [
-    "[16:55:07] holding the VM at 'end' for 1800 s (create /tmp/release in the container to go on)"
-  ]
+  "log": []
 }
