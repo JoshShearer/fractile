@@ -264,6 +264,13 @@ def run_all(e: Env):
     tb = [ln for ln in (e.ui_log.read_text().splitlines() if e.ui_log.exists() else []) if "Traceback" in ln]
     check("K16", "UI logged no Python errors", not tb, "; ".join(tb[:2]))
 
+    # orderly exit releases the KDE shortcuts (no ghost bindings)
+    before = dbus("--dest=org.kde.kglobalaccel", "/component/fractile", "org.kde.kglobalaccel.Component.shortcutNames", check=False)
+    e.stop_daemon()
+    after = dbus("--dest=org.kde.kglobalaccel", "/component/fractile", "org.kde.kglobalaccel.Component.shortcutNames", check=False)
+    check("K17", "on exit Fractile unregisters its KDE global shortcuts",
+          '"panel"' in before and '"panel"' not in after and '"t-left-third"' not in after, f"after exit: {' '.join(after.split())[:120]}")
+
 
 def main():
     e = Env()

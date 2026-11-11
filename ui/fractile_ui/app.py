@@ -77,7 +77,9 @@ class FractileApp:
         if self.status.get("config_error"):
             self.notify("Settings could not be loaded", f"Fractile is using defaults. Your file was not changed. {self.status['config_error'][:200]}")
         a = self.args
-        if a.settings:
+        if a.launcher and self.config().get("general", {}).get("first_run_complete", False):
+            self.bridge.try_call("show_panel")
+        elif a.settings:
             self.show_settings(a.page)
         elif a.dashboard:
             self.show_dashboard()
@@ -277,7 +279,10 @@ def forward_if_running(args) -> bool:
         st = c.call("status")
         if not st.get("ui_attached"):
             return False
-        if args.settings:
+        if args.launcher:
+            # Divvy: launching the app again shows the panel
+            c.call("show_panel")
+        elif args.settings:
             c.call("show_settings", {"page": args.page})
         elif args.dashboard:
             c.call("show_dashboard")
@@ -320,6 +325,7 @@ def main(argv=None) -> int:
     ap.add_argument("--page", default=None, help="settings page to open")
     ap.add_argument("--dashboard", action="store_true", help="open the workspace dashboard")
     ap.add_argument("--panel", action="store_true", help="show the placement panel")
+    ap.add_argument("--launcher", action="store_true", help="started from the app menu: the panel (or first-run setup)")
     ap.add_argument("--palette", action="store_true", help="open the command palette")
     ap.add_argument("--version", action="version", version=f"fractile-ui {__version__}")
     args = ap.parse_args((argv or sys.argv)[1:])

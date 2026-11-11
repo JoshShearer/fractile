@@ -1,6 +1,6 @@
 {
   "suite": "gui-x11",
-  "when": "2026-11-11T00:56:27-0600",
+  "when": "2026-11-11T00:59:50-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
@@ -99,6 +99,12 @@
       "name": "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
       "ok": true,
       "detail": "in panel {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; after close {'h': 584, 'w': 767, 'x': 449, 'y': 324} (centered {'h': 584, 'w': 767, 'x': 449, 'y': 324})"
+    },
+    {
+      "id": "G17",
+      "name": "relaunching from the app menu shows the panel for the focused window; no second UI stays running",
+      "ok": true,
+      "detail": "exit 0; ui pids [1715950] -> [1715950]; got {'h': 194, 'w': 255, 'x': 66, 'y': 32}"
     },
     {
       "id": "G13",

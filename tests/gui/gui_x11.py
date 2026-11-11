@@ -348,6 +348,20 @@ def run_all(e: GuiEnv) -> None:
     check("G16", "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
           in_panel and closed and rect_eq(e.frame(wid), centered), f"in panel {got}; after close {e.frame(wid)} (centered {centered})")
 
+    # G17: launching the app again (menu entry) shows the panel for the focused window (DV-02)
+    pids = sorted(e.ui_pids())
+    e.xdo("windowactivate", "--sync", str(xid))
+    time.sleep(0.3)
+    e.geom.unlink(missing_ok=True)
+    lp = subprocess.run([sys.executable, str(ROOT / "ui" / "fractile-ui"), "--launcher"], env=e.env, capture_output=True, text=True, timeout=20)
+    g = e.panel_geometry()
+    shown = bool(g) and bool(e.visible_named("Fractile panel"))
+    e.xdo("key", "Right", "Return")
+    want = expected(e, 6, 6, 0, 0, 0, 0)
+    got = e.wait_for(lambda: (lambda f: f if rect_eq(f, want) else None)(e.frame(wid)), 4.0) or e.frame(wid)
+    check("G17", "relaunching from the app menu shows the panel for the focused window; no second UI stays running",
+          lp.returncode == 0 and shown and rect_eq(got, want) and sorted(e.ui_pids()) == pids, f"exit {lp.returncode}; ui pids {pids} -> {sorted(e.ui_pids())}; got {got}")
+
     log = e.ui_log.read_text() if e.ui_log.exists() else ""
     tb = [line for line in log.splitlines() if "Traceback" in line or "Error" in line]
     check("G13", "UI logged no Python errors during the run", not tb, "; ".join(tb[:3]))

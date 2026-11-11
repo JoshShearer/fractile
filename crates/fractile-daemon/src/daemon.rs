@@ -391,6 +391,18 @@ impl Daemon {
     }
 
     // ---------- hotkeys ----------
+    /// Release every global shortcut (orderly exit). KDE keeps
+    /// KGlobalAccel registrations, and their keys, after an app exits, so
+    /// leaving them would be ghost bindings.
+    pub fn unregister_all_hotkeys(&self) {
+        let adapter = self.adapter();
+        let mut actions = self.hotkey_actions.lock().unwrap();
+        for id in actions.keys() {
+            let _ = adapter.unregister_hotkey(id);
+        }
+        actions.clear();
+    }
+
     pub fn register_hotkeys(&self) {
         let cfg = self.config();
         let adapter = self.adapter();
