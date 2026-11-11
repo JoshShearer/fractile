@@ -19,6 +19,7 @@ pub struct Environment {
     pub os_pretty_name: String,
     pub gnome_shell_version: Option<String>,
     pub cosmic_comp_running: bool,
+    /// kwin_wayland runs for this user. (kwin_x11 says nothing about a Wayland session.)
     pub kwin_running: bool,
 }
 
@@ -58,7 +59,7 @@ pub fn detect() -> Environment {
         os_pretty_name: os,
         gnome_shell_version: gsv,
         cosmic_comp_running: proc_running("cosmic-comp"),
-        kwin_running: proc_running("kwin_wayland") || proc_running("kwin_x11"),
+        kwin_running: proc_running("kwin_wayland"),
     }
 }
 

@@ -90,11 +90,19 @@ def run_all(e: Env) -> None:
 
     # Panel on each monitor (DV-12)
     e.activate(q)
+    t0 = time.time()
     e.keys("ctrl+alt+g")
-    panels = e.wait_for(lambda: (lambda ps: ps if len(ps) == 2 else None)([w for w in e.windows(True) if w["title"].startswith("Fractile panel")]), 12.0, 0.3) or []
-    where = sorted(next((o["stable_id"] for o in outs if inside(p["frame"], o["work_area"])), "?") for p in panels)
+
+    def panel_spots():
+        ps = [w for w in e.windows(True) if w["title"].startswith("Fractile panel")]
+        return ps, sorted(next((o["stable_id"] for o in outs if inside(p["frame"], o["work_area"])), "?") for p in ps)
+    # On Wayland a panel maps first and is then moved to its monitor by the
+    # compositor integration; wait for that, and report how long it took.
+    e.wait_for(lambda: panel_spots()[1] == sorted(ids), 12.0, 0.1)
+    settled = time.time() - t0
+    panels, where = panel_spots()
     check("M05", "the panel shortcut shows one panel inside each monitor's work area", where == sorted(ids) and all(p["is_own"] for p in panels),
-          f"{len(panels)} panels on {where}")
+          f"{len(panels)} panels on {where}, {settled:.2f} s after the key press")
     c = e.client()
     c.call("hide_panel")
     c.close()

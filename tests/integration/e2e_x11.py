@@ -495,7 +495,7 @@ def run_all(e: Env) -> None:
     out = subprocess.run([str(BIN / "fractiled"), "--check"], env=env2, capture_output=True, text=True)
     caps = json.loads(out.stdout)["capabilities"]
     levels = {v["level"] for v in caps["operations"].values()}
-    check("X24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, str(levels))
+    check("X24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, f"adapter={caps['adapter']} levels={levels}")
 
 
 UNI_TITLE = "Résumé 履歴書 Ünïcode ✓ 🎉"
