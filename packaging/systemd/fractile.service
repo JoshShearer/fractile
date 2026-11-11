@@ -1,0 +1,27 @@
+[Unit]
+Description=Fractile window placement and session restore
+Documentation=file:///usr/share/doc/fractile/README.md
+# Runs only inside a graphical login and stops with it.
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/fractiled --autostart
+Restart=on-failure
+RestartSec=3
+# Apps that Fractile reopens and the UI run in their own transient scopes;
+# only the service process itself belongs to this unit.
+KillMode=process
+# Time for the logout snapshot.
+TimeoutStopSec=15
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=graphical-session.target

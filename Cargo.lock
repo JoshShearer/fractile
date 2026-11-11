@@ -483,6 +483,7 @@ version = "0.9.0"
 dependencies = [
  "fractile-core",
  "fractile-ipc",
+ "libc",
  "serde_json",
 ]
 

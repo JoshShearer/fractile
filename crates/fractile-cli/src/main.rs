@@ -278,6 +278,11 @@ fn restore_options(a: &mut Args) -> Value {
 }
 
 fn main() {
+    // Behave like other CLI tools when piped into `head` and friends.
+    // SAFETY: restoring the default disposition of SIGPIPE has no preconditions.
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
     let mut a = Args { v: std::env::args().skip(1).collect(), json: false };
     a.json = a.flag("--json");
     let cmd = a.pos().unwrap_or_else(|| {

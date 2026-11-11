@@ -92,7 +92,13 @@ fn main() {
 
     let env = backend::detect();
     if has("--check") {
-        let log = Logger::new(std::env::temp_dir().join("fractiled-check.log"), 64, "info", false);
+        // Output is often piped into `head`; exit quietly on a closed pipe.
+        // SAFETY: restoring the default disposition of SIGPIPE has no preconditions.
+        unsafe {
+            libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+        }
+        // Per-user log (never a fixed path in a shared temp dir).
+        let log = Logger::new(paths::log_file(), 64, "info", false);
         let a = make_adapter(&env, forced, &log);
         let mut caps = a.capabilities();
         caps.tiling_manager = backend::detect_tiling(&env);

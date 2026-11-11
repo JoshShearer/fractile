@@ -208,7 +208,7 @@ impl Daemon {
         self.adapter().get_outputs().map_err(|e| err("adapter", e.to_string()))
     }
 
-    fn require(&self, op: Operation) -> R<()> {
+    pub fn require(&self, op: Operation) -> R<()> {
         let c = self.adapter().capabilities();
         if c.supports(op) {
             Ok(())

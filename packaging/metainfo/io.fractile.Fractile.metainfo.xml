@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.fractile.Fractile</id>
+  <name>Fractile</name>
+  <summary>Place windows on a grid and restore your workspace</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>Fractile opens a small grid over the focused window. Drag across cells, or use the arrow keys,
+    and the window fills that area. Global shortcuts, per-monitor panels, margins, gaps and
+    named layouts are supported.</p>
+    <p>Fractile also saves which applications and windows were open and puts them back after a
+    restart or crash: monitor, workspace, size and position. It does not restore unsaved
+    content inside applications. Apps are only reopened with your approval.</p>
+    <p>Fully supported on X11 desktops. Wayland support depends on the compositor; see the
+    compatibility matrix.</p>
+  </description>
+  <developer id="io.fractile">
+    <name>Fractile contributors</name>
+  </developer>
+  <launchable type="desktop-id">io.fractile.Fractile.desktop</launchable>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <provides>
+    <binary>fractile</binary>
+    <binary>fractiled</binary>
+    <binary>fractile-ui</binary>
+  </provides>
+  <releases>
+    <release version="0.9.0" date="2026-11-10"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -1,0 +1,43 @@
+# Maintainer: Fractile maintainers <maintainers@fractile.invalid>
+#
+# Local build: packaging/arch/make-srctar.sh && cd packaging/arch && makepkg -si
+# For the AUR, replace the local source with the release tarball URL and run
+# updpkgsums.
+pkgname=fractile
+pkgver=0.9.0
+pkgrel=1
+pkgdesc="Grid window placement (Divvy-style) and workspace session restore"
+arch=('x86_64' 'aarch64')
+url="https://example.invalid/fractile"
+license=('GPL-3.0-or-later')
+depends=('gcc-libs' 'glibc' 'python' 'python-pyqt6')
+makedepends=('cargo')
+optdepends=('libnotify: notifications when the desktop has no tray')
+# The bundled SQLite is C code; makepkg's -flto=auto would turn it into GCC
+# LTO objects that Rust's linker cannot read.
+options=('!lto')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo test --frozen --release --workspace
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  packaging/install.sh "$pkgdir" /usr target/release
+}

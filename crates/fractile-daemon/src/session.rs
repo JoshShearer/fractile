@@ -2,7 +2,7 @@
 //! login-time restore policy, monitor reconnect handling.
 
 use crate::daemon::{err, Daemon, RestoreJob, R};
-use fractile_core::adapter::{Capabilities, PlacementOutcome};
+use fractile_core::adapter::{Capabilities, Operation, PlacementOutcome};
 use fractile_core::config::{PowerLossPolicy, RestorePolicy};
 use fractile_core::geometry::{rect_to_norm, Rect};
 use fractile_core::layout::{ApplyMode, Layout, LayoutEntry, LayoutVariant};
@@ -22,6 +22,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub fn capture_now(d: &Daemon, mode: SnapshotMode, name: Option<String>) -> R<Snapshot> {
+    // An empty window list because the desktop can't report windows (no WM
+    // yet, unsupported compositor) must never become a "latest" snapshot.
+    d.require(Operation::ListWindows)?;
     let windows = d.windows()?;
     let outputs = d.outputs()?;
     let workspaces = d.adapter().get_workspaces().unwrap_or_default();

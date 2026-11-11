@@ -547,6 +547,31 @@ impl CompositorAdapter for X11Adapter {
     fn capabilities(&self) -> Capabilities {
         use Operation::*;
         use SupportLevel::*;
+        // Everything except outputs, key grabs and our own overlay needs an
+        // EWMH window manager. Checked live: the WM may start after us.
+        let has_wm = self.prop32(self.root, self.atoms._NET_SUPPORTING_WM_CHECK, AtomEnum::WINDOW).first().is_some();
+        if !has_wm {
+            let why = "no EWMH window manager is running on this X display (_NET_SUPPORTING_WM_CHECK is missing)".to_string();
+            let mut ops = BTreeMap::new();
+            for op in Operation::ALL {
+                ops.insert(op, Unsupported(why.clone()));
+            }
+            ops.insert(GetOutputs, if self.randr_ok { Full } else { Partial("RandR 1.5 unavailable: single screen only".into()) });
+            ops.insert(RegisterHotkey, Partial("passive X key grab; nothing to place without a window manager".into()));
+            ops.insert(ShowOverlay, Full);
+            ops.insert(GetPermissions, Full);
+            return Capabilities {
+                adapter: "x11".into(),
+                adapter_version: env!("CARGO_PKG_VERSION").into(),
+                api_version: ADAPTER_API_VERSION,
+                session_type: "x11".into(),
+                compositor: "none".into(),
+                compositor_version: None,
+                operations: ops,
+                tiling_manager: None,
+                notes: vec![why],
+            };
+        }
         let mut ops = BTreeMap::new();
         ops.insert(ListWindows, Full);
         ops.insert(GetActiveWindow, Full);

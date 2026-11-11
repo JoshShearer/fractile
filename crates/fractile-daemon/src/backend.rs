@@ -130,8 +130,16 @@ impl StubAdapter {
             name: "none".into(),
             session_type: env.session_type.clone(),
             compositor: env.current_desktop.clone(),
-            reason: format!("no Fractile adapter for session '{}' desktop '{}'", env.session_type, env.current_desktop),
-            notes: vec!["Wayland clients cannot position other applications' windows without a compositor-specific integration.".into()],
+            reason: if env.wayland_display.is_none() && env.x_display.is_none() {
+                "no graphical session: neither WAYLAND_DISPLAY nor DISPLAY is set (started outside a desktop login?)".into()
+            } else {
+                format!("no Fractile adapter for session '{}' desktop '{}'", env.session_type, env.current_desktop)
+            },
+            notes: if env.wayland_display.is_some() {
+                vec!["Wayland clients cannot position other applications' windows without a compositor-specific integration.".into()]
+            } else {
+                vec![]
+            },
         }
     }
     fn err<T>(&self) -> AResult<T> {

@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 /dist
 /packaging/build
+/packaging/arch/fractile-*.tar.gz
+/packaging/arch/src/
+/packaging/arch/pkg/
+/packaging/arch/*.pkg.tar.*

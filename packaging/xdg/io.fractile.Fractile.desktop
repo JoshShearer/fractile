@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+Name=Fractile
+GenericName=Window Grid and Session Restore
+Comment=Place windows on a grid and restore your workspace after a restart
+Exec=fractile-ui --settings
+Icon=io.fractile.Fractile
+Terminal=false
+Categories=Utility;Qt;
+Keywords=window;tile;grid;snap;layout;session;restore;divvy;
+StartupNotify=false
+Actions=Panel;Dashboard;Palette;
+
+[Desktop Action Panel]
+Name=Show Placement Panel
+Exec=fractile-ui --panel
+
+[Desktop Action Dashboard]
+Name=Workspace Dashboard
+Exec=fractile-ui --dashboard
+
+[Desktop Action Palette]
+Name=Command Palette
+Exec=fractile-ui --palette
