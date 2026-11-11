@@ -157,7 +157,7 @@ desktops only. See PLATFORM_MATRIX.md.
 ### Known issues and limits
 
 - Real logins, log-out and reboot are validated on Ubuntu 24.04 GNOME
-  Wayland only (VM). X11 and KDE logins are simulated. Mixed DPI and monitor
+  (Wayland and Xorg sessions, VM) only. KDE logins are simulated. Mixed DPI and monitor
   disconnect/reconnect are validated on headless GNOME (virtual monitors
   changed through DisplayConfig), not with physical monitors. The tray is
   validated on GNOME with the AppIndicator extension only.

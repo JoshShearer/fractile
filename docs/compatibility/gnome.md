@@ -17,7 +17,7 @@ Fractile controls windows on GNOME in two different ways, depending on the sessi
 | Same, monitors changed at runtime through Mutter DisplayConfig: scale 2 + scale 1 (mixed DPI), monitor disabled and re-enabled | 10/10 | `tests/evidence/e2e-gnome-wayland-displays.json` |
 | Same, tray: Ubuntu AppIndicators extension + the PyQt6 UI | 12/12 | `tests/evidence/tray-gnome-wayland.json` |
 | GNOME Shell 45.10 (Fedora 39), 47.10 (Fedora 41), 48.8 (Fedora 42), each headless in a container (`tests/gnome/e2e-gnome-in-container.sh`): the functional, two-monitor, display-change (mixed DPI, disconnect/reconnect), Settings and tray suites | all pass on all three | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
-| Ubuntu 24.04.5 desktop (GNOME Shell 46.0, Wayland) in a QEMU/KVM VM: real GDM login, `apt install` of the .deb, start from the app menu, real log-out and log-in, reboot and restore (`tests/vm/vm-e2e.sh wayland`) | 7/7 | `tests/evidence/vm-ubuntu24.04-wayland.json`, screenshots in `tests/evidence/vm/` |
+| Ubuntu 24.04.5 desktop (GNOME Shell 46.0, Wayland and Xorg sessions) in a QEMU/KVM VM: real GDM login, `apt install` of the .deb, start from the app menu, real log-out and log-in, reboot and restore (`tests/vm/vm-e2e.sh wayland`, `x11`) | 7/7 on each | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, screenshots in `tests/evidence/vm/` |
 
 Version differences found by these runs, and handled:
 

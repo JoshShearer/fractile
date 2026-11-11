@@ -23,7 +23,7 @@ cannot show.
 | E6 | archlinux:latest container | Openbox on Xvfb | PKGBUILD build, install, lifecycle |
 | E7 | ubuntu:24.04 container | kwin_x11 4:5.27.11 (Plasma X11) on Xvfb, no plasmashell | X11 E2E under KWin |
 | E8 | fedora:39 / 41 / 42 containers | GNOME Shell 45.10 / 47.10 / 48.8 headless Wayland | the five GNOME Wayland suites |
-| E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0 Wayland, real GDM logins | VM E2E (`tests/vm/`) |
+| E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0, Wayland and Xorg sessions, real GDM logins | VM E2E (`tests/vm/`) |
 
 ## Results
 
@@ -43,7 +43,7 @@ cannot show.
 | Tray on GNOME Wayland (AppIndicator extension) | `python3 tests/gui/tray_gnome_wayland.py` | E2 | 12/12 | `tests/evidence/tray-gnome-wayland.json` |
 | GNOME 45 / 47 / 48 (all five GNOME Wayland suites) | `bash tests/gnome/e2e-gnome-in-container.sh fedora:39` (`:41`, `:42`) | E8 | all pass on each | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 19/19 | `tests/evidence/e2e-kwin-wayland.json` |
-| Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` | E9 | 7/7 | `tests/evidence/vm-ubuntu24.04-wayland.json`, screenshots `tests/evidence/vm/` |
+| Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` | E9 | 7/7 on Wayland, 7/7 on Xorg | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, screenshots `tests/evidence/vm/` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
 | .deb package lifecycle | `bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb` | E5 | passed | `tests/evidence/package-deb-ubuntu24.04.log` |
 | Arch package lifecycle | `bash packaging/test/arch-in-container.sh` | E6 | passed | `tests/evidence/package-arch.log` |
@@ -110,7 +110,7 @@ not include the compositor's paint.
 
 ## What is not covered
 
-- Real logins on X11 and KDE (simulated relogins only), a power-loss
+- Real logins on KDE (simulated relogins only), a power-loss
   interruption, and physical monitors (mixed DPI and disconnect/reconnect ran
   on virtual monitors through DisplayConfig).
 - A real Plasma log-out (the logout snapshot there is taken at SIGTERM).
