@@ -18,6 +18,11 @@ class PreviewOverlay(QWidget):
         self.setWindowTitle("Fractile preview")
         self.label = ""
 
+    def show_target(self, r: dict, screen, label: str = "") -> None:
+        """Show over a daemon (device-pixel) rectangle on `screen`."""
+        from .panel import to_logical
+        self.show_rect(to_logical(r, screen), label)
+
     def show_rect(self, r: QRect, label: str = "") -> None:
         self.label = label
         self.setGeometry(r)
@@ -50,3 +55,31 @@ class PreviewOverlay(QWidget):
             p.drawRoundedRect(br, 6, 6)
             p.setPen(QColor(255, 255, 255))
             p.drawText(br, Qt.AlignmentFlag.AlignCenter, self.label)
+
+
+class CompositorOverlay:
+    """Wayland: the preview is drawn by the compositor integration (a client
+    window there would take keyboard focus from the panel and cannot
+    position itself). Same interface as PreviewOverlay."""
+
+    def __init__(self, bridge):
+        self.bridge = bridge
+        self._visible = False
+        self._last = None
+
+    def show_target(self, r: dict, _screen, label: str = "") -> None:
+        key = (r["x"], r["y"], r["w"], r["h"], label)
+        if self._visible and key == self._last:
+            return
+        rect = {k: r[k] for k in ("x", "y", "w", "h")}
+        self._visible = self.bridge.try_call("overlay_show", {"rect": rect, "label": label}) is not None
+        self._last = key if self._visible else None
+
+    def hide(self) -> None:
+        if self._visible:
+            self.bridge.try_call("overlay_hide", {})
+        self._visible = False
+        self._last = None
+
+    def isVisible(self) -> bool:
+        return self._visible

@@ -186,4 +186,13 @@ pub trait CompositorAdapter: Send + Sync {
     fn session_locked(&self) -> Option<bool> {
         None
     }
+    /// Optional: draw the placement preview inside the compositor (Wayland,
+    /// where a client overlay window would take focus and cannot position
+    /// itself). `below_pids`: keep the preview under these processes' windows.
+    fn show_overlay(&self, _rect: Rect, _label: &str, _below_pids: &[u32]) -> AResult<()> {
+        Err(AdapterError::Unsupported("the preview is drawn by the Fractile UI on this desktop".into()))
+    }
+    fn hide_overlay(&self) -> AResult<()> {
+        Ok(())
+    }
 }

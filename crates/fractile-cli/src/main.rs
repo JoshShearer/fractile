@@ -309,7 +309,15 @@ fn main() {
                 println!("Fractile {} running (pid {}, up {}s)", sv(&v["version"]), sv(&v["pid"]), sv(&v["uptime_s"]));
                 println!("Session:          {} / {}", sv(&v["session_type"]), sv(&v["desktop"]));
                 println!("Adapter:          {}", sv(&v["adapter"]));
-                println!("Window control:   {}", if v["window_control"].as_bool() == Some(true) { "available" } else { "NOT AVAILABLE on this desktop (run 'fractile diagnose')" });
+                let integ = &v["integration"];
+                if v["window_control"].as_bool() == Some(true) {
+                    println!("Window control:   available");
+                } else if integ["connected"].as_bool() == Some(false) {
+                    println!("Window control:   NOT AVAILABLE: compositor integration not connected");
+                    println!("                  {}", sv(&integ["hint"]));
+                } else {
+                    println!("Window control:   NOT AVAILABLE on this desktop (run 'fractile diagnose')");
+                }
                 println!("Global shortcuts: {}", if v["global_shortcuts"].as_bool() == Some(true) { "available" } else { "not available" });
                 if !v["tiling_manager"].is_null() {
                     println!("Tiling manager:   {} (may override placement)", sv(&v["tiling_manager"]));

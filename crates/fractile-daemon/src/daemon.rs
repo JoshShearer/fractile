@@ -87,7 +87,6 @@ pub struct Daemon {
     pub locked: AtomicBool,
     pub tiling: Option<String>,
     pub started: Instant,
-    pub bridge_status: Mutex<Value>,
     pub last_place_ms: Mutex<Vec<u64>>,
 }
 
@@ -128,7 +127,6 @@ impl Daemon {
             locked: AtomicBool::new(false),
             tiling,
             started: Instant::now(),
-            bridge_status: Mutex::new(Value::Null),
             last_place_ms: Mutex::new(vec![]),
         }
     }

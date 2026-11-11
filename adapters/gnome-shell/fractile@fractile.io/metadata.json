@@ -1,0 +1,8 @@
+{
+  "uuid": "fractile@fractile.io",
+  "name": "Fractile",
+  "description": "Compositor integration for Fractile (grid window placement and session restore). Lets the Fractile daemon list, move and focus windows and register its shortcuts on GNOME Wayland. It connects only to Fractile's private per-user socket and sends nothing anywhere else.",
+  "shell-version": ["45", "46", "47", "48"],
+  "version-name": "0.9.0",
+  "url": "https://fractile.invalid/"
+}

@@ -1,0 +1,6 @@
+# Lint config for the Python UI and test tooling.
+line-length = 200
+
+[lint]
+# E741 (a variable named "l") is a readability nit, not a bug.
+ignore = ["E741"]

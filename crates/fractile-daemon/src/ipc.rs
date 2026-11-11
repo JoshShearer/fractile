@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 struct Conn {
+    id: u64,
     pid: i32,
     writer: Arc<Mutex<UnixStream>>,
     sub_id: Option<u64>,
@@ -49,7 +50,8 @@ pub fn serve(d: Arc<Daemon>, listener: UnixListener) {
 fn handle(d: Arc<Daemon>, s: UnixStream, pid: i32) {
     let _ = s.set_read_timeout(None);
     let Ok(w) = s.try_clone() else { return };
-    let mut conn = Conn { pid, writer: Arc::new(Mutex::new(w)), sub_id: None, client: String::new() };
+    static NEXT_CONN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let mut conn = Conn { id: NEXT_CONN.fetch_add(1, Ordering::SeqCst), pid, writer: Arc::new(Mutex::new(w)), sub_id: None, client: String::new() };
     let mut reader = BufReader::new(s);
     let mut greeted = false;
     loop {
@@ -92,9 +94,18 @@ fn handle(d: Arc<Daemon>, s: UnixStream, pid: i32) {
             break;
         }
     }
+    if let Some(b) = crate::bridge::get() {
+        if b.detach(conn.id) {
+            warn!(d.log, "{} integration disconnected", b.kind);
+            d.broadcast("capabilities_changed", json!({}));
+        }
+    }
     if let Some(id) = conn.sub_id {
         d.subscribers.lock().unwrap().retain(|s| s.id != id);
         if conn.client == "ui" {
+            // A UI that exits or crashes must not leave a compositor-drawn
+            // preview behind.
+            let _ = d.adapter().hide_overlay();
             d.panel.lock().unwrap().visible = false;
         }
     }
@@ -113,6 +124,23 @@ fn hello(d: &Daemon, c: &mut Conn, p: &Value) -> R<Value> {
     c.client = p.get("client").and_then(|v| v.as_str()).unwrap_or("unknown").chars().take(32).collect();
     let caps = d.caps();
     Ok(json!({"product": fractile_core::PRODUCT_NAME, "version": fractile_core::VERSION, "protocol": PROTOCOL_VERSION, "adapter": caps.adapter, "pid": std::process::id()}))
+}
+
+/// A window of the calling (registered) Fractile UI process, by title.
+fn own_window_by_title(d: &Daemon, c: &Conn, title: &str) -> R<fractile_core::window::WindowInfo> {
+    let pid = c.pid as u32;
+    if !d.own_pids.lock().unwrap().contains(&pid) {
+        return Err(err("denied", "only a registered Fractile UI may manage its windows"));
+    }
+    // A freshly mapped surface can take a moment to reach the compositor.
+    for _ in 0..40 {
+        let ws = d.adapter().list_windows().map_err(|e| err("adapter", e.to_string()))?;
+        if let Some(w) = ws.into_iter().find(|w| w.pid == Some(pid) && w.title == title) {
+            return Ok(w);
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    Err(err("no_window", "own window not found"))
 }
 
 fn s<'a>(p: &'a Value, k: &str) -> Option<&'a str> {
@@ -188,7 +216,7 @@ pub fn status(d: &Daemon) -> Value {
         "locked": d.locked.load(Ordering::SeqCst),
         "config_error": d.cfg_error.lock().unwrap().clone(),
         "hotkey_errors": d.hotkey_errors.lock().unwrap().clone(),
-        "bridge": d.bridge_status.lock().unwrap().clone(),
+        "integration": crate::bridge::get().map(|b| b.status()).unwrap_or(Value::Null),
     })
 }
 
@@ -276,22 +304,61 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             // process are eligible.
             let title = req_s(p, "title")?;
             let rect: fractile_core::geometry::Rect = parse(p, "rect")?;
-            let pid = c.pid as u32;
-            if !d.own_pids.lock().unwrap().contains(&pid) {
-                return Err(err("denied", "only a registered Fractile UI may position its windows"));
-            }
-            let ws = d.adapter().list_windows().map_err(|e| err("adapter", e.to_string()))?;
-            let w = ws.into_iter().find(|w| w.pid == Some(pid) && w.title == title).ok_or_else(|| err("no_window", "own window not found"))?;
+            let w = own_window_by_title(d, c, title)?;
             Ok(json!(d.adapter().move_resize(&w.id, rect).map_err(|e| err("adapter", e.to_string()))?))
         }
         "focus_own_window" => {
-            d.focus_own_window(req_s(p, "window")?);
+            if let Some(wid) = s(p, "window") {
+                d.focus_own_window(wid);
+                return Ok(json!({}));
+            }
+            // Wayland: the UI knows only its window title.
+            let w = own_window_by_title(d, c, req_s(p, "title")?)?;
+            d.focus_own_window(&w.id);
+            Ok(json!({"window": w.id}))
+        }
+        "overlay_show" | "overlay_hide" => {
+            if !d.own_pids.lock().unwrap().contains(&(c.pid as u32)) {
+                return Err(err("denied", "only a registered Fractile UI may draw the preview"));
+            }
+            let a = d.adapter();
+            let r = if method == "overlay_show" {
+                let rect: fractile_core::geometry::Rect = parse(p, "rect")?;
+                let pids = d.own_pids.lock().unwrap().clone();
+                a.show_overlay(rect, s(p, "label").unwrap_or(""), &pids)
+            } else {
+                a.hide_overlay()
+            };
+            r.map_err(|e| err("adapter", e.to_string()))?;
             Ok(json!({}))
         }
         "show_settings" | "show_dashboard" | "show_palette" | "show_recovery" => {
             d.request_ui(method, p.clone());
             Ok(json!({}))
         }
+        "bridge_attach" => {
+            let b = crate::bridge::get().ok_or_else(|| err("unsupported", "this session does not use a compositor integration"))?;
+            b.attach(c.id, c.pid, c.writer.clone(), p).map_err(|e| err("denied", e))?;
+            info!(d.log, "{} integration attached from pid {}", b.kind, c.pid);
+            // Hotkey grabs are calls over this same connection, so they must
+            // not run on this reader thread.
+            let d2 = d.clone();
+            std::thread::spawn(move || {
+                d2.register_hotkeys();
+                d2.broadcast("capabilities_changed", json!({}));
+            });
+            Ok(json!({"api": fractile_core::adapter::ADAPTER_API_VERSION}))
+        }
+        "bridge_result" | "bridge_event" => {
+            let b = crate::bridge::get().filter(|b| b.is_bridge_conn(c.id)).ok_or_else(|| err("denied", "not the attached integration"))?;
+            if method == "bridge_result" {
+                b.deliver_result(p);
+            } else {
+                b.deliver_event(p).map_err(|e| err("invalid", e))?;
+            }
+            Ok(json!({}))
+        }
+        "bridge_status" => Ok(crate::bridge::get().map(|b| b.status()).unwrap_or(Value::Null)),
         "subscribe" => {
             let kind: String = s(p, "kind").unwrap_or("client").chars().take(16).collect();
             if c.sub_id.is_none() {
@@ -615,11 +682,6 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             info!(d.log, "quit requested over IPC by pid {}", c.pid);
             crate::request_shutdown(d);
             Ok(json!({"ok": true}))
-        }
-        "bridge_report" => {
-            // Status pushed by the GNOME/KWin integration helpers.
-            *d.bridge_status.lock().unwrap() = p.clone();
-            Ok(json!({}))
         }
         _ => Err(err("unknown_method", format!("unknown method '{method}'"))),
     }

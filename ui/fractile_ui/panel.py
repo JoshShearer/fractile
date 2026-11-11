@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QToolButto
 from . import keys
 from .grid_model import GridModel, Sel
 from .gridwidget import GridWidget
-from .overlay import PreviewOverlay
+from .overlay import CompositorOverlay, PreviewOverlay
 from .theme import mute
 
 
@@ -245,7 +245,7 @@ class PanelController:
         self.model = GridModel(6, 6)
         self.cell_px = 40
         self.panels: list[PanelWindow] = []
-        self.overlay = PreviewOverlay()
+        self.overlay = CompositorOverlay(app.bridge) if app.wayland else PreviewOverlay()
         self.payload: dict = {}
         self.cfg: dict = {}
         self.visible = False
@@ -378,7 +378,7 @@ class PanelController:
                 return
             self._preview_cache[key] = r
         scr = screen_for_output(output)
-        self.overlay.show_rect(to_logical(r, scr), f"{r['w']} × {r['h']}")
+        self.overlay.show_target(r, scr, f"{r['w']} × {r['h']}")
         self.app.register_own_windows()
         for p in self.panels:
             p.raise_()

@@ -1,0 +1,13 @@
+/* Fractile placement preview, drawn by GNOME Shell. */
+.fractile-preview {
+  background-color: rgba(53, 132, 228, 0.24);
+  border: 3px solid rgba(53, 132, 228, 0.95);
+  border-radius: 10px;
+}
+.fractile-preview-label {
+  color: #ffffff;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-weight: bold;
+}

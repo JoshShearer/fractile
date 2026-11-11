@@ -36,6 +36,7 @@ class FractileApp:
         self.qapp = qapp
         self.args = args
         self.bridge = Bridge("ui")
+        self.wayland = QGuiApplication.platformName().startswith("wayland")
         self.panel = PanelController(self)
         self._cfg: dict | None = None
         self.settings_win = None
@@ -46,7 +47,6 @@ class FractileApp:
         self._wizard_pending = False
         self.tray: QSystemTrayIcon | None = None
         self.status: dict = {}
-        self.wayland = QGuiApplication.platformName().startswith("wayland")
         self.bridge.event.connect(self.on_event)
         self.bridge.connected.connect(self.on_connected)
         self.bridge.disconnected.connect(self.on_disconnected)
@@ -151,12 +151,16 @@ class FractileApp:
     def focus_own(self, w):
         if QGuiApplication.platformName() == "xcb":
             self.bridge.try_call("focus_own_window", {"window": f"x11:0x{int(w.winId()):x}"})
+        elif self.wayland:
+            # Async: on Wayland the surface only maps once the event loop
+            # runs, and the daemon looks the window up in the compositor.
+            self.bridge.call_async("focus_own_window", {"title": w.windowTitle()})
 
     def position_own(self, w, rect: QRect):
         """Wayland clients cannot position themselves; ask the compositor
         integration to do it. On X11, Qt's move() already did."""
         if self.wayland:
-            self.bridge.try_call("place_own_window", {"title": w.windowTitle(), "rect": {"x": rect.x(), "y": rect.y(), "w": rect.width(), "h": rect.height()}})
+            self.bridge.call_async("place_own_window", {"title": w.windowTitle(), "rect": {"x": rect.x(), "y": rect.y(), "w": rect.width(), "h": rect.height()}})
 
     # ---- windows ----
     def show_settings(self, page: str | None = None):

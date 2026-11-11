@@ -5,6 +5,7 @@
 mod logging;
 mod autostart;
 mod backend;
+mod bridge;
 mod daemon;
 mod ipc;
 mod logind;
@@ -66,6 +67,8 @@ fn make_adapter(env: &backend::Environment, forced: Option<&str>, log: &Logger) 
                 Arc::new(backend::StubAdapter::unsupported(env))
             }
         },
+        backend::Backend::GnomeShell => bridge::install(Arc::new(bridge::BridgeAdapter::gnome())),
+        backend::Backend::KWin => bridge::install(Arc::new(bridge::BridgeAdapter::kwin())),
         backend::Backend::Cosmic => Arc::new(backend::StubAdapter::cosmic()),
         _ => Arc::new(backend::StubAdapter::unsupported(env)),
     }
