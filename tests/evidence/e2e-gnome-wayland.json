@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-11T00:56:50-0600",
+  "when": "2026-11-11T01:11:35-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:4264133537 gnome:4264133536"
+      "detail": "gnome:894686078 gnome:894686077"
     },
     {
       "id": "W03",
@@ -61,7 +61,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "971 ms incl. key injection"
+      "detail": "970 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -73,7 +73,7 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1738 ms"
+      "detail": "1737 ms"
     },
     {
       "id": "W12",
@@ -91,7 +91,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:4264133537"
+      "detail": "active gnome:894686078"
     },
     {
       "id": "W15",
@@ -127,7 +127,13 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot 473c69c1-d476-4448-acab-8d3f5109b8b1 (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot ceb027a6-9e18-49b8-964f-51785941813d (4 windows)"
+    },
+    {
+      "id": "W23",
+      "name": "an integration with a mismatched adapter API is refused; status reports the mismatch and how to fix it; the right version reattaches",
+      "ok": true,
+      "detail": "refused: version mismatch: the integration speaks adapter API 999, this Fractile needs 1. To fix: reinstall the Fractil; status line: The GNOME Shell integration tried to connect but was refused: version mismatch: the integr"
     },
     {
       "id": "W18",

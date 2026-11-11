@@ -438,6 +438,27 @@ def run_all(e: Env) -> None:
           unlocked and held == "(uint32 1,)" and snap and released, f"inhibitors before {held}; snapshot {snap and snap['id']} ({snap and snap['window_count']} windows)")
     e.run("config", "set", "session.policy", '"manual"')
 
+    # T19: an integration speaking another adapter API (after a shell or
+    # Fractile upgrade) is refused, and status names the mismatch and a fix
+    e.gext("disable", EXT_UUID)
+    detached = e.wait_for(lambda: not e.status()["window_control"], 8.0)
+    c = e.client()
+    try:
+        c.call("bridge_attach", {"kind": "gnome", "api": 999, "operations": {}})
+        refused = ""
+    except Exception as ex:  # noqa: BLE001 - the refusal is the expected outcome
+        refused = str(ex)
+    c.close()
+    st = e.status()
+    human = e.run("status").stdout
+    reported = "version mismatch" in (st["integration"].get("rejected") or "") and "To fix:" in human and not st["window_control"]
+    e.gext("enable", EXT_UUID)
+    back = e.wait_for(lambda: e.status()["window_control"], 10.0)
+    cleared = back and "rejected" not in e.status()["integration"]
+    check("W23", "an integration with a mismatched adapter API is refused; status reports the mismatch and how to fix it; the right version reattaches",
+          detached and "version mismatch" in refused and reported and cleared,
+          f"refused: {refused[:110]}; status line: {next((ln.strip() for ln in human.splitlines() if 'refused' in ln), '')[:90]}")
+
     tb = [l for l in (e.ui_log.read_text().splitlines() if e.ui_log.exists() else []) if "Traceback" in l or "Error" in l and "qt.qpa" not in l]
     check("W18", "UI logged no Python errors during the run", not tb, "; ".join(tb[:3]))
     log = (e.shell_state / "shell.log").read_text(errors="replace")

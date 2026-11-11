@@ -123,6 +123,10 @@ pub struct BridgeAdapter {
     /// What to tell the user while the integration is not connected.
     hint: String,
     attached: Mutex<Option<Attached>>,
+    /// Why the most recent attach attempt was refused (cleared on success),
+    /// so status/diagnose can say "update the integration" instead of the
+    /// generic "enable it" hint.
+    rejected: Mutex<Option<String>>,
     pending: Mutex<HashMap<u64, Sender<AResult<Value>>>>,
     next: AtomicU64,
     events: Mutex<Option<Sender<AdapterEvent>>>,
@@ -166,6 +170,7 @@ impl BridgeAdapter {
             compositor: compositor.into(),
             hint: hint.into(),
             attached: Mutex::new(None),
+            rejected: Mutex::new(None),
             pending: Mutex::new(HashMap::new()),
             next: AtomicU64::new(1),
             events: Mutex::new(None),
@@ -197,19 +202,34 @@ impl BridgeAdapter {
     pub fn status(&self) -> Value {
         match &*self.attached.lock().unwrap() {
             Some(a) => json!({"kind": self.kind, "connected": true, "peer_pid": a.peer_pid, "info": a.info}),
-            None => json!({"kind": self.kind, "connected": false, "hint": self.hint}),
+            None => match &*self.rejected.lock().unwrap() {
+                Some(r) => json!({"kind": self.kind, "connected": false, "rejected": r, "hint": format!("The {} integration tried to connect but was refused: {r}", self.compositor)}),
+                None => json!({"kind": self.kind, "connected": false, "hint": self.hint}),
+            },
         }
     }
 
-    /// Validate and accept an integration connection.
+    /// Validate and accept an integration connection. A refusal is kept for
+    /// status/diagnose until the next successful attach.
     pub fn attach(&self, conn_id: u64, peer_pid: i32, transport: Transport, p: &Value) -> Result<(), String> {
+        let r = self.attach_checked(conn_id, peer_pid, transport, p);
+        *self.rejected.lock().unwrap() = r.as_ref().err().cloned();
+        r
+    }
+
+    fn attach_checked(&self, conn_id: u64, peer_pid: i32, transport: Transport, p: &Value) -> Result<(), String> {
         let kind = p.get("kind").and_then(|v| v.as_str()).unwrap_or("");
         if kind != self.kind {
             return Err(format!("this session expects a '{}' integration, not '{kind}'", self.kind));
         }
         let api = p.get("api").and_then(|v| v.as_u64()).unwrap_or(0);
         if api != ADAPTER_API_VERSION as u64 {
-            return Err(format!("integration speaks adapter API {api}, Fractile needs {ADAPTER_API_VERSION}; update the extension/script"));
+            let fix = if self.kind == "gnome" {
+                "reinstall the Fractile package so the shipped extension matches, then log out and back in"
+            } else {
+                "reinstall the Fractile package so the shipped KWin script matches, then turn the script off and on in System Settings > Window Management > KWin Scripts"
+            };
+            return Err(format!("version mismatch: the integration speaks adapter API {api}, this Fractile needs {ADAPTER_API_VERSION}. To fix: {fix}"));
         }
         verify_compositor_peer(peer_pid, &self.allowed_peers)?;
         let mut ops = BTreeMap::new();
@@ -469,5 +489,40 @@ impl CompositorAdapter for BridgeAdapter {
 
     fn session_locked(&self) -> Option<bool> {
         self.call("session_locked", json!({})).ok().and_then(|v| v.as_bool())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn q() -> Transport {
+        Transport::Queue(async_channel::unbounded().0)
+    }
+
+    /// SRS T19: after a shell/KWin or Fractile upgrade the integration may
+    /// speak another adapter API. It must be refused (fail safe), and the
+    /// refusal must reach status with a concrete fix, not the generic hint.
+    #[test]
+    fn adapter_api_mismatch_is_refused_and_reported_with_a_fix() {
+        for b in [BridgeAdapter::gnome(), BridgeAdapter::kwin()] {
+            let me = std::process::id() as i32;
+            let e = b.attach(1, me, q(), &json!({"kind": b.kind, "api": ADAPTER_API_VERSION + 1})).unwrap_err();
+            assert!(e.contains("version mismatch") && e.contains("To fix:"), "{e}");
+            assert!(!b.is_attached());
+            let st = b.status();
+            assert_eq!(st["connected"], false);
+            assert_eq!(st["rejected"].as_str(), Some(e.as_str()));
+            assert!(st["hint"].as_str().unwrap().contains("refused"));
+            // A missing api field is treated as a mismatch too.
+            assert!(b.attach(2, me, q(), &json!({"kind": b.kind})).unwrap_err().contains("version mismatch"));
+            // The wrong kind is refused before anything else.
+            assert!(b.attach(3, me, q(), &json!({"kind": "other", "api": ADAPTER_API_VERSION})).is_err());
+            // A correct-version attach from a process that is not the
+            // compositor (this test binary) is still refused by peer checks.
+            let e = b.attach(4, me, q(), &json!({"kind": b.kind, "api": ADAPTER_API_VERSION})).unwrap_err();
+            assert!(!e.contains("version mismatch"), "{e}");
+            assert!(!b.is_attached());
+        }
     }
 }

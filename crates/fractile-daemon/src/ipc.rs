@@ -230,6 +230,9 @@ pub fn diagnose(d: &Daemon) -> Value {
     if !caps.supports(fractile_core::adapter::Operation::MoveResize) {
         warnings.push(format!("Window placement is unavailable on this desktop ({}).", caps.adapter));
     }
+    if let Some(r) = crate::bridge::get().and_then(|b| b.status().get("rejected").and_then(|v| v.as_str()).map(String::from)) {
+        warnings.push(format!("The compositor integration was refused: {r}"));
+    }
     if let Some(t) = &d.tiling {
         warnings.push(format!("An automatic tiling manager is active ({t}); it may override floating placement. Fractile does not change its settings."));
     }
