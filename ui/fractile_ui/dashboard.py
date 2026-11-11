@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLi
 
 from .theme import accent, is_dark
 
-MODE_LABEL = {"manual": "Saved by you", "periodic": "Automatic", "logout": "At logout", "shutdown": "At shutdown", "pre_restore": "Before a restore", "layout": "Layout"}
+MODE_LABEL = {"manual": "Saved by you", "periodic": "Automatic", "logout": "At logout", "shutdown": "At shutdown", "pre_restore": "Before a restore", "layout": "Layout", "topology": "Monitor setup"}
 
 
 class Wireframe(QWidget):

@@ -141,7 +141,8 @@ impl Store {
     /// Resolve an id prefix or a name to a snapshot id.
     pub fn resolve_snapshot_ref(&self, r: &str) -> Result<String, String> {
         if r == "latest" {
-            return self.latest_good(None).map(|s| s.snapshot_id).ok_or_else(|| "no valid snapshot".into());
+            let modes = [SnapshotMode::Manual, SnapshotMode::Periodic, SnapshotMode::Logout, SnapshotMode::Shutdown, SnapshotMode::PreRestore, SnapshotMode::Layout];
+            return self.latest_good(Some(&modes)).map(|s| s.snapshot_id).ok_or_else(|| "no valid snapshot".into());
         }
         let mut st = self.conn.prepare("SELECT id FROM snapshots WHERE id LIKE ?1 || '%' OR name=?1 ORDER BY created_at DESC").map_err(|e| e.to_string())?;
         let ids: Vec<String> = st.query_map([r], |row| row.get(0)).map_err(|e| e.to_string())?.filter_map(|x| x.ok()).collect();

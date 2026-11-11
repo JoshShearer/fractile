@@ -408,14 +408,20 @@ pub fn session_key() -> String {
 
 /// Periodic autosave (only for automatic policies), retention and daily DB backup.
 pub fn autosave_loop(d: Arc<Daemon>) {
+    if let Ok(o) = d.outputs() {
+        d.topology.lock().unwrap().get_or_insert_with(|| fractile_core::output::topology_signature(&o));
+    }
     let mut last_capture = Instant::now();
     let mut last_backup_day = String::new();
     loop {
-        for _ in 0..30 {
+        for i in 0..30 {
             if d.shutdown.load(Ordering::SeqCst) {
                 return;
             }
             std::thread::sleep(Duration::from_secs(1));
+            if i % 10 == 9 {
+                remember_layout(&d);
+            }
         }
         let cfg = d.config();
         let auto = matches!(cfg.session.policy, RestorePolicy::LastClean | RestorePolicy::LastKnown | RestorePolicy::Ask);
@@ -723,16 +729,70 @@ pub fn on_outputs_changed(d: &Arc<Daemon>) {
             }
         }
     }
-    if cfg.session.restore_on_monitor_reconnect && d.restore.lock().unwrap().is_none() {
-        let snap = d.store.lock().unwrap().latest_good(None);
-        if let Some(s) = snap {
-            let present: HashSet<&str> = outs.iter().map(|o| o.stable_id.as_str()).collect();
-            let recorded: HashSet<&str> = s.outputs.iter().map(|o| o.stable_id.as_str()).collect();
-            if recorded.is_subset(&present) && recorded.len() > 1 {
-                info!(d.log, "all monitors of snapshot {} present again; repositioning windows", s.snapshot_id);
-                let req = RestoreRequest { launch: false, ..Default::default() };
-                let _ = start_snapshot(d, &s.snapshot_id, &req, "reconnect", false);
+    let sig = fractile_core::output::topology_signature(&outs);
+    let prev = d.topology.lock().unwrap().replace(sig.clone());
+    let Some(prev) = prev else { return };
+    if prev == sig {
+        return;
+    }
+    info!(d.log, "monitor setup changed: {prev} -> {sig}");
+    // Keep the layout the ended setup had, for when it returns (SRS 6.2:
+    // "retain original layout for reconnection").
+    let mem = d.topology_memory.lock().unwrap().take();
+    if let Some((msig, mut snap)) = mem {
+        if msig == prev && !snap.windows.is_empty() {
+            snap.mode = SnapshotMode::Topology;
+            snap.diagnostics.push(format!("layout of monitor setup {prev}, kept when it changed to {sig}"));
+            let key = format!("topology:{prev}");
+            let old = d.store.lock().unwrap().meta_get(&key).ok().flatten();
+            let saved = d.store.lock().unwrap().save_snapshot(&snap, false);
+            match saved {
+                Ok(()) => {
+                    let _ = d.store.lock().unwrap().meta_set(&key, &snap.snapshot_id);
+                    if let Some(o) = old {
+                        let _ = d.store.lock().unwrap().delete_snapshot(&o);
+                    }
+                    info!(d.log, "kept the layout of monitor setup {prev} ({} windows) as snapshot {}", snap.windows.len(), snap.snapshot_id);
+                }
+                Err(e) => warn!(d.log, "could not keep the layout of monitor setup {prev}: {e}"),
             }
         }
+    }
+    if cfg.session.restore_on_monitor_reconnect && d.restore.lock().unwrap().is_none() && !d.is_locked() {
+        let kept = d.store.lock().unwrap().meta_get(&format!("topology:{sig}")).ok().flatten();
+        if let Some(id) = kept {
+            info!(d.log, "monitor setup {sig} is back; restoring the layout it had (snapshot {id})");
+            let req = RestoreRequest { launch: false, ..Default::default() };
+            if let Err(e) = start_snapshot(d, &id, &req, "reconnect", false) {
+                warn!(d.log, "could not restore the layout of monitor setup {sig}: {}", e.message);
+            }
+        }
+    }
+    // The new setup's layout is remembered from now on.
+    remember_layout(d);
+}
+
+/// Remember the current layout under the current monitor setup (memory only;
+/// it is written to the store when the setup changes). Skipped while a
+/// restore runs (a half-restored desktop is not the user's layout), while
+/// locked, and when session snapshots are turned off.
+pub fn remember_layout(d: &Daemon) {
+    let cfg = d.config();
+    if cfg.session.policy == RestorePolicy::Off || d.restore_in_progress() || d.is_locked() {
+        return;
+    }
+    let Ok(before) = d.outputs() else { return };
+    let Ok(snap) = capture_now(d, SnapshotMode::Topology, None) else { return };
+    let Ok(after) = d.outputs() else { return };
+    let sig = fractile_core::output::topology_signature(&before);
+    if sig != fractile_core::output::topology_signature(&after) {
+        return; // the setup changed while capturing
+    }
+    let mut cur = d.topology.lock().unwrap();
+    if cur.is_none() {
+        *cur = Some(sig.clone());
+    }
+    if cur.as_deref() == Some(sig.as_str()) {
+        *d.topology_memory.lock().unwrap() = Some((sig, snap));
     }
 }

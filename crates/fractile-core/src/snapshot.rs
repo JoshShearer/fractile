@@ -49,6 +49,9 @@ pub enum SnapshotMode {
     Shutdown,
     PreRestore,
     Layout,
+    /// The layout a monitor setup had when it ended (a monitor was
+    /// disconnected or the arrangement changed), kept for its return.
+    Topology,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
