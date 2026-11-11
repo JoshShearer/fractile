@@ -691,6 +691,24 @@ impl Daemon {
         }
     }
 
+    /// The tray icon lives in the UI process, so with the icon turned on
+    /// the UI is started in the background (no window) when the service
+    /// starts or the setting is turned on. Without a tray on the desktop
+    /// that UI exits again on its own (fractile-ui --background).
+    pub fn start_tray_ui(self: &Arc<Self>) {
+        if !self.config().general.tray_icon || self.ui_attached() {
+            return;
+        }
+        let mut p = self.panel.lock().unwrap();
+        if p.ui_spawned_at.map(|t| t.elapsed() < Duration::from_secs(10)).unwrap_or(false) {
+            return;
+        }
+        p.ui_spawned_at = Some(Instant::now());
+        drop(p);
+        info!(self.log, "starting the UI in the background for the tray icon");
+        spawn_ui(self, &["--background"]);
+    }
+
     pub fn flush_pending_ui(&self) {
         let pending = self.panel.lock().unwrap().pending_show.take();
         if let Some(v) = pending {
@@ -709,11 +727,15 @@ impl Daemon {
     pub fn apply_config(self: &Arc<Self>, new: Config) -> R<()> {
         new.validate().map_err(|e| err("invalid_config", e))?;
         new.save(&self.cfg_path).map_err(|e| err("io", e))?;
+        let tray_on = new.general.tray_icon && !self.config().general.tray_icon;
         *self.cfg.write().unwrap() = new;
         *self.cfg_error.lock().unwrap() = None;
         self.register_hotkeys();
         crate::autostart::reconcile(self);
         self.broadcast("config_changed", json!({}));
+        if tray_on {
+            self.start_tray_ui();
+        }
         Ok(())
     }
 

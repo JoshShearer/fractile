@@ -198,11 +198,18 @@ fn main() {
     }
     d.register_hotkeys();
 
+    // Catch TERM/INT/HUP before anything can see the service running: a
+    // logout that arrives during startup must still take the orderly exit
+    // path (handled below, once startup is done; signals wait until then).
+    let mut signals = signal_hook::iterator::Signals::new([signal_hook::consts::SIGTERM, signal_hook::consts::SIGINT, signal_hook::consts::SIGHUP]).expect("signals");
+
     // IPC
     {
         let d = d.clone();
         std::thread::Builder::new().name("ipc".into()).spawn(move || ipc::serve(d, listener)).unwrap();
     }
+    // The tray icon lives in the UI process (after IPC is up: the UI connects).
+    d.start_tray_ui();
     // Adapter events
     match d.adapter().subscribe_events() {
         Ok(rx) => {
@@ -234,7 +241,7 @@ fn main() {
     }
 
     // Signals: TERM/INT = orderly end of session, HUP = reload config.
-    let mut signals = signal_hook::iterator::Signals::new([signal_hook::consts::SIGTERM, signal_hook::consts::SIGINT, signal_hook::consts::SIGHUP]).expect("signals");
+    // (Registered before the socket opens; see above.)
     {
         let d = d.clone();
         std::thread::Builder::new()

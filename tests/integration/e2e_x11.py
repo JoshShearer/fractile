@@ -48,7 +48,7 @@ class Env:
         self.env.update(
             DISPLAY=f":{display}",
             XDG_SESSION_TYPE="x11",
-            XDG_CURRENT_DESKTOP="GNOME",
+            XDG_CURRENT_DESKTOP="KDE" if os.environ.get("FRACTILE_TEST_WM") == "kwin" else "GNOME",
             FRACTILE_RUNTIME_DIR=str(rt),
             FRACTILE_DATA_DIR=str(self.base / "data"),
             FRACTILE_CONFIG=str(self.base / "config.toml"),
@@ -181,8 +181,13 @@ def main() -> int:
         e.cleanup()
         if not a.keep:
             subprocess.run(["bash", str(nested), "stop", str(a.display)])
-    gs = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout.strip()
-    ev = {"suite": "e2e-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": f"Xephyr nested {gs} (X11), real mutter WM", "results": results}
+    if os.environ.get("FRACTILE_TEST_WM") == "kwin":
+        kv = subprocess.run(["kwin_x11", "--version"], capture_output=True, text=True).stdout.strip()
+        envdesc = f"{os.environ.get('FRACTILE_TEST_XSERVER', 'xephyr')} with {kv} (Plasma X11 window manager, no plasmashell)"
+    else:
+        gs = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout.strip()
+        envdesc = f"Xephyr nested {gs} (X11), real mutter WM"
+    ev = {"suite": "e2e-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": envdesc, "results": results}
     Path(a.evidence).parent.mkdir(parents=True, exist_ok=True)
     Path(a.evidence).write_text(json.dumps(ev, indent=2) + "\n")
     failed = [r for r in results if not r["ok"]]

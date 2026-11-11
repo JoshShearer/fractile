@@ -1,0 +1,35 @@
+# e2e_gnome_wayland.py with the extension from commit 7efb569 (before the unmanaging fix). GNOME Shell crashed with SIGSEGV during W24, so the integration disconnected:
+PASS W01 extension attaches over the private socket; window control available on Wayland :: GNOME Shell 46.0
+PASS SEC5 a non-compositor process cannot attach as the integration or inject events :: attach: only the compositor (gnome-shell) may attach; peer runs /usr/bin/python3.12; event: not the attached integration
+PASS W02 native Wayland GTK4 and Qt windows are listed with app id and pid :: gnome:4008068740 gnome:4008068739
+PASS W03 outputs have a stable id and a work area that excludes the top bar :: mon-MetaVendor-MetaVirtualMonitor-0x00 work_area={'h': 1168, 'w': 1600, 'x': 0, 'y': 32}
+PASS W04 grid placements land on the requested rectangle (GTK4, client-side decorations) :: 6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px
+PASS W05 grid placement on a Qt Wayland window :: err=0px
+PASS W06 1x1 selection fills the work area exactly :: {'h': 1168, 'w': 1600, 'x': 0, 'y': 32} vs {'h': 1168, 'w': 1600, 'x': 0, 'y': 32}
+PASS W07 undo restores the previous geometry
+PASS W08 placing a maximized window unmaximizes it and lands exactly :: maximized=False frame={'h': 1168, 'w': 800, 'x': 0, 'y': 32}
+PASS W09 global shortcut (grabbed by GNOME Shell) places the focused window :: 971 ms incl. key injection
+PASS W10 workspaces are listed and a window can be moved between them :: 2 workspaces
+PASS W11 snapshot restore puts Wayland windows back exactly :: 1753 ms
+PASS W12 shortcut starts the Wayland UI; the panel is shown, focused and inside the work area :: 1.0s incl. UI start; panel {'h': 386, 'w': 427, 'x': 800, 'y': 32} own=True
+PASS W13 panel keyboard selection (arrows, Shift+arrows, Enter) places the window :: want {'h': 584, 'w': 800, 'x': 533, 'y': 32} got {'h': 584, 'w': 800, 'x': 533, 'y': 32}
+PASS W14 panel closes after placing and focus returns to the window :: active gnome:4008068740
+PASS W15 Fractile UI windows are never offered as placement targets :: 0 own window(s)
+PASS W16 extension disabled: Fractile reports no window control and refuses; re-enabled: control and shortcuts return :: place exit 5: fractile: unsupported: The Fractile GNOME Shell extension is not connected. Enab
+PASS W17 daemon restart: the extension reconnects without user action
+PASS W20 an on-create rule places a new matching window :: {'h': 1168, 'w': 800, 'x': 800, 'y': 32} want {'h': 1168, 'w': 800, 'x': 800, 'y': 32}
+PASS W21 session locked: status says so, on-create rules and restores do not run, shortcuts do nothing :: locked=True rule_held=True restore exit 1: fractile: the session is locked; restore runs only while it is unlocked
+PASS W22 logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released :: inhibitors before (uint32 1,); snapshot 14519040-12cb-495a-bf48-720f3d2218ff (4 windows)
+PASS W23 an integration with a mismatched adapter API is refused; status reports the mismatch and how to fix it; the right version reattaches :: refused: version mismatch: the integration speaks adapter API 999, this Fractile needs 1. To fix: reinstall the Fractil; status line: The GNOME Shell integration tried to connect but was refused: version mismatch: the integr
+FAIL WXX suite crashed :: RuntimeError('fractile list-windows -> 1: fractile: unsupported: The Fractile GNOME Shell extension is not connected. Enable it in the Extensions app or run: gnome-extensions enable fractile@fractile.io (on Wayland, log out and in once after installing).\n')
+== daemon log (rules, warnings)
+2026-11-11T04:35:04.862 Error adapter disconnected: GNOME Shell integration disconnected
+2026-11-11T04:35:04.862 Warn gnome integration disconnected
+2026-11-11T04:35:06.690 Warn gnome integration disconnected
+2026-11-11T04:35:10.098 Info rule 'Late apps right' matched new window gnome:4008068743
+2026-11-11T04:35:14.575 Warn gnome integration disconnected
+2026-11-11T04:35:14.575 Error adapter disconnected: GNOME Shell integration disconnected
+2026-11-11T04:35:15.559 Error adapter disconnected: GNOME Shell integration disconnected
+2026-11-11T04:35:15.559 Warn gnome integration disconnected
+
+22/23 checks passed; evidence: /tmp/claude-1000/-home-joshshearer-Documents-Dev-Fractile/ca29d3c7-3215-4d6b-996a-2b6eba7ff40f/scratchpad/gw-before.json

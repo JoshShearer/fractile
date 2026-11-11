@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-11T03:26:35-0600",
+  "when": "2026-11-11T04:35:52-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:4162687577 gnome:4162687576"
+      "detail": "gnome:195554488 gnome:195554487"
     },
     {
       "id": "W03",
@@ -61,7 +61,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "970 ms incl. key injection"
+      "detail": "971 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -73,13 +73,13 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1749 ms"
+      "detail": "1738 ms"
     },
     {
       "id": "W12",
       "name": "shortcut starts the Wayland UI; the panel is shown, focused and inside the work area",
       "ok": true,
-      "detail": "1.2s incl. UI start; panel {'h': 386, 'w': 427, 'x': 800, 'y': 32} own=True"
+      "detail": "1.0s incl. UI start; panel {'h': 386, 'w': 427, 'x': 800, 'y': 32} own=True"
     },
     {
       "id": "W13",
@@ -91,7 +91,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:4162687577"
+      "detail": "active gnome:195554488"
     },
     {
       "id": "W15",
@@ -127,13 +127,19 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot 4ae5f4bf-5413-40cc-8890-c184f535a85d (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot de645bb4-a408-44cb-9ca8-36c6526c5b57 (4 windows)"
     },
     {
       "id": "W23",
       "name": "an integration with a mismatched adapter API is refused; status reports the mismatch and how to fix it; the right version reattaches",
       "ok": true,
       "detail": "refused: version mismatch: the integration speaks adapter API 999, this Fractile needs 1. To fix: reinstall the Fractil; status line: The GNOME Shell integration tried to connect but was refused: version mismatch: the integr"
+    },
+    {
+      "id": "W24",
+      "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
+      "ok": true,
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:195554493 closed while being placed', '1: no such window: gnome:195554494 closed while being placed', '2: no such window: gnome:195554495 closed while being placed']"
     },
     {
       "id": "W18",

@@ -53,15 +53,22 @@ def rect_eq(a, b, tol=0):
 
 
 class Env:
-    def __init__(self, monitors="1600x1200"):
+    def __init__(self, monitors="1600x1200", extra_exts=()):
+        """extra_exts: directories of further shell extensions to enable
+        (test tools, or the AppIndicator tray host)."""
         self.base = Path(tempfile.mkdtemp(prefix="fractile-wl-e2e-"))
         ext_home = self.base / "shell-data"
         dst = ext_home / "gnome-shell" / "extensions" / EXT_UUID
         shutil.copytree(ROOT / "adapters" / "gnome-shell" / EXT_UUID, dst)
+        uuids = [EXT_UUID]
+        for x in extra_exts:
+            x = Path(x)
+            shutil.copytree(x, ext_home / "gnome-shell" / "extensions" / x.name)
+            uuids.append(x.name)
         env = dict(os.environ)
         env["FRACTILE_TEST_DATA_HOME"] = str(ext_home)
         env.pop("FRACTILE_RUNTIME_DIR", None)
-        st = subprocess.run(["bash", str(HEADLESS), "start", NAME, monitors, EXT_UUID], env=env, capture_output=True, text=True)
+        st = subprocess.run(["bash", str(HEADLESS), "start", NAME, monitors, *uuids], env=env, capture_output=True, text=True)
         if st.returncode != 0:
             raise RuntimeError(f"headless shell failed: {st.stderr}")
         info = dict(kv.split("=", 1) for kv in st.stdout.strip().splitlines()[-1].split())
@@ -458,6 +465,36 @@ def run_all(e: Env) -> None:
     check("W23", "an integration with a mismatched adapter API is refused; status reports the mismatch and how to fix it; the right version reattaches",
           detached and "version mismatch" in refused and reported and cleared,
           f"refused: {refused[:110]}; status line: {next((ln.strip() for ln in human.splitlines() if 'refused' in ln), '')[:90]}")
+
+    # A window that closes while a placement is still settling: GNOME
+    # Shell 46 crashed (SIGSEGV in Mutter) when the extension re-requested
+    # the geometry of a window that was being unmanaged.
+    crashes = []
+    for i in range(8):
+        p = e.window("gtk4", f"org.fractile.Closing{i}", f"Closing {i}")
+        try:
+            cw = e.wait_window(lambda w, i=i: w.get("app_id") == f"org.fractile.Closing{i}")
+        except RuntimeError as ex:  # the integration is gone (the shell died)
+            crashes.append(f"{i}: {str(ex)[:60]}")
+            break
+        if not cw:
+            continue
+        c = e.client()
+        try:
+            # slow client response is not needed: kill right after the request
+            import threading
+            threading.Timer(0.05 + 0.03 * i, p.kill).start()
+            try:
+                c.call("place", {"window": cw["id"], "grid": {"cols": 3, "rows": 3}, "selection": {"col0": 2, "row0": 2, "col1": 2, "row1": 2}})
+            except Exception as ex:  # noqa: BLE001 - a "window closed" error is the expected outcome
+                crashes.append(f"{i}: {str(ex)[:60]}")
+        finally:
+            c.close()
+    shell_pid = int((e.shell_state / "shell.pid").read_text())
+    alive = os.path.exists(f"/proc/{shell_pid}")
+    still = e.wait_for(lambda: e.status()["window_control"], 5.0)
+    check("W24", "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
+          alive and still, f"shell alive={alive} attached={still}; errors reported: {crashes[:3]}")
 
     tb = [l for l in (e.ui_log.read_text().splitlines() if e.ui_log.exists() else []) if "Traceback" in l or "Error" in l and "qt.qpa" not in l]
     check("W18", "UI logged no Python errors during the run", not tb, "; ".join(tb[:3]))

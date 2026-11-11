@@ -187,7 +187,8 @@ def run(app: FractileApp, shot_dir: str) -> None:
     start_injector()
     w = wait(lambda: app.settings_win if app.settings_win and app.settings_win.isVisible() else None, 10.0)
     if not check("S01", "Settings opens from the service request with all eight pages", w is not None and w.tabs.count() == 8,
-                 str([w.tabs.tabText(i) for i in range(w.tabs.count())]) if w else "no window"):
+                 str([w.tabs.tabText(i) for i in range(w.tabs.count())]) if w else
+                 f"no window (connected={app.bridge.calls is not None}, settings_win={app.settings_win is not None})"):
         return
     pump(0.5)
     harness_focus(app, w.windowTitle())

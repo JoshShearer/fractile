@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -28,7 +29,7 @@ sys.path.insert(0, str(ROOT / "tests" / "gui"))
 import pause_checks  # noqa: E402
 from e2e_gnome_wayland import EXT_UUID, Env, check, rect_eq, results  # noqa: E402
 
-SHOTS = ROOT / "tests" / "evidence" / "gui" / "wayland"
+SHOTS = Path(os.environ.get("FRACTILE_SHOT_DIR") or ROOT / "tests" / "evidence" / "gui" / "wayland")
 
 
 def run_all(e: Env) -> None:

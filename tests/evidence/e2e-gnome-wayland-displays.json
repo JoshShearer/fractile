@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland-displays",
-  "when": "2026-11-11T03:45:05-0600",
+  "when": "2026-11-11T04:22:05-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual monitors 1600x1200,1280x1024, changed at runtime through Mutter DisplayConfig (scale 2+1, disable/enable); Fractile extension fractile@fractile.io",
   "results": [
     {

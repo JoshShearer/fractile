@@ -1,0 +1,6 @@
+{
+  "uuid": "unsafe-mode@fractile.test",
+  "name": "Fractile test: unsafe mode",
+  "description": "TEST ONLY. Loaded only into the private headless shell of the test suites. Turns on the shell's unsafe mode so the harness can use org.gnome.Shell.Eval and the screenshot API to inspect the top bar. Never install this in a real session.",
+  "shell-version": ["45", "46", "47", "48"]
+}

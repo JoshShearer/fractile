@@ -71,7 +71,16 @@ class FractileApp:
         self.status = self.bridge.try_call("status", {}, {}) or {}
         self.reload_config()
         self.register_own_windows()
-        if not self.config().get("general", {}).get("first_run_complete", False):
+        first_run = not self.config().get("general", {}).get("first_run_complete", False)
+        if getattr(self.args, "background", False):
+            # Started at login only for the tray icon: no windows. First-run
+            # setup waits until the user has used the panel once (it shows
+            # when the panel closes, as for a UI started by the panel).
+            self._wizard_pending = first_run
+            if not getattr(self, "_bg_started", False):
+                self._bg_started = True
+                QTimer.singleShot(0, lambda: self._background_check(0))
+        elif first_run:
             self._wizard_pending = True
             QTimer.singleShot(300, self.maybe_show_wizard)
         if self.status.get("config_error"):
@@ -244,6 +253,27 @@ class FractileApp:
             self._tray_menu = m
         self.tray.show()
 
+    BACKGROUND_TRIES = 15  # x 2 s: the desktop's tray can start after the service
+
+    def _background_check(self, n: int) -> None:
+        """--background: stay for the tray icon, or exit when there is none
+        (no tray on this desktop, or the icon is turned off) and no window is
+        open, so an idle UI process is not kept around for nothing."""
+        if self.tray is not None and self.tray.isVisible():
+            return
+        want = bool(self.config().get("general", {}).get("tray_icon", True))
+        if want and n < self.BACKGROUND_TRIES:
+            def again():
+                self.update_tray()
+                self._background_check(n + 1)
+            QTimer.singleShot(2000, again)
+            return
+        if any(w.isVisible() for w in QApplication.topLevelWidgets()):
+            return
+        print("fractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)", file=sys.stderr)
+        self.bridge.stop()
+        self.qapp.quit()
+
     def save_now(self):
         def ok(r):
             self.notify("Workspace saved", f"Snapshot {r.get('snapshot_id', '')[:8]} saved.")
@@ -279,7 +309,9 @@ def forward_if_running(args) -> bool:
         st = c.call("status")
         if not st.get("ui_attached"):
             return False
-        if args.launcher:
+        if args.background:
+            pass  # a UI is already running, so the tray icon is handled
+        elif args.launcher:
             # Divvy: launching the app again shows the panel
             c.call("show_panel")
         elif args.settings:
@@ -327,6 +359,8 @@ def main(argv=None) -> int:
     ap.add_argument("--panel", action="store_true", help="show the placement panel")
     ap.add_argument("--launcher", action="store_true", help="started from the app menu: the panel (or first-run setup)")
     ap.add_argument("--palette", action="store_true", help="open the command palette")
+    ap.add_argument("--background", action="store_true",
+                    help="started by the service at login for the tray icon; exits if the desktop has no tray")
     ap.add_argument("--version", action="version", version=f"fractile-ui {__version__}")
     args = ap.parse_args((argv or sys.argv)[1:])
     if os.geteuid() == 0:

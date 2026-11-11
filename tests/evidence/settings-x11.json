@@ -1,6 +1,6 @@
 {
   "suite": "settings-x11",
-  "when": "2026-11-11T04:10:28-0600",
+  "when": "2026-11-11T04:29:28-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
@@ -80,7 +80,7 @@
       "id": "S10",
       "name": "after Apply the service saved and registered it; the table says active",
       "ok": true,
-      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-d7f4ba32', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-43a7c6d8', 'name': 'Probe left half', 'scope': 'global'}] status=active"
     },
     {
       "id": "S13",

@@ -47,6 +47,22 @@ function wid(w) {
     return `gnome:${w.get_id()}`;
 }
 
+/** Track whether a window starts being unmanaged (closed) while a timer
+ * still refers to it. */
+function watchGone(w) {
+    const st = {gone: false};
+    let hid = w.connect('unmanaging', () => {
+        st.gone = true;
+    });
+    st.release = () => {
+        if (hid) {
+            w.disconnect(hid);
+            hid = 0;
+        }
+    };
+    return st;
+}
+
 function rectOf(r) {
     return {x: r.x, y: r.y, w: r.width, h: r.height};
 }
@@ -508,12 +524,23 @@ export default class FractileExtension extends Extension {
             const start = GLib.get_monotonic_time();
             let last = null;
             let stable = 0;
+            const gone = watchGone(w);
             const src = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 30, () => {
                 const elapsed = (GLib.get_monotonic_time() - start) / 1000;
+                // A window closed while settling must not be touched again:
+                // move_resize_frame on a window Mutter is unmanaging crashes
+                // GNOME Shell (stack_position assertion, then SIGSEGV).
+                if (gone.gone) {
+                    gone.release();
+                    this._settleSources.delete(src);
+                    done(false, new BridgeError('no_such_window', `${id} closed while being placed`));
+                    return GLib.SOURCE_REMOVE;
+                }
                 let cur;
                 try {
                     cur = rectOf(w.get_frame_rect());
                 } catch (_e) {
+                    gone.release();
                     this._settleSources.delete(src);
                     done(false, new BridgeError('no_such_window', id));
                     return GLib.SOURCE_REMOVE;
@@ -531,6 +558,7 @@ export default class FractileExtension extends Extension {
                     return GLib.SOURCE_CONTINUE;
                 }
                 if ((hit && stable >= 2) || (stable >= 6) || elapsed >= SETTLE_TIMEOUT_MS) {
+                    gone.release();
                     this._settleSources.delete(src);
                     let note = null;
                     if (!hit)
@@ -589,10 +617,14 @@ export default class FractileExtension extends Extension {
             // at login), which would undo an activation made now. 'hidden'
             // is emitted just before that grab is released, so activate on
             // the next idle.
+            const gone = watchGone(w);
             const id2 = overview.connect('hidden', () => {
                 overview.disconnect(id2);
                 const idle = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                     this._settleSources.delete(idle);
+                    gone.release();
+                    if (gone.gone)
+                        return GLib.SOURCE_REMOVE;
                     ts = currentTime();
                     Main.activateWindow(w, ts);
                     return GLib.SOURCE_REMOVE;
