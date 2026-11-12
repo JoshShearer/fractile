@@ -538,10 +538,94 @@ def wait_session_shell(vm: VM, session: str, timeout=300) -> dict:
     return last
 
 
+SOAK_PKGS = ("xvfb x11-utils x11-xserver-utils xdotool dbus-x11 python3-xlib python3-gi gir1.2-gtk-4.0 "
+             "python3-pyqt6 libglib2.0-bin sqlite3")
+
+
+def soak(minutes: float) -> int:
+    """T27: tests/perf/soak_x11.py inside the VM, so a long run uses the VM's
+    memory and never the user's desktop. Runs on Xvfb with the guest's GNOME
+    Shell (X11) as the window manager, under the soak's own memory cap, as a
+    transient systemd user service (linger on, so it does not depend on the
+    ssh session). Progress goes to stdout and tests/evidence/vm/soak-progress.log."""
+    base = ensure_base()
+    vm = VM(base, "soak")
+    prog = EVID / "vm" / "soak-progress.log"
+    prog.parent.mkdir(exist_ok=True)
+    def note(msg: str) -> None:
+        say(msg)
+        with prog.open("a") as f:
+            f.write(time.strftime("%Y-%m-%dT%H:%M:%S ") + msg + "\n")
+    prog.write_text("")
+    ok = False
+    try:
+        if not vm.wait_ssh(600):
+            note("the VM did not answer over ssh")
+            return 1
+        rel = vm.ssh(". /etc/os-release; echo $PRETTY_NAME; gnome-shell --version; uname -r; nproc; free -m | awk '/Mem/{print $2\" MiB\"}'").stdout.strip().replace("\n", "; ")
+        note(f"guest: {rel}")
+        inst = vm.ssh(f"for i in 1 2 3; do {APT} update -q >/dev/null 2>&1; {APT} install -y --no-install-recommends {SOAK_PKGS} > /tmp/apt.log 2>&1 && break; "
+                      "sleep 30; done; tail -1 /tmp/apt.log; sudo loginctl enable-linger tester; dpkg-query -W python3-pyqt6 xvfb", timeout=2400)
+        note(f"soak dependencies: {inst.stdout.strip().splitlines()[-2:]}")
+        tar = subprocess.Popen(["tar", "-C", "/src", "-cf", "-", "--exclude=__pycache__", "--exclude=tests/evidence", "tests", "ui",
+                                "target/release/fractiled", "target/release/fractile"], stdout=subprocess.PIPE)
+        put = subprocess.run(["ssh", "-q", "-i", str(vm.ssh_key), "-p", str(SSH_PORT), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                              "-o", "BatchMode=yes", "tester@127.0.0.1", "mkdir -p fractile/tests/evidence && tar -C fractile -xf -"], stdin=tar.stdout, timeout=600)
+        tar.wait()
+        if put.returncode != 0 or tar.returncode != 0:
+            note(f"copying the build into the VM failed (tar {tar.returncode}, ssh {put.returncode})")
+            return 1
+        cmd = (f"cd ~/fractile && exec python3 tests/perf/soak_x11.py --display 31 --minutes {minutes} --memory-max 3G "
+               f"--evidence /home/tester/soak.json --keep-log /home/tester/soak-daemon.log > /home/tester/soak.log 2>&1")
+        st = vm.ssh("systemd-run --user --quiet --unit=fractile-soak -E FRACTILE_BIN_DIR=/home/tester/fractile/target/release "
+                    f"-E FRACTILE_TEST_XSERVER=xvfb -E PYTHONDONTWRITEBYTECODE=1 bash -c '{cmd}'; sleep 5; systemctl --user is-active fractile-soak")
+        note(f"soak started ({minutes} min): {st.stdout.strip()} {st.stderr.strip()[-300:]}")
+        end = time.time() + minutes * 60 + 3 * 3600
+        last = ""
+        while time.time() < end:
+            time.sleep(300)
+            try:
+                r = vm.ssh("systemctl --user is-active fractile-soak; grep -E '^(soak progress|PASS|FAIL|soak error)' soak.log | tail -1; "
+                           "free -m | awk '/Mem/{print \"guest used \"$3\" of \"$2\" MiB\"}'", timeout=60)
+            except subprocess.TimeoutExpired:
+                note("the VM did not answer this poll")
+                continue
+            lines = r.stdout.strip().splitlines()
+            state = lines[0] if lines else "?"
+            body = " | ".join(lines[1:])
+            if body != last:
+                note(f"[{state}] {body}")
+                last = body
+            if state not in ("active", "activating"):
+                break
+        for src, dst in (("soak.json", EVID / "perf-x11-24h.json"), ("soak.log", EVID / "vm" / "soak.log")):
+            r = vm.ssh(f"cat {src}", timeout=120)
+            if r.returncode == 0 and r.stdout:
+                dst.write_text(r.stdout)
+        r = vm.ssh("tail -3000 soak-daemon.log", timeout=120)
+        (EVID / "vm" / "soak-daemon-tail.log").write_text(r.stdout)
+        res = vm.ssh("tail -2 soak.log").stdout.strip()
+        note(f"soak finished: {res}")
+        ok = "checks passed" in res and res.split("/")[0].split()[-1] == res.split("/")[1].split()[0]
+        if not ok:
+            # Diagnose in place: the test desktop and test windows by hand.
+            d = vm.ssh("cd ~/fractile; export XDG_RUNTIME_DIR=/run/user/$(id -u); "
+                       "FRACTILE_TEST_XSERVER=xvfb bash tests/integration/nested-gnome-x11.sh start 33 1600x1200 2>&1 | tail -3; "
+                       "for tk in gtk4 qt; do DISPLAY=:33 timeout 8 python3 tests/tools/testwin.py --toolkit $tk --app-id org.diag.$tk --title diag-$tk 2>&1 | tail -5 & done; "
+                       "sleep 5; DISPLAY=:33 xprop -root _NET_CLIENT_LIST; wait; "
+                       "tail -15 /run/user/$(id -u)/fractile-nested-33/shell.log; bash tests/integration/nested-gnome-x11.sh stop 33", timeout=180)
+            note("diagnostics:\n" + d.stdout[-4000:] + d.stderr[-1000:])
+            hold("fail")
+    finally:
+        vm.stop()
+    return 0 if ok else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--session", choices=sorted(SESSIONS), required=True)
-    ap.add_argument("--deb", required=True)
+    ap.add_argument("--session", choices=sorted(SESSIONS))
+    ap.add_argument("--deb")
+    ap.add_argument("--soak-minutes", type=float, default=0, help="run the T27 soak in the VM instead of the login tests")
     ap.add_argument("--provision-only", action="store_true")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
     ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail"])
@@ -549,6 +633,10 @@ def main() -> int:
     global HOLD, HOLD_AT
     HOLD = min(a.hold, 2400)
     HOLD_AT = a.hold_at
+    if a.soak_minutes:
+        return soak(a.soak_minutes)
+    if not a.session or not a.deb:
+        ap.error("--session and --deb are required")
     if a.provision_only:
         ensure_plasma_base() if a.session == "plasma-x11" else ensure_base()
         return 0

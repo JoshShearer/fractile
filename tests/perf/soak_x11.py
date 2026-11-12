@@ -174,7 +174,9 @@ def run_all(e: GuiEnv, a) -> dict:
     e.window("gtk4", "org.fractile.SoakA", "Soak A")
     e.window("qt", "org.fractile.SoakB", "Soak B")
     e.window("gtk4", "org.fractile.SoakC", "Soak C")
-    wins = [e.wait_window(lambda w, t=t: w.get("title") == t, 15.0) for t in ("Soak A", "Soak B", "Soak C")]
+    # 60 s: in a fresh VM the first GTK4 window takes over 15 s (cold caches,
+    # software rendering); start-up time is not what this test measures.
+    wins = [e.wait_window(lambda w, t=t: w.get("title") == t, 60.0) for t in ("Soak A", "Soak B", "Soak C")]
     if not check("P00", "test windows are up", all(wins)):
         return m
     wids = [w["id"] for w in wins]
@@ -185,7 +187,14 @@ def run_all(e: GuiEnv, a) -> dict:
     keys.combo("Control_L", "Alt_L", "g")
     first = e.wait_for(lambda: keys.visible_named("Fractile panel"), 20.0, 0.2)
     keys.combo("Escape")
-    check("P01", "UI starts and the panel appears on the global hotkey", bool(first))
+    if not check("P01", "UI starts and the panel appears on the global hotkey", bool(first)):
+        # Say why, here: the UI log goes away with the test environment.
+        names = subprocess.run(["sh", "-c", f"for w in $(xprop -root _NET_CLIENT_LIST | grep -o '0x[0-9a-f]*'); do xprop -id $w WM_NAME; done"],
+                               env={**os.environ, "DISPLAY": f":{a.display}"}, capture_output=True, text=True).stdout
+        print("P01 diagnostics: ui pids", e.ui_pids(), "| windows:", names.replace("\n", "; "), flush=True)
+        print("P01 status:", e.run("status").stdout[-1500:], flush=True)
+        if e.ui_log.exists():
+            print("P01 ui log:\n" + e.ui_log.read_text()[-3000:], flush=True)
     time.sleep(5)
 
     # Idle footprint and CPU, warm service, UI attached, 3 windows open.
@@ -495,7 +504,8 @@ def main() -> int:
     cpu = next((ln.split(":", 1)[1].strip() for ln in Path("/proc/cpuinfo").read_text().splitlines() if ln.startswith("model name")), "?")
     build = "debug" if "debug" in str(e2e_x11.BIN) else "release"
     ev = {"suite": "perf-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-          "environment": f"Xephyr nested {gs} (X11), real mutter WM, PyQt6 UI; fractiled {build} build; CPU {cpu}, {os.cpu_count()} threads",
+          "environment": f"{os.environ.get('FRACTILE_TEST_XSERVER', 'xephyr').capitalize()} with {gs} (X11) as the window manager, PyQt6 UI; fractiled {build} build; "
+                         f"CPU {cpu}, {os.cpu_count()} threads; memory cap {a.memory_max}",
           "metrics": m, "results": results}
     Path(a.evidence).write_text(json.dumps(ev, indent=2) + "\n")
     failed = [r for r in results if not r["ok"]]

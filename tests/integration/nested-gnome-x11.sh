@@ -109,5 +109,20 @@ for _ in $(seq $tries); do
   sleep 0.1
 done
 if (( ! struts )); then echo "warning: work area still covers the whole screen (no panel struts yet)" >&2; fi
+# GNOME Shell 40 and later starts in the Overview, which holds the keyboard:
+# no passive key grab (Fractile's global shortcuts included) fires until it
+# closes. A user closes it at once; tests do the same, through the shell's own
+# OverviewActive property.
+if [[ ${FRACTILE_TEST_WM:-gnome} == gnome ]]; then
+  bus=$(sed -n 1p "$state/dbus.out")
+  ov() { DBUS_SESSION_BUS_ADDRESS=$bus gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
+           --method org.freedesktop.DBus.Properties."$@" 2>/dev/null; }
+  for _ in $(seq 50); do
+    ov Get org.gnome.Shell OverviewActive | grep -q false && break
+    ov Set org.gnome.Shell OverviewActive "<false>" >/dev/null || true
+    sleep 0.2
+  done
+  ov Get org.gnome.Shell OverviewActive | grep -q false || echo "warning: the GNOME Shell Overview is still open; global shortcuts will not fire" >&2
+fi
 sleep 1
 echo "DISPLAY=:$num XEPHYR_PID=$(cat "$state/xephyr.pid") SHELL_PID=$(cat "$state/shell.pid") STATE=$state DBUS_SESSION_BUS_ADDRESS=$(sed -n 1p "$state/dbus.out")"
