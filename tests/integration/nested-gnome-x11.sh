@@ -19,6 +19,8 @@ session_pids() {
   return 0
 }
 if [[ $cmd == stop ]]; then
+  # Stop the watchdog unless this stop is the watchdog's own.
+  if [[ -f $state/watchdog.pid ]]; then wpid=$(cat "$state/watchdog.pid"); [[ $wpid != "$$" ]] && kill "$wpid" 2>/dev/null || true; fi
   for f in shell dbus xephyr; do
     [[ -f $state/$f.pid ]] && kill "$(cat "$state/$f.pid")" 2>/dev/null || true
   done
@@ -41,6 +43,16 @@ if [[ -e /tmp/.X11-unix/X$num ]] || DISPLAY=":$num" xprop -root >/dev/null 2>&1;
 fi
 mkdir -p "$state"
 args=()
+# Watchdog: when the process that started this desktop exits without running
+# "stop" (killed, timed out, the terminal closed), stop it anyway, so a test
+# shell and its bus never outlive their test. The owner is the caller
+# (FRACTILE_TEST_OWNER_PID overrides it).
+owner=${FRACTILE_TEST_OWNER_PID:-$PPID}
+if (( owner > 1 )); then
+  setsid bash -c 'while kill -0 "$1" 2>/dev/null && [[ -d $3 ]]; do sleep 2; done; [[ -d $3 ]] && exec bash "$2" stop "$4"' \
+    _ "$owner" "$(realpath "$0")" "$state" "$num" </dev/null >/dev/null 2>&1 &
+  echo $! >"$state/watchdog.pid"
+fi
 IFS=+ read -ra scr <<<"$screens"
 for s in "${scr[@]}"; do args+=(-screen "$s"); done
 # multiple -screen with +xinerama gives a multi-monitor RandR layout

@@ -14,6 +14,8 @@ set -euo pipefail
 cmd=${1:?start|stop}; name=${2:?name}; size=${3:-1600x1200}
 state="${XDG_RUNTIME_DIR:?}/fractile-headless-$name"
 if [[ $cmd == stop ]]; then
+  # Stop the watchdog unless this stop is the watchdog's own.
+  if [[ -f $state/watchdog.pid ]]; then wpid=$(cat "$state/watchdog.pid"); [[ $wpid != "$$" ]] && kill "$wpid" 2>/dev/null || true; fi
   [[ -f $state/dbus.pid ]] && kill "$(cat "$state/dbus.pid")" 2>/dev/null || true
   if [[ -f $state/shell.pid ]]; then
     spid=$(cat "$state/shell.pid"); kill "$spid" 2>/dev/null || true
@@ -24,6 +26,16 @@ fi
 [[ -e $state ]] && { echo "$state already exists; stop it first" >&2; exit 1; }
 shift 3 || shift $#
 mkdir -p "$state"/{config,data,cache,rt}; chmod 700 "$state/rt"
+# Watchdog: when the process that started this desktop exits without running
+# "stop" (killed, timed out, the terminal closed), stop it anyway, so a test
+# shell and its bus never outlive their test. The owner is the caller
+# (FRACTILE_TEST_OWNER_PID overrides it).
+owner=${FRACTILE_TEST_OWNER_PID:-$PPID}
+if (( owner > 1 )); then
+  setsid bash -c 'while kill -0 "$1" 2>/dev/null && [[ -d $3 ]]; do sleep 2; done; [[ -d $3 ]] && exec bash "$2" stop "$4"' \
+    _ "$owner" "$(realpath "$0")" "$state" "$name" </dev/null >/dev/null 2>&1 &
+  echo $! >"$state/watchdog.pid"
+fi
 export XDG_CONFIG_HOME="$state/config" XDG_DATA_HOME="${FRACTILE_TEST_DATA_HOME:-$state/data}" XDG_CACHE_HOME="$state/cache"
 mkdir -p "$XDG_CONFIG_HOME/glib-2.0/settings"
 exts=$(printf "'%s'," "$@"); exts="[${exts%,}]"; [[ $# -eq 0 ]] && exts="@as []"

@@ -254,9 +254,12 @@ def run_all(e: GuiEnv, a) -> dict:
     e.cli_json("save", "--name", "soak-base")
     e.run("layout", "save", "soak-layout", "--no-launch")
     trace = []
+    slots: dict[int, str] = {}  # soak-N name -> its current snapshot id
+    last_trace = 0.0
     t_end = time.time() + a.minutes * 60
     cycles = errors = 0
     t_soak = time.time()
+    last_progress = t_soak
     while time.time() < t_end:
         try:
             c = e.client()
@@ -269,7 +272,15 @@ def run_all(e: GuiEnv, a) -> dict:
             keys.combo("Control_L", "Alt_L", "g")
             time.sleep(0.4)
             keys.combo("Escape")
-            e.cli_json("save", "--name", f"soak-{cycles % 5}")
+            # Named saves are pinned, so retention never removes them: keep
+            # five named slots and delete each slot's previous snapshot, or a
+            # 24 h run piles up ~20,000 pinned snapshots.
+            slot = cycles % 5
+            new_id = e.cli_json("save", "--name", f"soak-{slot}").get("snapshot_id")
+            if slot in slots:
+                e.run("snapshot", "delete", slots[slot])
+            if new_id:
+                slots[slot] = new_id
             rep = e.cli_json("restore", "--snapshot", "latest", "--no-launch")
             errors += rep.get("state") != "completed"
             if cycles % 3 == 0:
@@ -279,8 +290,18 @@ def run_all(e: GuiEnv, a) -> dict:
             print("soak error:", ex, flush=True)
         cycles += 1
         s = proc_sample(dpid)
-        if s:
+        if s and time.time() - last_trace >= 30:  # bounded: ~2,900 samples per day
+            last_trace = time.time()
             trace.append({"t": round(s["t"] - t_soak, 1), "rss_kib": s["rss_kib"], "fds": s["fds"], "threads": s["threads"]})
+        # A progress line every minute, so a long run can be checked from
+        # outside (a stopped run and a running one look alike otherwise). It
+        # includes the memory of the whole test (Xephyr, the nested shell,
+        # the UI, the test windows), not only the service.
+        if time.time() - last_progress >= 60:
+            last_progress = time.time()
+            print(f"soak progress: {round((last_progress - t_soak) / 60)} min, {cycles} cycles, {errors} errors"
+                  + (f", fractiled rss {s['rss_kib'] / 1024:.1f} MiB, fds {s['fds']}, threads {s['threads']}" if s else "")
+                  + f", whole test {test_memory()}", flush=True)
         if e.daemon.poll() is not None:
             break
     alive = e.daemon.poll() is None
@@ -403,6 +424,42 @@ def run_all(e: GuiEnv, a) -> dict:
     return m
 
 
+def cgroup_dir() -> Path | None:
+    try:
+        rel = Path("/proc/self/cgroup").read_text().strip().split("::", 1)[1]
+        return Path("/sys/fs/cgroup" + rel)
+    except (OSError, IndexError):
+        return None
+
+
+def test_memory() -> str:
+    """Memory of this test's cgroup (every process it started), and the cap."""
+    d = cgroup_dir()
+    try:
+        cur = int((d / "memory.current").read_text()) / 2**20
+        mx = (d / "memory.max").read_text().strip()
+        cap = "no cap" if mx == "max" else f"cap {int(mx) / 2**20:.0f}"
+        return f"{cur:.0f} MiB ({cap})"
+    except (OSError, ValueError, TypeError):
+        return "unknown"
+
+
+def capped_or_exec(limit: str) -> None:
+    """Re-run this script in a systemd user scope with a hard memory cap and
+    no swap, so a leak in anything the test starts (the nested shell, Xephyr,
+    the UI, the service) is killed at the cap instead of pushing the user's
+    desktop into swap. --memory-max none skips this."""
+    if limit == "none" or os.environ.get("FRACTILE_SOAK_CAPPED") == limit:
+        return
+    os.environ["FRACTILE_SOAK_CAPPED"] = limit
+    cmd = ["systemd-run", "--user", "--scope", "--quiet", "-p", f"MemoryMax={limit}", "-p", "MemorySwapMax=0",
+           sys.executable, *sys.argv]
+    try:
+        os.execvp(cmd[0], cmd)
+    except OSError as ex:
+        sys.exit(f"cannot start the memory-capped scope ({ex}); pass --memory-max none to run without a cap")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--display", type=int, default=23)
@@ -413,7 +470,11 @@ def main() -> int:
     ap.add_argument("--panel-runs", type=int, default=40)
     ap.add_argument("--evidence", default=str(ROOT / "tests" / "evidence" / "perf-x11.json"))
     ap.add_argument("--keep-log", default=None, help="copy the service log here before cleanup")
+    ap.add_argument("--memory-max", default="3G",
+                    help="hard memory cap (no swap) for the whole test, via a systemd user scope; 'none' for no cap")
     a = ap.parse_args()
+    capped_or_exec(a.memory_max)
+    print(f"memory: whole test {test_memory()}", flush=True)
     nested = ROOT / "tests" / "integration" / "nested-gnome-x11.sh"
     st = subprocess.run(["bash", str(nested), "start", str(a.display), "1600x1200"], capture_output=True, text=True)
     if st.returncode != 0:

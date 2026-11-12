@@ -75,6 +75,20 @@ request to geometry read back from the window manager; panel latency is from a
 real hotkey event to the panel window being viewable (X map state), so it does
 not include the compositor's paint.
 
+The soak runs itself in a systemd user scope with a hard memory cap and no
+swap (`--memory-max`, default 3G; `none` turns it off), so a leak anywhere in
+the test (Xephyr, the nested shell, the UI, the service) is killed at the cap
+instead of pushing the desktop into swap. It prints the service's RSS, fds and
+threads and the whole test's memory every minute. A 2-minute check of these
+changes measured the whole test flat at about 557 MiB (fractiled 13.7 to
+13.9 MiB). The five named soak snapshots are reused (each save deletes that
+name's previous one); before, every cycle added a pinned snapshot. The test
+desktops (`nested-gnome-x11.sh`, `headless-gnome-wayland.sh`) start a
+watchdog that stops them when the test that started them exits without
+stopping them (verified by killing a test with SIGKILL: the shell, its bus
+and its state were gone within seconds). Before, an interrupted GNOME Wayland
+run left its headless shell running.
+
 ## Bugs found by the suites, and the before/after evidence
 
 | Bug | Found by | Before the fix | After |
@@ -119,5 +133,11 @@ not include the compositor's paint.
 - Pop!_OS host package install (no root on the test host): dependency
   resolution was simulated (`tests/evidence/package-deb-popos24.04-simulate.log`);
   the real install ran on Ubuntu 24.04 (container and VM).
-- The 24-hour soak (T27) is running; until it finishes, the soak evidence is
-  the 20-minute run.
+- The 24-hour soak (T27) has not been run to the end. The first attempt was
+  stopped by the terminal (SIGTTIN) 2 minutes in; the second was started on
+  the developer's desktop without a memory cap and was stopped during the
+  soak loop while that desktop was short of memory (it logged no memory
+  figures before it stopped). The soak evidence is still the 20-minute run.
+  The harness now runs in a memory-capped scope and logs the whole test's
+  memory every minute (see Method); the 24-hour run is to be repeated that
+  way, in the VM or on an otherwise idle machine.
