@@ -301,7 +301,10 @@ def run_all(e: GuiEnv, a) -> dict:
         s = proc_sample(dpid)
         if s and time.time() - last_trace >= 30:  # bounded: ~2,900 samples per day
             last_trace = time.time()
-            trace.append({"t": round(s["t"] - t_soak, 1), "rss_kib": s["rss_kib"], "fds": s["fds"], "threads": s["threads"]})
+            uis = e.ui_pids()
+            u = proc_sample(uis[0]) if uis else None
+            trace.append({"t": round(s["t"] - t_soak, 1), "rss_kib": s["rss_kib"], "fds": s["fds"], "threads": s["threads"],
+                          "ui_rss_kib": u and u["rss_kib"]})
         # A progress line every minute, so a long run can be checked from
         # outside (a stopped run and a running one look alike otherwise). It
         # includes the memory of the whole test (Xephyr, the nested shell,
@@ -310,6 +313,7 @@ def run_all(e: GuiEnv, a) -> dict:
             last_progress = time.time()
             print(f"soak progress: {round((last_progress - t_soak) / 60)} min, {cycles} cycles, {errors} errors"
                   + (f", fractiled rss {s['rss_kib'] / 1024:.1f} MiB, fds {s['fds']}, threads {s['threads']}" if s else "")
+                  + (f", ui rss {trace[-1]['ui_rss_kib'] / 1024:.1f} MiB" if trace and trace[-1].get("ui_rss_kib") else "")
                   + f", whole test {test_memory()}", flush=True)
         if e.daemon.poll() is not None:
             break
@@ -328,6 +332,16 @@ def run_all(e: GuiEnv, a) -> dict:
           alive and not errors and growth < 5 and fd_ok and th_ok and m["soak"]["zombie_children"] == 0,
           f"{cycles} cycles (~{cycles * 10} placements, {cycles} saves+restores); RSS {m['soak']['rss_mib_start']} -> {m['soak']['rss_mib_end']} MiB (max {m['soak']['rss_mib_max']}); "
           f"fds {m['soak']['fds_start_end']}, threads {m['soak']['threads_start_end']}; {errors} errors")
+    # T27 asks for no unbounded growth of the product, and the UI is part of
+    # it: the same start/end medians for the UI process (one UI for the run).
+    ui_tr = [x["ui_rss_kib"] for x in trace if x.get("ui_rss_kib")]
+    ui_head = statistics.median(ui_tr[:n]) if ui_tr else 0
+    ui_tail = statistics.median(ui_tr[-n:]) if ui_tr else 0
+    m["soak"]["ui_rss_mib_start"], m["soak"]["ui_rss_mib_end"] = round(ui_head / 1024, 1), round(ui_tail / 1024, 1)
+    m["soak"]["ui_rss_mib_max"] = ui_tr and round(max(ui_tr) / 1024, 1)
+    check("P06u", f"{a.minutes}-minute soak: the UI process stays up and its RSS grows < 10 MiB",
+          bool(ui_tr) and len(ui_tr) >= len(trace) * 0.9 and (ui_tail - ui_head) / 1024 < 10,
+          f"UI RSS {m['soak']['ui_rss_mib_start']} -> {m['soak']['ui_rss_mib_end']} MiB (max {m['soak']['ui_rss_mib_max']}); sampled {len(ui_tr)}/{len(trace)}")
     bm = m["soak"]["snapshots_by_mode"]
     auto = sum(v for k, v in bm.items() if k != "manual")
     # Retention keeps the max_recent newest, plus the newest of each

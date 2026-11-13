@@ -672,7 +672,10 @@ def soak(minutes: float) -> int:
     ssh session). Progress goes to stdout and tests/evidence/vm/soak-progress.log."""
     base = ensure_base()
     vm = VM(base, "soak")
-    prog = EVID / "vm" / "soak-progress.log"
+    # The 24 h run keeps its file names; a run of another length gets its own,
+    # so it never overwrites the 24 h evidence.
+    tag = "" if minutes == 1440 else f"-{minutes:g}min"
+    prog = EVID / "vm" / f"soak{tag}-progress.log"
     prog.parent.mkdir(exist_ok=True)
     def note(msg: str) -> None:
         say(msg)
@@ -720,12 +723,12 @@ def soak(minutes: float) -> int:
                 last = body
             if state not in ("active", "activating"):
                 break
-        for src, dst in (("soak.json", EVID / "perf-x11-24h.json"), ("soak.log", EVID / "vm" / "soak.log")):
+        for src, dst in (("soak.json", EVID / f"perf-x11-{'24h' if not tag else tag[1:]}.json"), ("soak.log", EVID / "vm" / f"soak{tag}.log")):
             r = vm.ssh(f"cat {src}", timeout=120)
             if r.returncode == 0 and r.stdout:
                 dst.write_text(r.stdout)
         r = vm.ssh("tail -3000 soak-daemon.log", timeout=120)
-        (EVID / "vm" / "soak-daemon-tail.log").write_text(r.stdout)
+        (EVID / "vm" / f"soak{tag}-daemon-tail.log").write_text(r.stdout)
         res = vm.ssh("tail -2 soak.log").stdout.strip()
         note(f"soak finished: {res}")
         ok = "checks passed" in res and res.split("/")[0].split()[-1] == res.split("/")[1].split()[0]
