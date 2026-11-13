@@ -1,0 +1,50 @@
+{
+  "suite": "vm-ubuntu26.04-plasma-wayland",
+  "when": "2026-11-13T15:49:19+0000",
+  "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "results": [
+    {
+      "id": "V00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V01",
+      "name": "apt installs the .deb on Ubuntu 26.04 desktop (dependencies from the Ubuntu archive)",
+      "ok": true,
+      "detail": "Ubuntu 26.04.1 LTS; kwin-wayland 4:6.6.6-0ubuntu0.1; kwin-x11 ; plasma-workspace 4:6.6.6-0ubuntu0.1; 7.0.0-43-generic :: No user sessions are running outdated binaries.\n\nNo VM guests are running outdated hypervisor (qemu) binaries on this host.\nfractile\t0.9.0-1"
+    },
+    {
+      "id": "V02",
+      "name": "started from the app menu in a real plasma-wayland login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
+      "ok": true,
+      "detail": "session wayland, service socket True; {\"extension\": 0, \"extension_info\": [\"kwriteconfig6 0\", \"reconfigure 0 \", \"script loaded True\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"policy\": \"last_clean\"}"
+    },
+    {
+      "id": "V03",
+      "name": "after a real log-out and the next login, the systemd user unit started the service and it controls windows",
+      "ok": true,
+      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; adapter kwin window_control True session wayland"
+    },
+    {
+      "id": "V04",
+      "name": "10 apps / 15 windows opened and placed on a 4x4 grid",
+      "ok": true,
+      "detail": "15 windows, 10 apps; tests/evidence/vm/plasma-wayland-01-before-reboot.png; "
+    },
+    {
+      "id": "V05",
+      "name": "after a real reboot and the next login, Fractile asks first (the default); Enter on the prompt restores all 15 windows of the 10 apps where they were, with no duplicates",
+      "ok": true,
+      "detail": "boot id changed True; asked True, Enter pressed True (tests/evidence/vm/plasma-wayland-02a-restore-prompt.png); last restore completed LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/plasma-wayland-02-after-reboot.png"
+    },
+    {
+      "id": "V06",
+      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
+      "ok": true,
+      "detail": "logout 0; new login True; last restore completed source login ALREADY_PRESENT=9 LAUNCHED_AND_PLACED=6; ; tests/evidence/vm/plasma-wayland-03-after-logout.png; log: 2026-11-13T15:47:22.015 Info no snapshot from the previous session to restore\n2026-11-13T15:47:51.616 Info snapshot be68a943-7928-4ffd-9891-93821992c757 saved mode=Manual windows=15\n2026-11-13T15:47:52.059 Info Shutdown snapshot f1594be4-a475-4a7c-b22a-e85df430cfcc saved (15 windows)\n2026-11-13T15:47:52.083 Info signal 15: ending session\n2026-11-13T15:47:52.083 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-13T15:48:14.582 Info fractiled 0.9.0 starting pid=2938 autostart=true\n2026-11-13T15:48:14.598 Info login session 6 (from XDG_SESSION_ID)\n2026-11-13T15:48:15.161 Info login restore decision=ask unclean=false snapshot=f1594be4-a475-4a7c-b22a-e85df430cfcc\n2026-11-13T15:48:47.386 Warn Plasma is ending the session (its windows are closing); saved the layout last seen at 2026-11-13T15:48:45.393477531+00:00 as Logout snapshot 7d5f764b-2630-4aeb-8662-8050f43b4b2a (15 windows)\n2026-11-13T15:48:47.436 Info signal 15: ending session\n2026-11-13T15:48:47.436 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-13T15:48:57.788 Info fractiled 0.9.0 starting pid=6945 autostart=true\n2026-11-13T15:48:57.817 Info login session 22 (from XDG_SESSION_ID)\n2026-11-13T15:48:58.401 Info login restore decision=restore unclean=false snapshot=7d5f764b-2630-4aeb-8662-8050f43b4b2a"
+    }
+  ],
+  "log": []
+}

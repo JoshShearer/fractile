@@ -23,12 +23,13 @@ TESTED. Per-requirement detail is in [REQUIREMENTS.md](REQUIREMENTS.md).
 | E10 | Ubuntu 24.04.5 LTS desktop (ubuntu-desktop-minimal) in a QEMU/KVM VM, kernel 6.8.0-149 | GNOME Shell 46.0 / Mutter | Wayland | real GDM logins, real log-out and reboot, `apt install` of the .deb, keys typed on the VM's virtual keyboard (`tests/vm/vm-e2e.sh wayland`, `x11`, `plasma-x11`); GNOME Wayland and Xorg sessions, and a Plasma 5.27 X11 session (kde-plasma-desktop) | gnome (extension) / x11 |
 | E11 | archlinux:latest container on the host kernel, host GPU render node | Hyprland 0.57.2 | Wayland | nested inside `kwin_wayland --virtual` (KWin is only the parent display), native Wayland GTK4/Qt clients, keys pressed with wtype; no login, no bar, no uwsm | hyprland (IPC) |
 | E12 | archlinux:latest container on the host kernel | Sway 1.12 | Wayland | nested inside `kwin_wayland --virtual` (wlroots Wayland backend, pixman renderer), native Wayland GTK4/Qt clients, keys pressed with wtype; no login, no bar | sway (IPC) |
+| E13 | Ubuntu 26.04.1 LTS desktop with kde-plasma-desktop in a QEMU/KVM VM, kernel 7.0.0-43 | Plasma 6.6.6 / KWin 6.6.6 | Wayland | real GDM logins into the Plasma Wayland session, real log-out (Plasma's) and reboot, `apt install` of the .deb, keys typed on the VM's virtual keyboard (`tests/vm/vm-e2e.sh plasma-wayland`) | kwin (script) |
 
 Host UI stack: Python 3.12.3, Qt 6.4.2 / PyQt6 6.6.1 (Ubuntu packages). Rust 1.99.1.
 
 ## Capability by desktop
 
-| Capability | GNOME X11 (E1/E10) | GNOME Wayland (E2/E3/E8/E9/E10) | KDE Plasma Wayland (E4) | KDE Plasma X11 (E7/E10) | COSMIC (Pop!_OS 24.04) | Hyprland 0.57 (E11) | Sway 1.12 (E12) | Other Wayland (river, Wayfire, ...) |
+| Capability | GNOME X11 (E1/E10) | GNOME Wayland (E2/E3/E8/E9/E10) | KDE Plasma Wayland (E4/E13) | KDE Plasma X11 (E7/E10) | COSMIC (Pop!_OS 24.04) | Hyprland 0.57 (E11) | Sway 1.12 (E12) | Other Wayland (river, Wayfire, ...) |
 |---|---|---|---|---|---|---|---|---|
 | Window list / active window | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM | VERIFIED | VERIFIED (S02, S08) | NOT IMPLEMENTED (reported unsupported) |
 | Move / resize to grid | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM | VERIFIED (the placed window becomes floating) | VERIFIED (the placed window becomes floating; S04-S07) | NOT IMPLEMENTED |
@@ -39,9 +40,9 @@ Host UI stack: Python 3.12.3, Qt 6.4.2 / PyQt6 6.6.1 (Ubuntu packages). Rust 1.9
 | Workspaces | NOT TESTED (EWMH desktops implemented) | VERIFIED | VERIFIED | NOT TESTED | BLOCKED BY PLATFORM | VERIFIED | VERIFIED (S12) | NOT IMPLEMENTED |
 | Snapshot save | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM (no geometry to read back for restore) | VERIFIED | VERIFIED (S13, S21) | NOT IMPLEMENTED |
 | Snapshot restore (same session) | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM | VERIFIED | VERIFIED (S13) | NOT IMPLEMENTED |
-| Restore after relogin | VERIFIED (E10 X11 session: real log-out and log-in, 15 windows of 10 apps, V06) | VERIFIED (E10: real log-out and log-in, 15 windows of 10 apps restored automatically, V06) | NOT TESTED | VERIFIED (E10 Plasma X11 session: real log-out and log-in, 15 windows of 10 apps, V06) | BLOCKED BY PLATFORM | NOT TESTED | NOT TESTED | NOT IMPLEMENTED |
-| Restore after reboot | VERIFIED (E10 X11 session: real reboot, 15 windows of 10 apps, V05) | VERIFIED (E10: real reboot, the prompt answered with Enter, 15 windows of 10 apps restored, V05) | NOT TESTED | VERIFIED (E10 Plasma X11 session: real reboot, 15 windows of 10 apps, V05) | BLOCKED BY PLATFORM | NOT TESTED | NOT TESTED | NOT IMPLEMENTED |
-| App launch on restore (approved) | VERIFIED | VERIFIED (E10: 10 apps reopened at login, V05/V06) | NOT TESTED | VERIFIED | BLOCKED BY PLATFORM | NOT TESTED | NOT TESTED | NOT IMPLEMENTED |
+| Restore after relogin | VERIFIED (E10 X11 session: real log-out and log-in, 15 windows of 10 apps, V06) | VERIFIED (E10: real log-out and log-in, 15 windows of 10 apps restored automatically, V06) | VERIFIED (E13: real Plasma log-out and log-in, 15 windows of 10 apps restored automatically; Plasma reopened 9, Fractile launched 6; V06) | VERIFIED (E10 Plasma X11 session: real log-out and log-in, 15 windows of 10 apps, V06) | BLOCKED BY PLATFORM | NOT TESTED | NOT TESTED | NOT IMPLEMENTED |
+| Restore after reboot | VERIFIED (E10 X11 session: real reboot, 15 windows of 10 apps, V05) | VERIFIED (E10: real reboot, the prompt answered with Enter, 15 windows of 10 apps restored, V05) | VERIFIED (E13: real reboot, the prompt answered with Enter, 15 windows of 10 apps restored, V05) | VERIFIED (E10 Plasma X11 session: real reboot, 15 windows of 10 apps, V05) | BLOCKED BY PLATFORM | NOT TESTED | NOT TESTED | NOT IMPLEMENTED |
+| App launch on restore (approved) | VERIFIED | VERIFIED (E10: 10 apps reopened at login, V05/V06) | VERIFIED (E13: apps reopened at login, V05/V06) | VERIFIED | BLOCKED BY PLATFORM | NOT TESTED | NOT TESTED | NOT IMPLEMENTED |
 | Session lock handling | NOT TESTED | VERIFIED (logind LockedHint) | NOT TESTED | NOT TESTED | n/a | NOT TESTED | NOT TESTED | n/a |
 | Integration missing / mismatched reported | n/a | VERIFIED (W16, W23) | VERIFIED (K00, K14) | n/a | VERIFIED (`--check` reports unsupported with the reason) | VERIFIED (H23) | VERIFIED (S23) | VERIFIED (X24) |
 | Tray icon | NOT TESTED | VERIFIED (with the AppIndicator extension; stock GNOME has no tray) | NOT TESTED | NOT TESTED | n/a | NOT TESTED | NOT TESTED | n/a |

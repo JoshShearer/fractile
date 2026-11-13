@@ -22,12 +22,33 @@ pub struct DesktopEntry {
     pub hidden: bool,
     pub terminal: bool,
     pub kind: String,
+    /// The entry's "new window" desktop action (`Actions=new-window;` and its
+    /// `[Desktop Action new-window]` group), if it declares one: how to ask an
+    /// app that is already running for another window.
+    #[serde(default)]
+    pub new_window_action: Option<DesktopAction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct DesktopAction {
+    /// Action id, [A-Za-z0-9-] only (as the spec requires).
+    pub id: String,
+    pub exec: Option<String>,
+}
+
+/// Action ids that mean "open another window" (spec examples and common use).
+fn is_new_window_action(id: &str) -> bool {
+    let n: String = id.chars().filter(|c| *c != '-' && *c != '_').collect::<String>().to_lowercase();
+    n == "newwindow" || n == "newemptywindow"
 }
 
 /// Parse the `[Desktop Entry]` group of a desktop file.
 pub fn parse_desktop_entry(id: &str, path: &Path, content: &str) -> Option<DesktopEntry> {
     let mut in_group = false;
     let mut kv: BTreeMap<String, String> = BTreeMap::new();
+    // Exec of each [Desktop Action <id>] group.
+    let mut action_exec: BTreeMap<String, String> = BTreeMap::new();
+    let mut action: Option<String> = None;
     for line in content.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -35,6 +56,13 @@ pub fn parse_desktop_entry(id: &str, path: &Path, content: &str) -> Option<Deskt
         }
         if line.starts_with('[') {
             in_group = line == "[Desktop Entry]";
+            action = line.strip_prefix("[Desktop Action ").and_then(|r| r.strip_suffix(']')).map(|a| a.to_string());
+            continue;
+        }
+        if let Some(a) = &action {
+            if let Some(v) = line.strip_prefix("Exec=") {
+                action_exec.entry(a.clone()).or_insert_with(|| unescape_value(v.trim()));
+            }
             continue;
         }
         if !in_group {
@@ -54,6 +82,12 @@ pub fn parse_desktop_entry(id: &str, path: &Path, content: &str) -> Option<Deskt
         return None;
     }
     let b = |k: &str| kv.get(k).map(|v| v.eq_ignore_ascii_case("true")).unwrap_or(false);
+    let new_window_action = kv.get("Actions").and_then(|list| {
+        list.split(';')
+            .map(str::trim)
+            .find(|a| !a.is_empty() && a.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') && is_new_window_action(a))
+            .map(|a| DesktopAction { id: a.to_string(), exec: action_exec.get(a).cloned() })
+    });
     Some(DesktopEntry {
         id: id.to_string(),
         path: path.to_path_buf(),
@@ -67,6 +101,7 @@ pub fn parse_desktop_entry(id: &str, path: &Path, content: &str) -> Option<Deskt
         hidden: b("Hidden"),
         terminal: b("Terminal"),
         kind,
+        new_window_action,
     })
 }
 
@@ -302,6 +337,20 @@ mod tests {
         assert_eq!(e.name, "Term");
         assert_eq!(e.exec.as_deref(), Some("xterm -e bash"));
         assert_eq!(e.startup_wm_class.as_deref(), Some("XTerm"));
+        assert_eq!(e.new_window_action, None, "an action not listed in Actions= is not used");
+    }
+
+    #[test]
+    fn new_window_action_is_parsed() {
+        let c = "[Desktop Entry]\nType=Application\nName=Files\nExec=nautilus --new-window %U\nActions=new-window;\n\n[Desktop Action new-window]\nName=New Window\nExec=nautilus --new-window\n";
+        let e = parse_desktop_entry("org.gnome.Nautilus.desktop", Path::new("/x"), c).unwrap();
+        assert_eq!(e.new_window_action, Some(DesktopAction { id: "new-window".into(), exec: Some("nautilus --new-window".into()) }));
+        assert_eq!(e.exec.as_deref(), Some("nautilus --new-window %U"), "the action's Exec does not replace the entry's");
+        let c = "[Desktop Entry]\nType=Application\nName=T\nExec=t\nActions=preferences;NewWindow;\n[Desktop Action NewWindow]\nExec=t --window\n[Desktop Action preferences]\nExec=t --prefs\n";
+        assert_eq!(parse_desktop_entry("t.desktop", Path::new("/x"), c).unwrap().new_window_action.unwrap().exec.as_deref(), Some("t --window"));
+        // ids outside [A-Za-z0-9-] are refused (they go into a D-Bus call)
+        let c = "[Desktop Entry]\nType=Application\nName=T\nExec=t\nActions=new_window';\n";
+        assert_eq!(parse_desktop_entry("t.desktop", Path::new("/x"), c).unwrap().new_window_action, None);
     }
 
     #[test]

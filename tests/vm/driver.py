@@ -38,15 +38,17 @@ from pathlib import Path
 
 CACHE = Path("/cache")
 EVID = Path("/evidence")
-IMG_URL = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
-SUMS_URL = "https://cloud-images.ubuntu.com/noble/current/SHA256SUMS"
+# Ubuntu release -> version. Plasma 6 needs 26.04: 24.04 ships Plasma 5.27.
+RELEASES = {"noble": "24.04", "resolute": "26.04"}
 SSH_PORT = 2222
 QMP = "/tmp/qmp.sock"
 GUEST_TOOL = "/src/tests/vm/guest/vmctl.py"
 # session -> (GDM session name, logind session type, the shell process)
 SESSIONS = {"wayland": ("ubuntu", "wayland", "gnome-shell"), "x11": ("ubuntu-xorg", "x11", "gnome-shell"),
-            "plasma-x11": ("plasma", "x11", "plasmashell")}
-PLASMA_VERSIONS = "dpkg-query -W -f='${Package} ${Version}; ' plasma-workspace kwin-x11"
+            "plasma-x11": ("plasma", "x11", "plasmashell"), "plasma-wayland": ("plasma", "wayland", "plasmashell")}
+# The Ubuntu release each session runs on.
+SESSION_RELEASE = {"wayland": "noble", "x11": "noble", "plasma-x11": "noble", "plasma-wayland": "resolute"}
+PLASMA_VERSIONS = "dpkg-query -W -f='${Package} ${Version}; ' plasma-workspace kwin-wayland kwin-x11 2>/dev/null"
 APT = ("sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 -o Acquire::http::Timeout=60")
 APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-editor gnome-calculator "
              "gnome-system-monitor gnome-characters gnome-clocks baobab gnome-disk-utility gnome-font-viewer")
@@ -76,12 +78,15 @@ def check(tid: str, name: str, ok: bool, detail: str = "") -> bool:
 
 # ---------------------------------------------------------------- images
 
-def ensure_cloud_image() -> Path:
-    img = CACHE / "noble-server-cloudimg-amd64.img"
+def ensure_cloud_image(release: str = "noble") -> Path:
+    name = f"{release}-server-cloudimg-amd64.img"
+    img = CACHE / name
     if img.exists():
         return img
+    IMG_URL = f"https://cloud-images.ubuntu.com/{release}/current/{name}"
+    SUMS_URL = f"https://cloud-images.ubuntu.com/{release}/current/SHA256SUMS"
     sums = urllib.request.urlopen(SUMS_URL, timeout=60).read().decode()
-    want = next(line.split()[0] for line in sums.splitlines() if line.endswith("noble-server-cloudimg-amd64.img"))
+    want = next(line.split()[0] for line in sums.splitlines() if line.endswith(name))
     part = img.with_suffix(".part")
     say(f"downloading {IMG_URL}")
     h = hashlib.sha256()
@@ -160,17 +165,19 @@ def qemu_cmd(disk: Path, seed_img: Path | None, serial: Path) -> list[str]:
     return cmd
 
 
-def ensure_base() -> Path:
-    base = CACHE / "base-desktop.qcow2"
+def ensure_base(release: str = "noble") -> Path:
+    # 24.04 keeps its original cache names.
+    sfx = "" if release == "noble" else f"-{release}"
+    base = CACHE / f"base-desktop{sfx}.qcow2"
     if base.exists():
         return base
-    img = ensure_cloud_image()
-    tmp = CACHE / "base-desktop.part.qcow2"
+    img = ensure_cloud_image(release)
+    tmp = CACHE / f"base-desktop{sfx}.part.qcow2"
     subprocess.run(["qemu-img", "convert", "-O", "qcow2", str(img), str(tmp)], check=True)
     subprocess.run(["qemu-img", "resize", str(tmp), "24G"], check=True)
     sd = seed(Path("/tmp/seed.img"))
-    say("provisioning the base image: Ubuntu desktop and the test apps (cloud-init)")
-    serial = CACHE / "provision-serial.log"
+    say(f"provisioning the base image: Ubuntu {RELEASES[release]} desktop and the test apps (cloud-init)")
+    serial = CACHE / f"provision{sfx}-serial.log"
     p = subprocess.Popen(qemu_cmd(tmp, sd, serial))
     try:
         p.wait(timeout=3600)
@@ -185,14 +192,17 @@ def ensure_base() -> Path:
     return base
 
 
-def ensure_plasma_base() -> Path:
+def ensure_plasma_base(release: str = "noble") -> Path:
     """The desktop base plus kde-plasma-desktop, GDM kept as the display
     manager, and the Plasma screen locker off (as the GNOME base turns its
     own off): an idle lock would make Fractile skip its captures."""
-    out = CACHE / "base-plasma.qcow2"
+    sfx = "" if release == "noble" else f"-{release}"
+    out = CACHE / f"base-plasma{sfx}.qcow2"
     if out.exists():
         return out
-    base = ensure_base()
+    base = ensure_base(release)
+    # Plasma 6 (26.04) is tested on Wayland, Plasma 5.27 (24.04) on X11.
+    sess_file = "/usr/share/xsessions/plasma.desktop" if release == "noble" else "/usr/share/wayland-sessions/plasma.desktop"
     say("provisioning the Plasma image: kde-plasma-desktop on the desktop base")
     vm = VM(base, "plasma-provision")
     try:
@@ -201,7 +211,7 @@ def ensure_plasma_base() -> Path:
         steps = [
             "echo 'gdm3 shared/default-x-display-manager select gdm3' | sudo debconf-set-selections",
             f"for i in 1 2 3; do {APT} update -q && {APT} install -y kde-plasma-desktop > /tmp/plasma.log 2>&1 && break; sleep 30; done; tail -3 /tmp/plasma.log",
-            "test -e /usr/share/xsessions/plasma.desktop",
+            f"test -e {sess_file}",
             "echo /usr/sbin/gdm3 | sudo tee /etc/X11/default-display-manager >/dev/null",
             "sudo systemctl disable sddm 2>/dev/null; sudo ln -sf /lib/systemd/system/gdm3.service /etc/systemd/system/display-manager.service",
             "printf '[Daemon]\\nAutolock=false\\nLockOnResume=false\\nTimeout=0\\n' | sudo tee /etc/xdg/kscreenlockerrc >/dev/null",
@@ -416,10 +426,16 @@ def gdm_and_session(vm: VM, session: str) -> None:
     vm.ssh(f"printf '{conf}' | sudo tee /etc/gdm3/custom.conf >/dev/null && printf '{acct}' | sudo tee /var/lib/AccountsService/users/tester >/dev/null", check_rc=True)
 
 
+def base_for(session: str) -> Path:
+    rel = SESSION_RELEASE[session]
+    return ensure_plasma_base(rel) if session.startswith("plasma") else ensure_base(rel)
+
+
 def run(session: str, deb: str) -> None:
-    base = ensure_plasma_base() if session == "plasma-x11" else ensure_base()
+    base = base_for(session)
     _xs, stype, shell = SESSIONS[session]
-    plasma = session == "plasma-x11"
+    plasma = session.startswith("plasma")
+    ver = RELEASES[SESSION_RELEASE[session]]
     vm = VM(base, f"run-{session}")
     try:
         if not check("V00", "the VM boots and answers over ssh", vm.wait_ssh(600)):
@@ -436,7 +452,7 @@ def run(session: str, deb: str) -> None:
             "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb > /tmp/apt.log 2>&1 && break; "
             "echo \"attempt $i failed\"; sleep 30; sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; "
             "tail -4 /tmp/apt.log; dpkg-query -W fractile", timeout=1800)
-        check("V01", "apt installs the .deb on Ubuntu 24.04 desktop (dependencies from the Ubuntu archive)",
+        check("V01", f"apt installs the .deb on Ubuntu {ver} desktop (dependencies from the Ubuntu archive)",
               inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
 
         # First automatic login with the configured session type.
@@ -450,7 +466,7 @@ def run(session: str, deb: str) -> None:
         up = wait_for(lambda: vm.ssh("test -S /run/user/$(id -u)/fractile/fractile.sock").returncode == 0, 60)
         setup = vm.vmctl("setup")
         check("V02", f"started from the app menu in a real {session} login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
-              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and (plasma or setup.get("extension") == 0),
+              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and setup.get("extension") == ("n/a" if session == "plasma-x11" else 0),
               f"session {s1.get('session_type')}, service socket {bool(up)}; {json.dumps(setup)[:400]}")
 
         # One real log-out and log-in (loads the extension on Wayland).
@@ -765,7 +781,7 @@ def main() -> int:
     if not a.session or not a.deb:
         ap.error("--session and --deb are required")
     if a.provision_only:
-        ensure_plasma_base() if a.session == "plasma-x11" else ensure_base()
+        base_for(a.session)
         return 0
     try:
         run(a.session, a.deb)
@@ -773,9 +789,10 @@ def main() -> int:
         import traceback
         traceback.print_exc()
         check("VXX", "run crashed", False, repr(ex))
-    suite = f"vm-ubuntu24.04-{a.session}" + ("-power-cut" if POWER_CUT else "")
+    ver = RELEASES[SESSION_RELEASE[a.session]] if a.session else "24.04"
+    suite = f"vm-ubuntu{ver}-{a.session}" + ("-power-cut" if POWER_CUT else "")
     ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-          "environment": f"Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
+          "environment": f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}
     out = EVID / f"{suite}.json"
     out.write_text(json.dumps(ev, indent=2) + "\n")

@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Real login / log-out / reboot test (SRS T10) in an Ubuntu 24.04 desktop VM.
-#   tests/vm/vm-e2e.sh wayland|x11|plasma-x11 [path/to/fractile.deb]
-#   tests/vm/vm-e2e.sh provision        (only build the cached base image)
+#   tests/vm/vm-e2e.sh wayland|x11|plasma-x11|plasma-wayland [path/to/fractile.deb]
+#     (plasma-wayland: Plasma 6 on Ubuntu 26.04; the others on Ubuntu 24.04)
+#   tests/vm/vm-e2e.sh provision [session]  (only build the cached base image)
 #   tests/vm/vm-e2e.sh soak [minutes]   (T27 soak in the VM, detached; default 1440)
 # Needs docker and read/write access to /dev/kvm; no root. The first run
 # downloads Ubuntu's cloud image (about 600 MB, checksum verified) and installs
 # the desktop into a cached base image (docker volume fractile-vm-cache,
 # about 8 GB). Each run then uses a throwaway copy-on-write disk.
 set -euo pipefail
-what=${1:?wayland, x11, plasma-x11, soak or provision}
+what=${1:?wayland, x11, plasma-x11, plasma-wayland, soak or provision}
 root=$(cd "$(dirname "$0")/../.." && pwd)
-if [[ $what != soak ]]; then
+if [[ $what != soak && $what != provision ]]; then
   deb=${2:-$(ls "$root"/packaging/build/fractile_*_amd64.deb | tail -1)}
   deb=$(realpath "$deb")
   case $deb in "$root"/*) ;; *) echo "the .deb must be inside the repository" >&2; exit 2 ;; esac
@@ -22,12 +23,12 @@ mkdir -p "$root/tests/evidence/vm"
 docker volume inspect fractile-vm-cache >/dev/null 2>&1 || docker volume create fractile-vm-cache >/dev/null
 # The volume is created root-owned; hand it to the container user once.
 docker run --rm -v fractile-vm-cache:/cache --user 0 "$tag" chown "$(id -u)" /cache
-[[ $what != soak ]] && args=(--session "$what" --deb "/src/${deb#"$root"/}")
+[[ $what != soak && $what != provision ]] && args=(--session "$what" --deb "/src/${deb#"$root"/}")
 # Debug: keep the VM up for FRACTILE_VM_HOLD s at FRACTILE_VM_HOLD_AT (login|after-reboot).
 [[ -n ${FRACTILE_VM_HOLD:-} ]] && args+=(--hold "$FRACTILE_VM_HOLD" --hold-at "${FRACTILE_VM_HOLD_AT:-login}")
 # RS-18/T15: FRACTILE_VM_POWER_CUT=1 runs the power-cut scenario instead of reboot/log-out.
 [[ -n ${FRACTILE_VM_POWER_CUT:-} ]] && args+=(--power-cut)
-[[ $what == provision ]] && args=(--session wayland --deb /dev/null --provision-only)
+[[ $what == provision ]] && args=(--session "${2:-wayland}" --deb /dev/null --provision-only)
 if [[ $what == soak ]]; then
   # T27 in the VM: detached, so the run survives the terminal; follow it with
   # docker logs -f fractile-vm-soak or tests/evidence/vm/soak-progress.log.

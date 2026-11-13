@@ -44,13 +44,22 @@ function sanitize(s) {
     return String(s || "").replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 48);
 }
 
+// A QTimer nothing in the script refers to can be garbage-collected before
+// it fires (seen on KWin 6.6: a pending move_resize never answered), so each
+// one is held here until it has fired.
+const pendingTimers = {};
+let nextTimer = 0;
+
 function later(ms, fn) {
+    const key = ++nextTimer;
     const t = new QTimer();
     t.singleShot = true;
     t.interval = ms;
     t.timeout.connect(function () {
+        delete pendingTimers[key];
         fn();
     });
+    pendingTimers[key] = t;
     t.start();
     return t;
 }
@@ -213,6 +222,13 @@ const ops = {
         let last = null;
         let stable = 0;
         const tick = function () {
+            try {
+                step();
+            } catch (e) {
+                done(false, {kind: "other", message: "while waiting for the window to settle: " + String(e)});
+            }
+        };
+        const step = function () {
             if (w.deleted) {
                 done(false, {kind: "no_such_window", message: a.id});
                 return;

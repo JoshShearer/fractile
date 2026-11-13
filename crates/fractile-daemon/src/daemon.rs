@@ -93,6 +93,9 @@ pub struct Daemon {
     /// The exit snapshot of this session has been taken (at the session
     /// manager's EndSession, or at shutdown); SIGTERM does not take another.
     pub exit_captured: AtomicBool,
+    /// A check whether Plasma is ending the session is running (see
+    /// session::on_window_closed).
+    pub ending_check_busy: AtomicBool,
     /// Monitor topology signature last seen, and the most recent layout
     /// captured under it (refreshed every 10 s; see session::remember_layout).
     pub topology: Mutex<Option<String>>,
@@ -143,6 +146,7 @@ impl Daemon {
             // slip in before the login flow has decided; login_flow clears it.
             login_restore_pending: AtomicBool::new(new_login),
             exit_captured: AtomicBool::new(false),
+            ending_check_busy: AtomicBool::new(false),
             topology: Mutex::new(None),
             topology_memory: Mutex::new(None),
             env,
@@ -299,6 +303,28 @@ impl Daemon {
         // time the client has finished switching its buffer scale.
         for pause_ms in [0u64, 250] {
             if !transient(&out) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(pause_ms));
+            let attempts = out.attempts;
+            out = self.adapter().move_resize(wid, c.rect).map_err(|e| err("adapter", e.to_string()))?;
+            out.attempts += attempts;
+        }
+        // A window that has just been mapped (a launch, a restore) may not
+        // have applied the resize yet when the compositor reports back: the
+        // observed size is still the size it had. That is not a size limit.
+        // Ask again after short pauses until the size moves; only a size
+        // that never moves is learned below.
+        let unchanged = |o: &PlacementOutcome| {
+            !o.within_tolerance
+                && o.observed.is_some_and(|ob| {
+                    let same_as_before = (ob.w - w.frame.w).abs() <= tol && (ob.h - w.frame.h).abs() <= tol;
+                    let size_reached = (ob.w - c.rect.w).abs() <= tol && (ob.h - c.rect.h).abs() <= tol;
+                    same_as_before && !size_reached
+                })
+        };
+        for pause_ms in [250u64, 500, 1000] {
+            if transient(&out) || !unchanged(&out) {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(pause_ms));
@@ -825,6 +851,7 @@ impl Daemon {
             }
             AdapterEvent::WindowClosed { id } => {
                 self.undo.lock().unwrap().retain(|u| &u.window_id != id);
+                crate::session::on_window_closed(self);
                 self.broadcast("windows_changed", json!({}));
             }
             AdapterEvent::ActiveChanged { id } => {

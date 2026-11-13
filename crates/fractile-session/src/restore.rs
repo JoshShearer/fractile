@@ -193,7 +193,9 @@ pub trait RestoreHost {
     fn move_to_workspace(&self, id: &str, ws: u32) -> Result<(), String>;
     fn activate(&self, id: &str) -> Result<(), String>;
     /// Launch via desktop id (safe argv). Returns pid.
-    fn launch(&self, desktop_id: &str, extra_args: &[String]) -> Result<u32, String>;
+    /// `another_window`: the app already has a window (launched by this run
+    /// or open already) and one more is wanted (see `launch::plan_launch`).
+    fn launch(&self, desktop_id: &str, extra_args: &[String], another_window: bool) -> Result<u32, String>;
     fn can_launch(&self, desktop_id: &str) -> Result<String, String>;
     /// Next created window id, waiting up to `timeout`.
     fn next_new_window(&self, timeout: Duration) -> Option<String>;
@@ -720,7 +722,12 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 warnings.push(format!("{}: launched recently by an earlier attempt; not relaunching", g.desktop_id));
                 continue;
             }
-            match host.launch(&g.desktop_id, &g.extra_args) {
+            // A running app asked to activate only raises the window it has
+            // (Nautilus, a single-instance GTK app). When it already has a
+            // window (an earlier launch here, or one the desktop's own session
+            // restore reopened), ask for another one.
+            let has_window = g.launches > 0 || host.windows().map(|ws| ws.iter().any(|w| w.desktop_file_id.as_deref() == Some(g.desktop_id.as_str()))).unwrap_or(false);
+            match host.launch(&g.desktop_id, &g.extra_args, has_window) {
                 Ok(pid) => {
                     host.record_launch(&g.desktop_id, &opts.run_id, pid);
                     launches_total += 1;

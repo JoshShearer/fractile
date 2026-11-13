@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -128,7 +129,17 @@ def cmd_session() -> dict:
 def cmd_setup() -> dict:
     from fractile_ui.ipc import Client
     out = {}
-    if PLASMA:
+    if PLASMA and ENV.get("XDG_SESSION_TYPE") == "wayland":
+        # Plasma Wayland: the KWin script, enabled the way System Settings >
+        # Window Management > KWin Scripts does it (kwinrc [Plugins], then
+        # KWin reconfigures and loads it). 0 when KWin reports it loaded.
+        w = run("kwriteconfig6", "--file", "kwinrc", "--group", "Plugins", "--key", "fractileEnabled", "true")
+        r = run("dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure")
+        loaded = wait_for(lambda: "boolean true" in run("dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/Scripting",
+                                                          "org.kde.kwin.Scripting.isScriptLoaded", "string:fractile").stdout, 20.0)
+        out["extension"] = 0 if (w.returncode == 0 and r.returncode == 0 and loaded) else 1
+        out["extension_info"] = [f"kwriteconfig6 {w.returncode}", f"reconfigure {r.returncode} {r.stderr.strip()[-200:]}", f"script loaded {bool(loaded)}"]
+    elif PLASMA:
         # Plasma X11 needs no integration: the service talks to the X server.
         out["extension"] = "n/a"
     else:
@@ -153,14 +164,51 @@ def cmd_setup() -> dict:
     return out
 
 
-def launch(desktop_id: str) -> int:
+def new_window_action(path: str) -> tuple[str, str | None, bool] | None:
+    """(action id, its Exec, DBusActivatable) of a desktop file's new-window
+    action, if it declares one."""
+    group, acts, execs, dbus = None, [], {}, False
+    for line in open(path, encoding="utf-8", errors="replace"):
+        line = line.strip()
+        if line.startswith("["):
+            group = line
+        elif group == "[Desktop Entry]" and line.startswith("Actions="):
+            acts = [a for a in line[8:].split(";") if a]
+        elif group == "[Desktop Entry]" and line == "DBusActivatable=true":
+            dbus = True
+        elif group and group.startswith("[Desktop Action ") and line.startswith("Exec="):
+            execs.setdefault(group[16:-1], line[5:])
+    a = next((a for a in acts if a.replace("-", "").replace("_", "").lower() == "newwindow"), None)
+    return (a, execs.get(a), dbus) if a else None
+
+
+def launch(desktop_id: str, another: bool = False) -> int:
     """Start an app the way the app menu does: its desktop entry, in a
     scope of its own under the user manager. (Running gtk-launch as a
     transient systemd-run service is wrong: when gtk-launch exits, systemd
     stops the unit and kills the app it just started.)"""
     path = f"/usr/share/applications/{desktop_id}"
+    # Plasma's menu starts apps through KIO (D-Bus activation for
+    # DBusActivatable entries, waited for), GNOME Shell through GLib in its
+    # own process. `gio launch` is not Plasma's way, and on Ubuntu 26.04
+    # (GLib 2.88) it loses the activation of D-Bus activatable apps: it exits
+    # before dbus-daemon has started the app, which then never gets the call.
+    kio = shutil.which("kioclient") or shutil.which("kioclient5") or "kioclient"
+    launcher = [kio, "exec", path] if PLASMA else ["gio", "launch", path]
+    nw = new_window_action(path) if (another and PLASMA) else None
+    if nw:
+        # Another window of a running app: the taskbar's "New Window" (the
+        # entry's new-window action); activating it again would only raise
+        # the window it has (Files 50 does that).
+        aid, aexec, dbus = nw
+        stem = desktop_id[:-len(".desktop")]
+        if dbus:
+            launcher = ["gdbus", "call", "--session", "--dest", stem, "--object-path", "/" + stem.replace(".", "/").replace("-", "_"),
+                        "--method", "org.freedesktop.Application.ActivateAction", f"'{aid}'", "[]", "{}"]
+        elif aexec:
+            launcher = [a for a in aexec.split() if not a.startswith("%")]
     # No pipes: the app inherits them, and waiting for EOF would wait for it.
-    return subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", "gio", "launch", path], env=ENV,
+    return subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", *launcher], env=ENV,
                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60).returncode
 
 
@@ -179,7 +227,7 @@ def cmd_open_apps() -> dict:
     for app, n in APPS:
         for _ in range(n):
             before = len([w for w in mine(cli("list-windows")) if w["desktop_file_id"] == app])
-            launch(app)
+            launch(app, another=before > 0)
             wait_for(lambda: len([w for w in mine(cli("list-windows")) if w["desktop_file_id"] == app]) > before, 30.0)
     ws = wait_for(lambda: (lambda l: l if len(l) == sum(n for _, n in APPS) else None)(mine(cli("list-windows"))), 30.0) or mine(cli("list-windows"))
     # One grid cell each on a 4x4 grid, in a fixed order.

@@ -3,7 +3,7 @@
 | Desktop | Page | Summary |
 |---|---|---|
 | GNOME (X11 and Wayland) | [gnome.md](gnome.md) | works; Wayland needs the bundled extension enabled |
-| KDE Plasma (Wayland) | [kwin.md](kwin.md) | works; needs the bundled KWin script enabled; Plasma X11 not tested |
+| KDE Plasma (Wayland) | [kwin.md](kwin.md) | works; needs the bundled KWin script enabled; real Plasma 6.6.6 Wayland and Plasma 5.27 X11 logins tested in a VM |
 | Any X11 window manager | [x11.md](x11.md) | works with EWMH window managers; tested with Mutter and Openbox |
 | Hyprland 0.57+ | [hyprland.md](hyprland.md) | works through Hyprland's own IPC (nothing to enable); placed windows become floating; tested nested only, no real login |
 | COSMIC | [cosmic.md](cosmic.md) | BLOCKED BY PLATFORM: no API to place other apps' windows |

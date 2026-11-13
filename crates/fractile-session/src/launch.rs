@@ -16,7 +16,11 @@ pub struct LaunchPlan {
 }
 
 /// Build the argv that would be executed (for dry-run display and tests).
-pub fn plan_launch(entry: &DesktopEntry, extra_args: &[String], use_systemd: bool, gio_available: bool) -> Result<LaunchPlan, String> {
+/// `another_window`: the app already opened a window in this run and one
+/// more is wanted. An app whose desktop entry declares a "new window" action
+/// is then asked through that action, because activating a running app only
+/// raises its existing window (Files 50 does that).
+pub fn plan_launch(entry: &DesktopEntry, extra_args: &[String], use_systemd: bool, gio_available: bool, gdbus_available: bool, another_window: bool) -> Result<LaunchPlan, String> {
     if entry.terminal {
         return Err(format!("{} requires a terminal; refusing to guess a terminal emulator", entry.id));
     }
@@ -27,9 +31,28 @@ pub fn plan_launch(entry: &DesktopEntry, extra_args: &[String], use_systemd: boo
         .map(|b| if b.is_ascii_alphanumeric() || b == b':' || b == b'_' || b == b'.' { (b as char).to_string() } else { format!("\\x{b:02x}") })
         .collect();
     let unit = format!("app-fractile-{}-{}.scope", escaped, std::process::id() as u64 * 1000 + (rand_suffix() % 1000));
-    let (inner, method): (Vec<String>, &'static str) = if extra_args.is_empty() && gio_available && (entry.dbus_activatable || entry.exec.is_some()) {
-        // gio handles DBusActivatable, field codes and startup notification
-        // correctly; the desktop file path is the only argument.
+    let nw = entry.new_window_action.as_ref().filter(|_| another_window && extra_args.is_empty());
+    let dbus_ok = entry.dbus_activatable && gdbus_available && is_bus_name(id_stem);
+    let object_path = format!("/{}", id_stem.replace('.', "/").replace('-', "_"));
+    let (inner, method): (Vec<String>, &'static str) = if let Some(a) = nw.filter(|a| dbus_ok && a.id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')) {
+        // D-Bus activatable: the spec's ActivateAction with the action id.
+        let name = format!("'{}'", a.id);
+        let argv = ["gdbus", "call", "--session", "--dest", id_stem, "--object-path", &object_path, "--method", "org.freedesktop.Application.ActivateAction", &name, "[]", "{}"];
+        (argv.iter().map(|s| s.to_string()).collect(), "dbus-activate")
+    } else if let Some(exec) = nw.and_then(|a| a.exec.as_deref()).filter(|_| !entry.dbus_activatable || !dbus_ok) {
+        (exec_to_argv(exec, &entry.name, entry.icon.as_deref())?, "exec")
+    } else if extra_args.is_empty() && dbus_ok {
+        // D-Bus activation (the Desktop Entry spec's DBusActivatable): call
+        // Activate on the app's well-known name and wait for the reply. Not
+        // `gio launch`: it sends the call and exits at once, and dbus-daemon
+        // drops a message still waiting for its service to start when the
+        // sender has gone, so the app starts without a window and exits.
+        let argv = ["gdbus", "call", "--session", "--dest", id_stem, "--object-path", &object_path, "--method", "org.freedesktop.Application.Activate", "{}"];
+        (argv.iter().map(|s| s.to_string()).collect(), "dbus-activate")
+    } else if extra_args.is_empty() && gio_available && (entry.exec.is_none() || !entry.dbus_activatable) && (entry.dbus_activatable || entry.exec.is_some()) {
+        // gio handles field codes and startup notification correctly; the
+        // desktop file path is the only argument. (A D-Bus activatable entry
+        // comes here only without an Exec line: gio is the launcher left.)
         (vec!["gio".into(), "launch".into(), entry.path.to_string_lossy().to_string()], "gio-launch")
     } else {
         let exec = entry.exec.as_deref().ok_or_else(|| format!("{} has no Exec line", entry.id))?;
@@ -40,10 +63,18 @@ pub fn plan_launch(entry: &DesktopEntry, extra_args: &[String], use_systemd: boo
     if use_systemd {
         let mut argv = vec!["systemd-run".into(), "--user".into(), "--scope".into(), "--quiet".into(), "--collect".into(), format!("--unit={unit}"), "--".into()];
         argv.extend(inner);
-        Ok(LaunchPlan { desktop_id: entry.id.clone(), argv, method: if method == "exec" { "systemd-scope+exec" } else { "systemd-scope+gio" } })
+        Ok(LaunchPlan { desktop_id: entry.id.clone(), argv, method: match method { "exec" => "systemd-scope+exec", "dbus-activate" => "systemd-scope+dbus", _ => "systemd-scope+gio" } })
     } else {
         Ok(LaunchPlan { desktop_id: entry.id.clone(), argv: inner, method })
     }
+}
+
+/// A well-known D-Bus name, as the D-Bus Activation spec requires of a
+/// DBusActivatable desktop id: two or more dot-separated elements of
+/// [A-Za-z0-9_-], none empty or starting with a digit, at most 255 bytes.
+fn is_bus_name(n: &str) -> bool {
+    let parts: Vec<&str> = n.split('.').collect();
+    n.len() <= 255 && parts.len() >= 2 && parts.iter().all(|p| !p.is_empty() && !p.as_bytes()[0].is_ascii_digit() && p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'))
 }
 
 fn rand_suffix() -> u64 {
@@ -177,15 +208,76 @@ mod tests {
 
     #[test]
     fn plans_are_argv_never_shell() {
-        let p = plan_launch(&entry("app --x %U"), &["--restore".into()], true, true).unwrap();
+        let p = plan_launch(&entry("app --x %U"), &["--restore".into()], true, true, true, false).unwrap();
         assert_eq!(&p.argv[0], "systemd-run");
         let dashdash = p.argv.iter().position(|a| a == "--").unwrap();
         assert_eq!(&p.argv[dashdash + 1..], &["app", "--x", "--restore"]);
         assert!(p.argv.iter().any(|a| a.starts_with("--unit=app-fractile-org.x.App-")));
-        let p = plan_launch(&entry("app"), &[], false, true).unwrap();
+        let p = plan_launch(&entry("app"), &[], false, true, true, false).unwrap();
         assert_eq!(p.argv, vec!["gio", "launch", "/usr/share/applications/org.x.App.desktop"]);
         let mut t = entry("vim");
         t.terminal = true;
-        assert!(plan_launch(&t, &[], true, true).is_err());
+        assert!(plan_launch(&t, &[], true, true, true, false).is_err());
+    }
+
+    /// `gio launch` sends org.freedesktop.Application.Activate and exits at
+    /// once; dbus-daemon drops a message still waiting for its service to
+    /// start when the sender has gone, so the app starts and never opens a
+    /// window (reproduced on Ubuntu 26.04, GLib 2.88, Plasma 6.6 Wayland).
+    /// A D-Bus activatable app is activated by a call that waits for the
+    /// reply instead.
+    #[test]
+    fn dbus_activatable_apps_are_activated_by_a_call_that_waits_for_the_reply() {
+        let mut e = entry("app %U");
+        e.dbus_activatable = true;
+        let p = plan_launch(&e, &[], true, true, true, false).unwrap();
+        let dashdash = p.argv.iter().position(|a| a == "--").unwrap();
+        let want = ["gdbus", "call", "--session", "--dest", "org.x.App", "--object-path", "/org/x/App", "--method", "org.freedesktop.Application.Activate", "{}"];
+        assert_eq!(&p.argv[dashdash + 1..], &want);
+        assert_eq!(p.method, "systemd-scope+dbus");
+        // dashes become underscores in the object path (D-Bus Activation spec)
+        let mut d = e.clone();
+        d.id = "org.gnome.font-viewer.desktop".into();
+        let p = plan_launch(&d, &[], false, true, true, false).unwrap();
+        assert_eq!(p.argv[4..7], ["org.gnome.font-viewer", "--object-path", "/org/gnome/font_viewer"]);
+        // not a valid bus name, or no gdbus: the Exec line, never gio's activation
+        for (id, gdbus) in [("app.desktop", true), ("org.9x.App.desktop", true), ("org.x.App.desktop", false)] {
+            let mut d = e.clone();
+            d.id = id.into();
+            let p = plan_launch(&d, &[], false, true, gdbus, false).unwrap();
+            assert_eq!(p.argv, vec!["app"], "{id} gdbus={gdbus}");
+        }
+        // extra arguments need the Exec line
+        let p = plan_launch(&e, &["--x".into()], false, true, true, false).unwrap();
+        assert_eq!(p.argv, vec!["app", "--x"]);
+        // no Exec line and no gdbus: gio is the only launcher left
+        let mut n = e.clone();
+        n.exec = None;
+        let p = plan_launch(&n, &[], false, true, false, false).unwrap();
+        assert_eq!(p.argv[0], "gio");
+    }
+
+    /// Activating a running app only raises its window; the next window of a
+    /// restore uses the entry's "new window" action (Files 50, Plasma 6.6).
+    #[test]
+    fn another_window_uses_the_new_window_action() {
+        let mut e = entry("nautilus --new-window %U");
+        e.dbus_activatable = true;
+        e.new_window_action = Some(fractile_core::desktop::DesktopAction { id: "new-window".into(), exec: Some("nautilus --new-window".into()) });
+        // first window: plain activation
+        let p = plan_launch(&e, &[], false, true, true, false).unwrap();
+        assert_eq!(p.argv[8], "org.freedesktop.Application.Activate");
+        // another: ActivateAction('new-window')
+        let p = plan_launch(&e, &[], false, true, true, true).unwrap();
+        assert_eq!(p.argv[8..], ["org.freedesktop.Application.ActivateAction", "'new-window'", "[]", "{}"]);
+        // not D-Bus activatable (gnome-terminal): the action's Exec line
+        let mut t = entry("gnome-terminal");
+        t.new_window_action = Some(fractile_core::desktop::DesktopAction { id: "new-window".into(), exec: Some("gnome-terminal --window".into()) });
+        assert_eq!(plan_launch(&t, &[], true, true, true, true).unwrap().argv.iter().skip_while(|a| *a != "--").skip(1).cloned().collect::<Vec<_>>(), ["gnome-terminal", "--window"]);
+        // no gdbus: the action's Exec line
+        assert_eq!(plan_launch(&e, &[], false, true, false, true).unwrap().argv, ["nautilus", "--new-window"]);
+        // without the action, another window is a plain launch
+        let p = plan_launch(&entry("app"), &[], false, true, true, true).unwrap();
+        assert_eq!(p.argv, ["gio", "launch", "/usr/share/applications/org.x.App.desktop"]);
     }
 }

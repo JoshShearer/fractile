@@ -1,0 +1,3 @@
+2026-11-13T15:48:58.401 Info login restore decision=restore unclean=false snapshot=7d5f764b-2630-4aeb-8662-8050f43b4b2a
+2026-11-13T15:49:04.090 Info restore 840c6a28-971a-42e0-8a70-df171eab5b5e started source=login targets=15
+2026-11-13T15:49:13.091 Info restore 840c6a28-971a-42e0-8a70-df171eab5b5e finished state=completed ALREADY_PRESENT=9 LAUNCHED_AND_PLACED=6 launches=6 8998ms

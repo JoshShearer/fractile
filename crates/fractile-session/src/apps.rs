@@ -165,9 +165,17 @@ impl AppIndex {
                 w.sandbox = Some("flatpak".into());
             }
         }
-        if w.desktop_file_id.is_some() {
-            return;
-        }
+        // An adapter's own desktop id is kept when it names an installed
+        // entry. KWin reports the Wayland app id plus ".desktop" even when no
+        // such file exists; then the evidence below decides, and the reported
+        // id stays only if it finds nothing better.
+        let reported = match w.desktop_file_id.take() {
+            Some(id) if self.entries.is_empty() || self.entries.contains_key(&id) => {
+                w.desktop_file_id = Some(id);
+                return;
+            }
+            other => other,
+        };
         let mut found: Option<(String, &str)> = None;
         let mut try_set = |id: Option<String>, src: &'static str| {
             if found.is_none() {
@@ -208,6 +216,8 @@ impl AppIndex {
         if let Some((id, src)) = found {
             w.desktop_file_id = Some(id);
             w.desktop_file_source = Some(src.into());
+        } else {
+            w.desktop_file_id = reported;
         }
     }
 }
@@ -273,6 +283,41 @@ fn scan(base: &Path, dir: &Path, out: &mut HashMap<String, DesktopEntry>, depth:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// KWin names a window's desktop file after its Wayland app id even when
+    /// no such file exists: GNOME Disks (app id `gnome-disks`) is reported as
+    /// `gnome-disks.desktop`, its entry is `org.gnome.DiskUtility.desktop`
+    /// (Exec=gnome-disks, no StartupWMClass). Seen on Plasma 6.6 Wayland.
+    #[test]
+    fn a_reported_desktop_id_that_is_not_installed_is_resolved_from_other_evidence() {
+        let d = std::env::temp_dir().join(format!("fractile-apps-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("org.gnome.DiskUtility.desktop"), "[Desktop Entry]\nType=Application\nName=Disks\nExec=gnome-disks\nDBusActivatable=true\n").unwrap();
+        std::fs::write(d.join("org.x.Real.desktop"), "[Desktop Entry]\nType=Application\nName=Real\nExec=real\n").unwrap();
+        let idx = AppIndex::build(std::slice::from_ref(&d));
+        let mut w = WindowInfo {
+            app_id: Some("gnome-disks".into()),
+            wm_class: Some("gnome-disks".into()),
+            executable: Some("/usr/bin/gnome-disks".into()),
+            desktop_file_id: Some("gnome-disks.desktop".into()),
+            desktop_file_source: Some("kwin-desktop-file-name".into()),
+            ..Default::default()
+        };
+        idx.enrich(&mut w);
+        assert_eq!(w.desktop_file_id.as_deref(), Some("org.gnome.DiskUtility.desktop"));
+        assert_eq!(w.desktop_file_source.as_deref(), Some("exec-name"));
+        // an installed reported id is kept as it is
+        let mut w = WindowInfo { executable: Some("/usr/bin/gnome-disks".into()), desktop_file_id: Some("org.x.Real.desktop".into()), desktop_file_source: Some("kwin-desktop-file-name".into()), ..Default::default() };
+        idx.enrich(&mut w);
+        assert_eq!(w.desktop_file_id.as_deref(), Some("org.x.Real.desktop"));
+        assert_eq!(w.desktop_file_source.as_deref(), Some("kwin-desktop-file-name"));
+        // nothing better found: the reported id stays
+        let mut w = WindowInfo { app_id: Some("other".into()), desktop_file_id: Some("other.desktop".into()), desktop_file_source: Some("kwin-desktop-file-name".into()), ..Default::default() };
+        idx.enrich(&mut w);
+        assert_eq!(w.desktop_file_id.as_deref(), Some("other.desktop"));
+        assert_eq!(w.desktop_file_source.as_deref(), Some("kwin-desktop-file-name"));
+        std::fs::remove_dir_all(d).unwrap();
+    }
 
     #[test]
     fn resolves_by_startup_wm_class_and_name() {

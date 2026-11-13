@@ -191,20 +191,52 @@ desktops only. See PLATFORM_MATRIX.md.
   accept toggled that checkbox, and nothing was restored. The dialog now
   starts on "Restore selected", and Enter on a row also restores. Space still
   toggles a row. Found in a real login in the Ubuntu VM.
+- Apps with `DBusActivatable=true` were started with `gio launch`, which
+  sends the activation and disconnects about 1 ms later. The bus drops a
+  pending activation whose sender is gone, so with GLib 2.88 (Ubuntu 26.04)
+  the app started without a window and quit about 10 s later. Fractile now
+  activates such apps with `gdbus call`, which waits for the reply (Plasma 6
+  VM run).
+- KWin reports `<app id>.desktop` as a window's desktop file even when no
+  such file is installed (GNOME Disks: `gnome-disks.desktop`, installed as
+  `org.gnome.DiskUtility.desktop`), so a restore could not launch it. A
+  reported id that is not installed is now resolved from the other evidence.
+- A restore of several windows of a single-instance app (Nautilus) opened
+  only one: activating a running app raises its window. When the app already
+  has a window (from this restore, or reopened by the desktop's own session
+  restore), Fractile now uses the app's "new window" desktop action.
+- On Plasma 6 Wayland no logout snapshot was saved: Plasma closes every
+  window before systemd stops the service, and sends it nothing. When windows
+  close while KSMServer reports that the session is ending, Fractile saves
+  the layout last seen as the logout snapshot. The layout last seen is now
+  also refreshed right after a restore finishes (V06 in the Plasma 6 VM).
+- Right after a launch, KWin can report a placement before the new window
+  has applied the size. Fractile took the unchanged size for the window's
+  minimum and kept it at that size (GNOME Text Editor at 700x520 for a
+  400x288 cell). When the observed size is still the window's previous size,
+  Fractile now asks again after short pauses (up to about 1.75 s) and learns a
+  minimum only if the size never moves (V05 in the Plasma 6 VM).
+- The KWin script did not keep a reference to its timers. KWin 6.6's
+  JavaScript engine can collect such a timer before it fires (reproduced in
+  the VM: 0 of 200 fired after an allocation burst), and a placement then
+  never answered ("KWin integration did not answer 'move_resize'"). Timers
+  are now held until they fire (200 of 200), and an error while a placement
+  settles is reported instead of leaving the call open.
 - Test harnesses: the nested X11 desktop leaked D-Bus-activated host services
   and FUSE mounts, and `xdotool --sync` could hang forever. Both are fixed.
 
 ### Known issues and limits
 
 - Real logins, log-out and reboot are validated on Ubuntu 24.04 GNOME
-  (Wayland and Xorg sessions) and Plasma 5.27 X11, in a VM. Plasma 6 / KWin
-  Wayland has no real login test. Mixed DPI and monitor
+  (Wayland and Xorg sessions), Plasma 5.27 X11 and Ubuntu 26.04 Plasma 6.6.6
+  Wayland, in a VM. Sway and Hyprland have no real login test. Mixed DPI and monitor
   disconnect/reconnect are validated on headless GNOME (virtual monitors
   changed through DisplayConfig), not with physical monitors. The tray is
   validated on GNOME with the AppIndicator extension only.
 - On Plasma and other desktops without gnome-session, the logout snapshot is
   taken when systemd stops the service. Apps in KDE's own session management
-  may have closed by then (Plasma reopens those itself). If the display is
+  may have closed by then (Plasma reopens those itself). On Plasma 6 Wayland
+  every window is closed first; the layout last seen is saved instead. If the display is
   already gone, the layout last seen (up to about 10 s old) is saved.
 - COSMIC: no window control (platform limitation).
 - Hyprland: tested nested inside a headless KWin only, not in a real Hyprland

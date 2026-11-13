@@ -93,18 +93,18 @@ impl RestoreHost for DaemonHost {
     fn activate(&self, id: &str) -> Result<(), String> {
         self.d.adapter().activate(id, None).map_err(|e| e.to_string())
     }
-    fn launch(&self, desktop_id: &str, extra: &[String]) -> Result<u32, String> {
+    fn launch(&self, desktop_id: &str, extra: &[String], another_window: bool) -> Result<u32, String> {
         // Launch what is installed now, not what was installed at login.
         self.d.apps.lock().unwrap().refresh_if_stale(Duration::from_secs(300));
         let entry = self.d.apps.lock().unwrap().get(desktop_id).cloned().ok_or_else(|| format!("{desktop_id} is not installed"))?;
-        let plan = plan_launch(&entry, extra, systemd_user_available(), which("gio"))?;
+        let plan = plan_launch(&entry, extra, systemd_user_available(), which("gio"), which("gdbus"), another_window)?;
         info!(self.d.log, "launch {desktop_id} via {} argv={:?}", plan.method, plan.argv);
         spawn(&plan)
     }
     fn can_launch(&self, desktop_id: &str) -> Result<String, String> {
         self.d.apps.lock().unwrap().refresh_if_stale(Duration::from_secs(300));
         let entry = self.d.apps.lock().unwrap().get(desktop_id).cloned().ok_or_else(|| format!("{desktop_id} is not installed"))?;
-        plan_launch(&entry, &[], systemd_user_available(), which("gio")).map(|p| p.method.to_string())
+        plan_launch(&entry, &[], systemd_user_available(), which("gio"), which("gdbus"), false).map(|p| p.method.to_string())
     }
     fn next_new_window(&self, timeout: Duration) -> Option<String> {
         self.new_windows.lock().unwrap().recv_timeout(timeout).ok()
@@ -265,6 +265,9 @@ fn start_job(d: &Arc<Daemon>, src: Source, req: &RestoreRequest, source_label: &
         let v = json!({"run_id": rid, "state": state, "report": rep});
         *d2.last_report.lock().unwrap() = Some(v.clone());
         *d2.restore.lock().unwrap() = None;
+        // The restored desktop is the user's layout now (the periodic
+        // memory skips running restores).
+        remember_layout(&d2);
         d2.broadcast("restore_finished", v.clone());
         v
     });
@@ -688,31 +691,84 @@ pub fn capture_before_exit(d: &Daemon, mode: SnapshotMode) {
                 }
                 Err(e) => error!(d.log, "exit snapshot failed: {e}"),
             },
-            Ok(_) => {}
+            // No windows left when the service hears the session end: the
+            // desktop closed them first (Plasma 6 on Wayland does, before
+            // systemd stops this unit). The layout last seen is the session's.
+            Ok(_) => {
+                save_last_seen(d, mode, "no windows were open any more when the session ended");
+            }
             Err(e) => {
                 // The compositor (or its Fractile integration) went away
                 // before the service was told the session ends. Keep the
                 // layout last seen in this session (at most ~10 s old) rather
                 // than nothing.
-                let seen = d.topology_memory.lock().unwrap().as_ref().map(|(_, s)| s.clone());
-                match seen.filter(|s| !s.windows.is_empty()) {
-                    Some(mut s) => {
-                        let seen_at = s.created_at.clone();
-                        s.snapshot_id = uuid::Uuid::new_v4().to_string();
-                        s.mode = mode;
-                        match save_automatic(d, &s) {
-                            Ok(()) => {
-                                d.exit_captured.store(true, Ordering::SeqCst);
-                                warn!(d.log, "exit capture failed ({}); saved the layout last seen at {seen_at} as {mode:?} snapshot {} ({} windows)", e.message, s.snapshot_id, s.windows.len())
-                            }
-                            Err(se) => error!(d.log, "exit snapshot failed: {se}"),
-                        }
-                    }
-                    None => warn!(d.log, "exit capture failed: {}", e.message),
-                }
+                save_last_seen(d, mode, &format!("exit capture failed ({})", e.message));
             }
         }
     }
+}
+
+/// Save the layout last seen in this session (see remember_layout; at most
+/// ~10 s old, and refreshed when a restore finishes) as this session's exit
+/// snapshot. Returns whether one was saved.
+fn save_last_seen(d: &Daemon, mode: SnapshotMode, why: &str) -> bool {
+    let seen = d.topology_memory.lock().unwrap().as_ref().map(|(_, s)| s.clone());
+    match seen.filter(|s| !s.windows.is_empty()) {
+        Some(mut s) => {
+            let seen_at = s.created_at.clone();
+            s.snapshot_id = uuid::Uuid::new_v4().to_string();
+            s.mode = mode;
+            s.diagnostics.push(format!("{why}; this is the layout last seen at {seen_at}"));
+            match save_automatic(d, &s) {
+                Ok(()) => {
+                    d.exit_captured.store(true, Ordering::SeqCst);
+                    warn!(d.log, "{why}; saved the layout last seen at {seen_at} as {mode:?} snapshot {} ({} windows)", s.snapshot_id, s.windows.len());
+                    true
+                }
+                Err(se) => {
+                    error!(d.log, "exit snapshot failed: {se}");
+                    false
+                }
+            }
+        }
+        None => {
+            warn!(d.log, "{why}; no layout was seen in this session, so no exit snapshot");
+            false
+        }
+    }
+}
+
+/// Plasma ends a session by closing its windows first, and stops this unit
+/// only afterwards; it sends no signal before. So when a window closes on
+/// Plasma, ask its session manager whether the session is ending
+/// (org.kde.KSMServerInterface.isShuttingDown). If it is, the layout last
+/// seen, from before the windows began to close, is this session's logout
+/// snapshot. One check at a time; nothing once the exit snapshot exists.
+pub fn on_window_closed(d: &Arc<Daemon>) {
+    if !d.env.current_desktop.split(':').any(|x| x.eq_ignore_ascii_case("KDE")) || d.exit_captured.load(Ordering::SeqCst) {
+        return;
+    }
+    if d.ending_check_busy.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let d = d.clone();
+    std::thread::spawn(move || {
+        let ending = plasma_is_shutting_down();
+        if ending == Some(true) && !d.exit_captured.load(Ordering::SeqCst) {
+            let cfg = d.config();
+            let auto = matches!(cfg.session.policy, RestorePolicy::LastClean | RestorePolicy::LastKnown | RestorePolicy::Ask);
+            if auto && !d.restore_in_progress() && !(d.is_locked() && cfg.session.skip_capture_when_locked) {
+                save_last_seen(&d, SnapshotMode::Logout, "Plasma is ending the session (its windows are closing)");
+            }
+        }
+        d.ending_check_busy.store(false, Ordering::SeqCst);
+    });
+}
+
+fn plasma_is_shutting_down() -> Option<bool> {
+    let conn = zbus::blocking::Connection::session().ok()?;
+    let p = zbus::blocking::Proxy::new(&conn, "org.kde.ksmserver", "/KSMServer", "org.kde.KSMServerInterface").ok()?;
+    p.call("isShuttingDown", &()).ok()
 }
 
 /// Exit snapshot of a session that ended during restore `run_id`: live state

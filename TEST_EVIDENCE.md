@@ -47,7 +47,7 @@ cannot show.
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 19/19 | `tests/evidence/e2e-kwin-wayland.json` |
 | Hyprland E2E | `bash tests/hyprland/e2e-hyprland-in-container.sh` | E10 | 25/25 | `tests/evidence/e2e-hyprland.json` |
 | Sway E2E | `bash tests/sway/e2e-sway-in-container.sh` | E11 | 25/25 (and 25/25 on three more runs after the placement-settling fix) | `tests/evidence/e2e-sway.json` |
-| Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` / `plasma-x11` | E9 | 7/7 on GNOME Wayland, 7/7 on GNOME Xorg, 7/7 on Plasma 5.27 X11 | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, screenshots `tests/evidence/vm/` |
+| Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` / `plasma-x11` / `plasma-wayland` | E9 | 7/7 on GNOME Wayland, 7/7 on GNOME Xorg, 7/7 on Plasma 5.27 X11 (Ubuntu 24.04); 7/7 on Plasma 6.6.6 Wayland (Ubuntu 26.04) | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, `vm-ubuntu26.04-plasma-wayland.json`, screenshots `tests/evidence/vm/` |
 | VM power loss (T15, RS-18): QEMU `system_reset` during back-to-back snapshot writes, twice, then the next login | `FRACTILE_VM_POWER_CUT=1 bash tests/vm/vm-e2e.sh x11` | E9 (GNOME Xorg session) | 9/9 | `tests/evidence/vm-ubuntu24.04-x11-power-cut.json`, `tests/evidence/vm/x11-power-cut-log.txt`, `x11-pc1-prompt.png`, `x11-pc2-after.png` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
 | 24-hour soak (T27) | `bash tests/vm/vm-e2e.sh soak 1440` | E9 (Xvfb + GNOME Shell 46.0 X11 in that VM) | 9/10 as run; P07 failed on a wrong bound in the check (see below) | `tests/evidence/perf-x11-24h.json`, `tests/evidence/vm/soak.log`, `soak-progress.log`, `soak-daemon-tail.log` |
@@ -157,8 +157,8 @@ run left its headless shell running.
 
 ## What is not covered
 
-- A real login on Plasma 6 / KWin Wayland, a power-loss
-  interruption, and physical monitors (mixed DPI and disconnect/reconnect ran
+- A power-loss interruption on real hardware (the VM power cut is
+  covered), and physical monitors (mixed DPI and disconnect/reconnect ran
   on virtual monitors through DisplayConfig).
 - The tray outside GNOME with the AppIndicator extension.
 - COSMIC: BLOCKED BY PLATFORM (docs/compatibility/cosmic.md).

@@ -32,6 +32,7 @@ struct Sim {
     pending: RefCell<Vec<(Instant, String, u32)>>,
     new_events: RefCell<VecDeque<String>>,
     launches: RefCell<Vec<String>>,
+    another_window: RefCell<Vec<bool>>,
     ledger: RefCell<Vec<(String, Instant)>>,
     persisted: RefCell<BTreeMap<String, ItemResult>>,
     fought: RefCell<std::collections::HashSet<String>>,
@@ -52,6 +53,7 @@ impl Sim {
             pending: RefCell::new(vec![]),
             new_events: RefCell::new(VecDeque::new()),
             launches: RefCell::new(vec![]),
+            another_window: RefCell::new(vec![]),
             ledger: RefCell::new(vec![]),
             persisted: RefCell::new(BTreeMap::new()),
             fought: RefCell::new(Default::default()),
@@ -156,8 +158,9 @@ impl RestoreHost for Sim {
         }
         Ok(())
     }
-    fn launch(&self, d: &str, _a: &[String]) -> Result<u32, String> {
+    fn launch(&self, d: &str, _a: &[String], another: bool) -> Result<u32, String> {
         let app = self.apps.get(d).ok_or("not installed")?;
+        self.another_window.borrow_mut().push(another);
         self.launches.borrow_mut().push(d.into());
         let already = self.launches.borrow().iter().filter(|x| *x == d).count() as u32 - 1;
         for k in 0..app.windows_per_launch {
@@ -350,6 +353,27 @@ fn per_instance_launch_for_plain_apps() {
     assert!(rep.all_success(), "{:#?}", rep.items);
     assert_eq!(sim.launches.borrow().len(), 2);
     assert_eq!(sim.count("term.desktop"), 2);
+    // the second launch asks for another window (the app's new-window action)
+    assert_eq!(*sim.another_window.borrow(), vec![false, true]);
+}
+
+/// The desktop's own session restore (Plasma) reopened one window of a
+/// single-instance app before Fractile restores: plain activation would only
+/// raise that window, so both launches ask for another window.
+#[test]
+fn launches_ask_for_another_window_when_the_app_already_has_one() {
+    let outs = vec![out("A", 0, 2560)];
+    let sim = Sim::new(outs.clone()).app("files.desktop", 1, 50, false, &["f1", "f2", "f3"]);
+    sim.open("files.desktop", "f1");
+    let recs = (0..3).map(|i| rec(&format!("r{i}"), "files.desktop", &format!("f{}", i + 1), i, "A", Rect::new(i as i32 * 500, 32, 500, 500), WA_A)).collect();
+    let cfg = Config::default();
+    let s = snapshot(outs, recs);
+    let o = opts(&cfg);
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    assert!(rep.all_success(), "{:#?}", rep.items);
+    assert_eq!(sim.count("files.desktop"), 3);
+    assert_eq!(*sim.another_window.borrow(), vec![true, true]);
 }
 
 /// T13: recorded monitor B missing → windows remapped onto A, inside its work area.
