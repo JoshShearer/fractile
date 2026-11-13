@@ -1,0 +1,503 @@
+{
+  "suite": "perf-x11",
+  "when": "2026-11-13T04:05:37+0000",
+  "environment": "Xvfb with GNOME Shell 46.0 (X11) as the window manager, PyQt6 UI; fractiled release build; CPU AMD Ryzen Threadripper 1920X 12-Core Processor, 4 threads; memory cap 3G",
+  "metrics": {
+    "idle": {
+      "seconds": 60,
+      "rss_mib": 12.4,
+      "threads": 8,
+      "fds": 15,
+      "cpu_pct_median": 0.0,
+      "cpu_pct_mean": 0.05,
+      "cpu_pct_max": 1.0,
+      "ui_rss_mib": null
+    },
+    "placement": {
+      "n": 200,
+      "service_p50_ms": 106,
+      "service_p95_ms": 113,
+      "client_rtt_p50_ms": 107.8,
+      "client_rtt_p95_ms": 116.0,
+      "within_tolerance": 200
+    },
+    "panel": {
+      "n": 40,
+      "missed": 0,
+      "p50_ms": 14.2,
+      "p95_ms": 23.6,
+      "max_ms": 124.5
+    },
+    "soak": {
+      "minutes": 1440.0,
+      "cycles": 21537,
+      "errors": 0,
+      "rss_mib_start": 16.5,
+      "rss_mib_end": 17.3,
+      "rss_mib_max": 17.3,
+      "fds_start_end": [
+        19,
+        19
+      ],
+      "threads_start_end": [
+        11,
+        11
+      ],
+      "zombie_children": 0,
+      "snapshots_by_mode": {
+        "pre_restore": 22,
+        "manual": 6
+      },
+      "trace": [
+        {
+          "t": 5.2,
+          "rss_kib": 13448,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 1439.5,
+          "rss_kib": 15432,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 2881.6,
+          "rss_kib": 16208,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 4321.9,
+          "rss_kib": 16940,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 5763.5,
+          "rss_kib": 17084,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 7210.6,
+          "rss_kib": 17184,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 8651.2,
+          "rss_kib": 17304,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 10100.4,
+          "rss_kib": 17368,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 11538.2,
+          "rss_kib": 17376,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 12979.2,
+          "rss_kib": 17432,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 14421.4,
+          "rss_kib": 17444,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 15862.5,
+          "rss_kib": 17456,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 17306.5,
+          "rss_kib": 17464,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 18747.7,
+          "rss_kib": 17464,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 20186.8,
+          "rss_kib": 17476,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 21630.1,
+          "rss_kib": 17480,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 23074.3,
+          "rss_kib": 17488,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 24514.7,
+          "rss_kib": 17512,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 25951.7,
+          "rss_kib": 17568,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 27386.2,
+          "rss_kib": 17596,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 28823.4,
+          "rss_kib": 17596,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 30259.0,
+          "rss_kib": 17596,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 31694.8,
+          "rss_kib": 17600,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 33129.7,
+          "rss_kib": 17600,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 34566.2,
+          "rss_kib": 17604,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 36000.3,
+          "rss_kib": 17612,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 37436.6,
+          "rss_kib": 17612,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 38872.9,
+          "rss_kib": 17612,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 40308.1,
+          "rss_kib": 17612,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 41743.7,
+          "rss_kib": 17612,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 43180.5,
+          "rss_kib": 17620,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 44617.6,
+          "rss_kib": 17628,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 46063.6,
+          "rss_kib": 17636,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 47501.8,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 48938.1,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 50383.9,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 51828.2,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 53271.1,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 54708.4,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 56142.3,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 57579.0,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 59014.1,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 60451.3,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 61886.4,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 63323.6,
+          "rss_kib": 17664,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 64759.7,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 66195.4,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 67634.6,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 69071.7,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 70510.6,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 71948.8,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 73391.1,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 74833.1,
+          "rss_kib": 17668,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 76281.6,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 77717.8,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 79159.7,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 80601.3,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 82039.7,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 83477.1,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 84917.9,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        },
+        {
+          "t": 86361.2,
+          "rss_kib": 17712,
+          "fds": 19,
+          "threads": 11
+        }
+      ]
+    },
+    "relogins": {
+      "n": 10,
+      "restored": 10,
+      "ghost_pids": [],
+      "duplicate_windows": 0,
+      "ui_processes_after": 1,
+      "misses": [],
+      "service_ready_ms_p50": 105,
+      "service_ready_ms_max": 107
+    },
+    "mid_restore_logouts": {
+      "n": 6,
+      "during_restore": 6,
+      "user_snaps_kept": 6,
+      "all_back": true,
+      "breaker_tripped": false,
+      "runs_ended_cancelled": 6,
+      "misses": [],
+      "last_run": "{\"running\": null, \"last_run\": {\"run_id\": \"073bb5b3-223f-4c9e-ac72-b7cf07521b58\", \"source\": \"login\", \"state\": \"completed\", \"summary\": \"ALREADY_PRESENT=3\"}}"
+    }
+  },
+  "results": [
+    {
+      "id": "P00",
+      "name": "test windows are up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P01",
+      "name": "UI starts and the panel appears on the global hotkey",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P02",
+      "name": "idle resident memory of fractiled < 75 MiB (UI excluded)",
+      "ok": true,
+      "detail": "12.4 MiB RSS, 8 threads, 15 fds; UI process None MiB (not counted)"
+    },
+    {
+      "id": "P03",
+      "name": "idle CPU median < 0.5% of one core",
+      "ok": true,
+      "detail": "median 0.0%, mean 0.05%, max 1.0% over 60 s"
+    },
+    {
+      "id": "P04",
+      "name": "placement P95 < 250 ms (request to geometry read back from the WM)",
+      "ok": true,
+      "detail": "service p50 106 / p95 113 ms; client round trip p50 107.8 / p95 116.0 ms; 200/200 within tolerance"
+    },
+    {
+      "id": "P05",
+      "name": "panel P95 < 150 ms after the hotkey (warm service; until the panel window is viewable)",
+      "ok": true,
+      "detail": "p50 14.2 / p95 23.6 / max 124.5 ms over 40 presses, 0 missed"
+    },
+    {
+      "id": "P06",
+      "name": "1440.0-minute soak: service alive, no errors, RSS growth < 5 MiB, fds and threads flat, no zombie children",
+      "ok": true,
+      "detail": "21537 cycles (~215370 placements, 21537 saves+restores); RSS 16.5 -> 17.3 MiB (max 17.3); fds [19, 19], threads [11, 11]; 0 errors"
+    },
+    {
+      "id": "P07",
+      "name": "automatic snapshots stay bounded by retention during the soak (max_recent=20); manual saves are kept by design",
+      "ok": false,
+      "detail": "22 automatic after 21537 restores (each writes a pre-restore baseline); by mode {'pre_restore': 22, 'manual': 6}"
+    },
+    {
+      "id": "P08",
+      "name": "10 simulated relogins: every one restores the window, no ghost service/UI processes, no duplicate windows, at most one UI",
+      "ok": true,
+      "detail": "restored 10/10; ghosts []; duplicate windows 0; UI processes 1; service ready p50 105 ms"
+    },
+    {
+      "id": "P09",
+      "name": "6 logouts during the login restore: the next login restores the layout including the user's change, and automatic restore is never paused",
+      "ok": true,
+      "detail": "6/6 logouts while the restore ran; 6 user re-snaps; all back True; breaker tripped False; runs ended cancelled 6; misses []"
+    }
+  ]
+}

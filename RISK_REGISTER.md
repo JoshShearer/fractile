@@ -36,5 +36,5 @@ Status as of 0.9.0.
 |---|---|---|---|---|
 | D1 | Evidence comes from nested/headless/container runs, not real logins (SRS 10: containers alone are insufficient for parity) | H | statuses say so; no parity claims | open: real-desktop pass needed on GNOME Wayland, Plasma, and a reboot |
 | D2 | Pop!_OS host install not tested (no root on the test host) | M | Ubuntu 24.04 container install; same packaging | open |
-| D3 | Soak far shorter than 24 h | M | 20-minute soak + 10 relogins + 6 mid-restore logouts with growth checks (RSS +2.9 MiB in 20 min) | open |
+| D3 | Soak far shorter than 24 h | M | 24 h VM soak: service RSS flat (17.0 to 17.3 MiB from hour 4), 0 errors; 10 relogins + 6 mid-restore logouts. Whole-test memory grew ~540 MiB unattributed (harness now logs per-process RSS) | partly mitigated |
 | D4 | Test flakiness under load (timing-sensitive GUI checks) | L | waits on observable state, not sleeps; bounded subprocess calls | mitigated; one G17 flake fixed (now waits for panel focus) |

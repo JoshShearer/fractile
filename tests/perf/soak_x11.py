@@ -330,9 +330,13 @@ def run_all(e: GuiEnv, a) -> dict:
           f"fds {m['soak']['fds_start_end']}, threads {m['soak']['threads_start_end']}; {errors} errors")
     bm = m["soak"]["snapshots_by_mode"]
     auto = sum(v for k, v in bm.items() if k != "manual")
-    # max_recent newest, plus at most one per day kept for daily history
-    check("P07", "automatic snapshots stay bounded by retention during the soak (max_recent=20); manual saves are kept by design",
-          auto <= 20 + 1, f"{auto} automatic after {cycles} restores (each writes a pre-restore baseline); by mode {bm}")
+    # Retention keeps the max_recent newest, plus the newest of each
+    # calendar day beyond those (daily history): one extra per local day the
+    # run touched. (A 24 h run crosses midnight: 20 + 2.)
+    days = len({time.strftime("%Y-%m-%d", time.localtime(t)) for t in (t_soak, time.time())} |
+               {time.strftime("%Y-%m-%d", time.localtime(t_soak + k * 86400)) for k in range(int((time.time() - t_soak) // 86400) + 1)})
+    check("P07", "automatic snapshots stay bounded by retention during the soak (max_recent=20, plus the newest of each day); manual saves are kept by design",
+          auto <= 20 + days, f"{auto} automatic after {cycles} restores (each writes a pre-restore baseline), run spans {days} day(s); by mode {bm}")
 
     # Repeated simulated relogins.
     c = e.client()
@@ -448,9 +452,31 @@ def test_memory() -> str:
         cur = int((d / "memory.current").read_text()) / 2**20
         mx = (d / "memory.max").read_text().strip()
         cap = "no cap" if mx == "max" else f"cap {int(mx) / 2**20:.0f}"
-        return f"{cur:.0f} MiB ({cap})"
+        # memory.current includes page cache; anon is what processes hold.
+        stat = dict(ln.split() for ln in (d / "memory.stat").read_text().splitlines() if ln.count(" ") == 1)
+        anon, file_ = int(stat.get("anon", 0)) / 2**20, int(stat.get("file", 0)) / 2**20
+        return f"{cur:.0f} MiB ({cap}; anon {anon:.0f}, file {file_:.0f}; {top_processes(d)})"
     except (OSError, ValueError, TypeError):
         return "unknown"
+
+
+def top_processes(d: Path, n: int = 4) -> str:
+    """The test's largest processes by RSS, to say what grows."""
+    rows = []
+    try:
+        pids = [int(p) for p in (d / "cgroup.procs").read_text().split()]
+    except (OSError, ValueError):
+        return "processes unknown"
+    for pid in pids:
+        try:
+            st = Path(f"/proc/{pid}/status").read_text()
+            name = next(ln.split()[1] for ln in st.splitlines() if ln.startswith("Name:"))
+            rss = next((int(ln.split()[1]) for ln in st.splitlines() if ln.startswith("VmRSS:")), 0)
+            rows.append((rss, name))
+        except (OSError, StopIteration, ValueError):
+            continue
+    rows.sort(reverse=True)
+    return ", ".join(f"{name} {rss / 1024:.0f}" for rss, name in rows[:n])
 
 
 def capped_or_exec(limit: str) -> None:

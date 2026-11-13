@@ -449,6 +449,27 @@ mod tests {
         std::fs::remove_dir_all(d).unwrap();
     }
 
+    /// The 24 h soak (T27): a restore every few seconds writes a
+    /// pre-restore snapshot each time, and the run crosses midnight. What
+    /// stays is the newest `max_recent`, plus the newest of each calendar
+    /// day beyond those: 20 + 2.
+    #[test]
+    fn retention_across_midnight_keeps_one_extra_per_day() {
+        use chrono::TimeZone;
+        let (mut st, d) = tmpdb();
+        let midnight = chrono::Local.from_local_datetime(&chrono::Local::now().date_naive().and_hms_opt(0, 0, 0).unwrap()).earliest().unwrap();
+        for k in 0..1440 {
+            let t = (midnight + chrono::Duration::minutes(60 - k)).to_rfc3339();
+            st.save_snapshot(&snap(SnapshotMode::PreRestore, &t), false).unwrap();
+        }
+        st.prune(20, 7).unwrap();
+        let left = st.list_snapshots(500).unwrap();
+        let days: std::collections::BTreeSet<&str> = left.iter().map(|x| &x.created_at[0..10]).collect();
+        assert_eq!(left.len(), 22, "20 newest + the newest of each of the 2 days beyond them");
+        assert_eq!(days.len(), 2);
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
     #[test]
     fn transaction_log_and_ledger() {
         let (st, d) = tmpdb();

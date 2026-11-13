@@ -154,7 +154,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | T24 | Arch packaging, clean install | VERIFIED (container) | `package-arch.log` |
 | T25 | Ubuntu/Pop!_OS packaging, clean install | VERIFIED (Ubuntu 24.04 container; and `apt install` on a real Ubuntu 24.04.5 desktop VM, dependencies from the Ubuntu archive, V01); Pop!_OS install NOT TESTED (no root on the test host) | `package-deb-ubuntu24.04.log` |
 | T26 | Malicious import | VERIFIED | SEC3, SEC4, SEC7 |
-| T27 | 24 h soak; repeated relogins | PARTIAL: 20-minute soak, 10 simulated relogins and 6 logouts during a restore all pass (P06, P08, P09); not 24 h, not real logins | `perf-x11.json` |
+| T27 | 24 h soak; repeated relogins | PARTIAL: 24 h soak in the Ubuntu VM (Xvfb + GNOME Shell X11): service RSS flat at 17.0-17.3 MiB from hour 4 to 24, fds and threads flat, 0 errors in 21537 cycles (P06); 10 simulated relogins and 6 logouts during a restore pass (P08, P09). Open: the whole test's memory grew 622 to 1166 MiB (slowing) and was not attributed to a process, so the UI's long-run memory is unmeasured; P07 failed as run on a wrong bound in the check (22 = 20 + one per day, by design; reproduced in a store test); relogins simulated | `perf-x11-24h.json`, `perf-x11.json`, `vm/soak.log` |
 | T28 | Uninstall/reinstall, config policy | VERIFIED (Ubuntu and Arch containers) | package logs |
 
 ## Quality targets (SRS 10)

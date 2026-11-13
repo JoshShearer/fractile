@@ -45,6 +45,7 @@ cannot show.
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 19/19 | `tests/evidence/e2e-kwin-wayland.json` |
 | Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` / `plasma-x11` | E9 | 7/7 on GNOME Wayland, 7/7 on GNOME Xorg, 7/7 on Plasma 5.27 X11 | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, screenshots `tests/evidence/vm/` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
+| 24-hour soak (T27) | `bash tests/vm/vm-e2e.sh soak 1440` | E9 (Xvfb + GNOME Shell 46.0 X11 in that VM) | 9/10 as run; P07 failed on a wrong bound in the check (see below) | `tests/evidence/perf-x11-24h.json`, `tests/evidence/vm/soak.log`, `soak-progress.log`, `soak-daemon-tail.log` |
 | .deb package lifecycle | `bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb` | E5 | passed | `tests/evidence/package-deb-ubuntu24.04.log` |
 | Arch package lifecycle | `bash packaging/test/arch-in-container.sh` | E6 | passed | `tests/evidence/package-arch.log` |
 
@@ -60,14 +61,32 @@ cites. Each JSON file lists every check with its name and measured detail.
 | Idle service RSS < 75 MiB | 10.4 MiB, 9 threads, 16 fds (the UI process is separate: 65.4 MiB) | P02 PASS |
 | Idle CPU median < 0.5% of a core | median 0.0%, max 0.0% over 60 s | P03 PASS |
 | Soak: no crash, no leak (T27, shortened) | 20 minutes, 300 cycles (~3000 placements, 300 save+restore); RSS 11.5 to 14.3 MiB (max 14.4), fds 16 and threads 9 flat, 0 errors | P06 PASS |
-| Automatic snapshots bounded | 21 automatic snapshots after 300 restores with max_recent=20 | P07 PASS |
+| Soak, 24 hours (T27; VM, release build, 3 GiB cap) | 1440 minutes, 21537 cycles (~215000 placements, 21537 save+restore), 0 errors. fractiled RSS 13.1 MiB at start, 17.0 MiB at 4 h, 17.3 MiB at 24 h (median of the first tenth 16.5); fds 19 and threads 11 flat; no zombie children | P06 PASS |
+| Whole test memory during the 24 h (cgroup: GNOME Shell, Xvfb, the UI, test windows, page cache) | 622 MiB at 1 min, 804 MiB at 4 h, 1026 MiB at 14.5 h, 1166 MiB at 24 h; growth slowing (about +45 MiB/h in the first 4 h, +15 MiB/h in the last 4 h). Not attributed: that run logged only the cgroup total | not a check |
+| Automatic snapshots bounded | 21 automatic snapshots after 300 restores with max_recent=20 (20 minutes); 22 after 21537 restores (24 h, the run crossed midnight) | P07 PASS (20 min); FAIL as run (24 h), see below |
 | Repeated relogins | 10/10 restored, no ghost processes, no duplicate windows, service ready p50 105 ms | P08 PASS |
 | Logouts during a running restore | 6/6 interrupted while running; layout and the user's changes restored; automatic restore never paused | P09 PASS |
 
 Most of the placement time is the deliberate read-back: the service waits for
 the window manager to apply the geometry and reads it back before answering.
-The RSS rose 2.9 MiB over the 20 minutes, under the 5 MiB bound; a 24-hour run
-would show whether it levels off.
+The RSS rose 2.9 MiB over the 20 minutes, under the 5 MiB bound. The 24-hour
+run shows it levels off: 17.0 MiB at 4 hours, 17.3 MiB at 24 hours.
+
+P07 in the 24-hour run: 22 automatic snapshots were left with max_recent=20.
+Retention keeps the 20 newest automatic snapshots plus the newest of each
+calendar day beyond those (daily history), and the run crossed midnight, so
+22 is the designed result. The check allowed 20 + 1. A store test now
+reproduces the run's pattern (a pre-restore snapshot every minute across
+midnight, prune to 20: exactly 22 left, one extra per day;
+`retention_across_midnight_keeps_one_extra_per_day`), and the check now
+allows one extra per calendar day the run touches. The 24-hour run was not
+repeated with the corrected check; its JSON keeps the FAIL as recorded.
+
+The whole test grew by about 540 MiB over the 24 hours while fractiled stayed
+flat. That run did not record which process grew. The memory line now also
+prints the cgroup's anonymous and file (page cache) memory and the four
+largest processes by RSS, so a repeat run can attribute it; until then the
+UI's long-run memory is not measured.
 
 Method: `tests/perf/soak_x11.py` header. RSS and CPU are read from
 `/proc/<fractiled>`; placement latency is the service's own timing from
@@ -133,11 +152,10 @@ run left its headless shell running.
 - Pop!_OS host package install (no root on the test host): dependency
   resolution was simulated (`tests/evidence/package-deb-popos24.04-simulate.log`);
   the real install ran on Ubuntu 24.04 (container and VM).
-- The 24-hour soak (T27) has not been run to the end. The first attempt was
-  stopped by the terminal (SIGTTIN) 2 minutes in; the second was started on
-  the developer's desktop without a memory cap and was stopped during the
-  soak loop while that desktop was short of memory (it logged no memory
-  figures before it stopped). The soak evidence is still the 20-minute run.
-  The harness now runs in a memory-capped scope and logs the whole test's
-  memory every minute (see Method); the 24-hour run is to be repeated that
-  way, in the VM or on an otherwise idle machine.
+- The 24-hour soak ran on Xvfb with GNOME Shell (X11) in the Ubuntu VM, not
+  on a GNOME Wayland or KDE session. Earlier attempts on the developer's
+  desktop were stopped (SIGTTIN after 2 minutes; then a run without a memory
+  cap stopped while the desktop was short of memory); the VM run is the
+  evidence. The UI process's memory over 24 hours is not attributed (see
+  above), and the relogins in the soak are simulated (real logins: the VM
+  suites).
