@@ -30,6 +30,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::MetadataExt;
+use std::os::unix::io::AsRawFd;
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -269,11 +270,36 @@ fn runtime_dir() -> PathBuf {
     std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| PathBuf::from(format!("/run/user/{}", uid())))
 }
 
-/// The instance directory, owned by this user, with a request socket.
+/// A real directory (not a symlink) owned by this user and writable by no
+/// one else.
+fn private_dir(p: &Path) -> bool {
+    std::fs::symlink_metadata(p).map(|m| m.file_type().is_dir() && m.uid() == uid() && m.mode() & 0o022 == 0).unwrap_or(false)
+}
+
+/// Connects to a Hyprland socket and checks, through SO_PEERCRED, that the
+/// process listening on it runs as this user. Checked on every connection,
+/// so a path swapped after discovery still cannot lead to another user's
+/// socket.
+fn connect_checked(path: &Path) -> std::io::Result<UnixStream> {
+    let s = UnixStream::connect(path)?;
+    let mut cred = libc::ucred { pid: 0, uid: u32::MAX, gid: 0 };
+    let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: getsockopt writes at most `len` bytes into `cred`, a ucred on
+    // the stack, for a socket fd that stays open for the call.
+    let rc = unsafe { libc::getsockopt(s.as_raw_fd(), libc::SOL_SOCKET, libc::SO_PEERCRED, &mut cred as *mut _ as *mut libc::c_void, &mut len) };
+    if rc != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if cred.uid != uid() {
+        return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, format!("the process on {} runs as uid {}, not this user", path.display(), cred.uid)));
+    }
+    Ok(s)
+}
+
+/// The instance directory: private to this user, with a request socket
+/// that a process of this user answers.
 fn usable_instance(dir: &Path) -> bool {
-    let sock = dir.join(".socket.sock");
-    let owned = |p: &Path| std::fs::symlink_metadata(p).map(|m| m.uid() == uid()).unwrap_or(false);
-    owned(dir) && owned(&sock) && UnixStream::connect(&sock).is_ok()
+    private_dir(dir) && connect_checked(&dir.join(".socket.sock")).is_ok()
 }
 
 /// Finds the running Hyprland instance. HYPRLAND_INSTANCE_SIGNATURE names it
@@ -281,7 +307,17 @@ fn usable_instance(dir: &Path) -> bool {
 /// service may not have it, and then the newest live instance of this user
 /// is used.
 fn find_instance() -> Result<PathBuf, String> {
-    let bases = [runtime_dir().join("hypr"), PathBuf::from("/tmp/hypr")];
+    // Hyprland 0.40 and later keep their sockets in $XDG_RUNTIME_DIR/hypr
+    // (older versions used /tmp/hypr, a shared directory; they are not
+    // supported, so it is not searched).
+    let rt = runtime_dir();
+    if !private_dir(&rt) {
+        return Err(format!("the runtime directory {} is not private to this user", rt.display()));
+    }
+    let bases = [rt.join("hypr")];
+    if !private_dir(&bases[0]) {
+        return Err(format!("no Hyprland directory of this user at {} (it must be owned by this user and writable by no one else)", bases[0].display()));
+    }
     if let Some(sig) = std::env::var("HYPRLAND_INSTANCE_SIGNATURE").ok().filter(|v| !v.is_empty()) {
         if sig.contains('/') || sig.starts_with('.') {
             return Err(format!("HYPRLAND_INSTANCE_SIGNATURE is not a valid instance name: {sig:?}"));
@@ -323,7 +359,7 @@ fn random_hex() -> String {
 
 impl Inner {
     fn request(&self, cmd: &str) -> AResult<String> {
-        let mut st = UnixStream::connect(self.dir.join(".socket.sock")).map_err(|e| AdapterError::Disconnected(format!("Hyprland IPC socket: {e}")))?;
+        let mut st = connect_checked(&self.dir.join(".socket.sock")).map_err(|e| AdapterError::Disconnected(format!("Hyprland IPC socket: {e}")))?;
         st.set_read_timeout(Some(Duration::from_secs(3))).ok();
         st.set_write_timeout(Some(Duration::from_secs(3))).ok();
         st.write_all(cmd.as_bytes()).map_err(|e| AdapterError::Disconnected(format!("Hyprland IPC write: {e}")))?;
@@ -824,7 +860,7 @@ impl CompositorAdapter for HyprlandAdapter {
             }
             *sub = true;
         }
-        let sock = UnixStream::connect(self.inner.dir.join(".socket2.sock")).map_err(|e| AdapterError::Disconnected(format!("Hyprland event socket: {e}")))?;
+        let sock = connect_checked(&self.inner.dir.join(".socket2.sock")).map_err(|e| AdapterError::Disconnected(format!("Hyprland event socket: {e}")))?;
         *self.inner.events.lock().unwrap() = sock.try_clone().ok();
         self.inner.state.lock().unwrap().last_active = self.inner.active().ok().flatten();
         let (tx, rx) = channel();
@@ -916,6 +952,7 @@ impl Drop for HyprlandAdapter {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn lua_strings_cannot_be_escaped() {
@@ -927,6 +964,27 @@ mod tests {
         assert!(!body.contains('"') && !body.contains('\n') && !body.contains('(') && !body.contains(')'));
         assert!(body.contains("\\034") && body.contains("\\010") && body.contains("\\092"));
         assert_eq!(lua_str("é"), "\"\\195\\169\"");
+    }
+
+    #[test]
+    fn socket_peer_must_be_this_user_and_dir_private() {
+        let base = std::env::temp_dir().join(format!("fractile-hypr-test-{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let sock = base.join(".socket.sock");
+        let _l = std::os::unix::net::UnixListener::bind(&sock).unwrap();
+        assert!(connect_checked(&sock).is_ok(), "a socket of this user is accepted");
+        assert!(usable_instance(&base));
+        std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(!private_dir(&base), "a directory others can write to is refused");
+        assert!(!usable_instance(&base));
+        let link = base.with_extension("link");
+        let _ = std::fs::remove_file(&link);
+        std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::os::unix::fs::symlink(&base, &link).unwrap();
+        assert!(!private_dir(&link), "a symlinked directory is refused");
+        let _ = std::fs::remove_file(&link);
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

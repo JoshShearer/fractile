@@ -72,8 +72,11 @@ the threat model.
 
 **Hyprland** is the other way round: there is no integration to attach.
 The service is a client of Hyprland's own IPC sockets in
-`$XDG_RUNTIME_DIR/hypr/<instance>/` and uses an instance only when the
-directory and socket are owned by the user. Values sent to Hyprland are
+`$XDG_RUNTIME_DIR/hypr/<instance>/` (never the shared `/tmp/hypr` of old
+Hyprland versions). It uses an instance only when the directories are real
+directories owned by the user and writable by no one else, and checks on
+every connection, through `SO_PEERCRED`, that the listening process runs as
+the user. Values sent to Hyprland are
 embedded in Lua string literals that keep only letters, digits and a few
 punctuation characters and escape every other byte, so a shortcut id cannot
 end the literal and run code in the compositor (SEC7, unit test

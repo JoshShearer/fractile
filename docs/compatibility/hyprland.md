@@ -108,8 +108,12 @@ newest running Hyprland instance in `$XDG_RUNTIME_DIR/hypr`. The UI needs
 
 ## Security
 
-The IPC directory is in the user's runtime directory. The service uses an
-instance directory and socket only when they are owned by the user. Values
+The IPC directory is in the user's runtime directory; the shared `/tmp/hypr`
+of Hyprland before 0.40 is never searched. The service uses an instance
+directory only when it is a real directory owned by the user and writable by
+no one else, and on every connection it checks (`SO_PEERCRED`) that the
+process listening on the socket runs as the same user (unit test
+`socket_peer_must_be_this_user_and_dir_private`). Values
 Fractile sends to Hyprland go into Lua string literals that pass only
 letters, digits and a few punctuation characters, and write every other byte
 as an escape, so a shortcut id or window address cannot end the literal (unit

@@ -1,6 +1,6 @@
 {
   "suite": "e2e-hyprland",
-  "when": "2026-11-13T04:19:43+0000",
+  "when": "2026-11-13T04:22:06+0000",
   "environment": "Hyprland 0.57.2 built from branch v0.57.2 at commit 11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947 clean (VERSION: bump to 0.57.2). nested in kwin_wayland --virtual, archlinux container (render device: nvidia); keys pressed with wtype",
   "results": [
     {
@@ -151,7 +151,7 @@
       "id": "H21",
       "name": "when Hyprland exits the service saves the last seen layout and exits",
       "ok": true,
-      "detail": "ms | 2026-11-13T04:19:43.401 Warn the display closed (Hyprland closed its event socket (the compositor exited)): the desktop session has ended; exiting | 2026-11-13T04:19:43.494 Info fractiled stopped"
+      "detail": "ms | 2026-11-13T04:22:06.448 Warn the display closed (Hyprland closed its event socket (the compositor exited)): the desktop session has ended; exiting | 2026-11-13T04:22:06.520 Info fractiled stopped"
     }
   ]
 }
