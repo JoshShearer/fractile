@@ -85,6 +85,17 @@ events whose names carry a random per-service part, so binds left by an
 earlier service do not trigger actions. Any same-uid process can use these
 sockets too; Fractile adds no access beyond what the user already has.
 
+**Sway** works the same way. The service uses `$SWAYSOCK` or this user's
+`sway-ipc.<uid>.*.sock` only when it is a socket owned by the user in a
+directory private to the user, and checks the listening process's uid with
+`SO_PEERCRED` on every connection. Commands contain only numbers, fixed text
+and key names limited to letters, digits and `_`, so a shortcut id or a window
+title cannot add a Sway command (SEC7, unit tests `ids_are_numbers_only`,
+`combos_refuse_sway_syntax_in_key_names`). Shortcut bindings run `nop` with a
+token holding a random per-service part, so bindings left by a killed service
+do not trigger actions. Fractile reads the Sway configuration files (to find
+keys they already bind) and never writes them.
+
 After `Attach`, KWin's `Poll`, `Result` and `Event` calls are accepted only from
 the D-Bus connection that attached. A second live integration is refused while
 the first one's process exists.
@@ -148,7 +159,10 @@ execute anything.
   placement result say so); Fractile's shortcuts are runtime binds and its own
   panel floats through a runtime window rule matching only Fractile's app id.
   None of this is written to the user's configuration, and it is listed in
-  docs/compatibility/hyprland.md.
+  docs/compatibility/hyprland.md. Sway is handled the same way (runtime
+  `bindsym` and `for_window`, never written to a file; a shortcut on keys the
+  user's configuration binds is refused, because a runtime binding would
+  replace the user's); see docs/compatibility/sway.md.
 - It never enables its GNOME extension or KWin script. The packages ship them
   disabled, and the user enables them.
 - It never closes or replaces user windows.

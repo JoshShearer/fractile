@@ -250,7 +250,9 @@ fn start_job(d: &Arc<Daemon>, src: Source, req: &RestoreRequest, source_label: &
             "cancelled"
         } else if rep.all_success() {
             "completed"
-        } else if rep.items.iter().any(|i| i.status.is_success()) {
+        } else if rep.items.iter().any(|i| i.status.is_success()) || rep.items.iter().all(|i| i.status == ItemStatus::Skipped) {
+            // Everything skipped on purpose (a mode that does not launch, a
+            // launch not approved): nothing went wrong, nothing was done.
             "partial"
         } else if rep.items.is_empty() {
             "completed"

@@ -25,6 +25,10 @@ pub struct Environment {
     pub hyprland_signature: Option<String>,
     /// A Hyprland compositor runs for this user.
     pub hyprland_running: bool,
+    /// SWAYSOCK from the environment, when set.
+    pub sway_socket: Option<String>,
+    /// A Sway compositor runs for this user.
+    pub sway_running: bool,
 }
 
 fn proc_running(name: &str) -> bool {
@@ -66,6 +70,8 @@ pub fn detect() -> Environment {
         kwin_running: proc_running("kwin_wayland"),
         hyprland_signature: std::env::var("HYPRLAND_INSTANCE_SIGNATURE").ok().filter(|v| !v.is_empty()),
         hyprland_running: proc_running("Hyprland"),
+        sway_socket: std::env::var("SWAYSOCK").ok().filter(|v| !v.is_empty()),
+        sway_running: proc_running("sway"),
     }
 }
 
@@ -76,6 +82,7 @@ pub enum Backend {
     GnomeShell,
     KWin,
     Hyprland,
+    Sway,
     Cosmic,
     Unsupported,
 }
@@ -93,6 +100,7 @@ impl Environment {
             Some("gnome") => return Backend::GnomeShell,
             Some("kwin") => return Backend::KWin,
             Some("hyprland") => return Backend::Hyprland,
+            Some("sway") => return Backend::Sway,
             Some("cosmic") => return Backend::Cosmic,
             _ => {}
         }
@@ -104,6 +112,9 @@ impl Environment {
         if self.desktop_has("Hyprland") || self.hyprland_signature.is_some() {
             return Backend::Hyprland;
         }
+        if self.desktop_has("sway") || self.sway_socket.is_some() {
+            return Backend::Sway;
+        }
         if self.desktop_has("GNOME") || self.desktop_has("ubuntu") && self.gnome_shell_version.is_some() {
             Backend::GnomeShell
         } else if self.desktop_has("KDE") || self.kwin_running {
@@ -112,6 +123,8 @@ impl Environment {
             Backend::Cosmic
         } else if self.hyprland_running {
             Backend::Hyprland
+        } else if self.sway_running {
+            Backend::Sway
         } else {
             Backend::Unsupported
         }
@@ -149,6 +162,16 @@ impl StubAdapter {
             compositor: "Hyprland".into(),
             reason: format!("no window control on Hyprland: {reason}"),
             notes: vec!["Fractile reaches Hyprland through its IPC socket in $XDG_RUNTIME_DIR/hypr. See docs/compatibility/hyprland.md.".into()],
+        }
+    }
+    /// Sway was detected but its IPC could not be used.
+    pub fn sway(reason: String) -> StubAdapter {
+        StubAdapter {
+            name: "sway".into(),
+            session_type: "wayland".into(),
+            compositor: "Sway".into(),
+            reason: format!("no window control on Sway: {reason}"),
+            notes: vec!["Fractile reaches Sway through its IPC socket ($SWAYSOCK, or sway-ipc.*.sock in $XDG_RUNTIME_DIR). See docs/compatibility/sway.md.".into()],
         }
     }
     pub fn unsupported(env: &Environment) -> StubAdapter {
@@ -221,9 +244,11 @@ impl CompositorAdapter for StubAdapter {
 
 /// Detect automatic tiling managers that would fight floating placement.
 pub fn detect_tiling(env: &Environment) -> Option<String> {
-    if env.choose(None) == Backend::Hyprland {
-        // A tiling compositor: windows Fractile places become floating.
-        return Some("hyprland".into());
+    match env.choose(None) {
+        // Tiling compositors: windows Fractile places become floating.
+        Backend::Hyprland => return Some("hyprland".into()),
+        Backend::Sway => return Some("sway".into()),
+        _ => {}
     }
     if env.desktop_has("COSMIC") || env.cosmic_comp_running {
         let home = std::env::var("HOME").unwrap_or_default();

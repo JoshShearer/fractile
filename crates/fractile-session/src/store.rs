@@ -181,15 +181,17 @@ impl Store {
 
     /// Newest snapshot that passes checksum + validation, optionally of
     /// given modes. Corrupt rows are skipped (previous good is used).
+    /// The newest snapshot of one of `modes` (any mode when None) whose
+    /// payload passes its checksum. The modes are filtered in the query, so
+    /// any number of newer snapshots of other modes (manual saves, say) do
+    /// not hide it; up to 200 corrupt rows of the wanted modes are skipped.
     pub fn latest_good(&self, modes: Option<&[SnapshotMode]>) -> Option<Snapshot> {
-        let mut st = self.conn.prepare("SELECT payload, checksum, mode FROM snapshots ORDER BY created_at DESC LIMIT 200").ok()?;
-        let rows = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))).ok()?;
-        for (p, c, m) in rows.flatten() {
-            if let Some(ms) = modes {
-                if !ms.contains(&mode_from(&m)) {
-                    continue;
-                }
-            }
+        let names: Vec<String> = modes.map(|ms| ms.iter().map(|m| mode_str(*m)).collect()).unwrap_or_default();
+        let filter = if modes.is_some() { format!("WHERE mode IN ({})", vec!["?"; names.len().max(1)].join(",")) } else { String::new() };
+        let mut st = self.conn.prepare(&format!("SELECT payload, checksum FROM snapshots {filter} ORDER BY created_at DESC LIMIT 200")).ok()?;
+        let args: Vec<&dyn rusqlite::ToSql> = if modes.is_some() && names.is_empty() { vec![&""] } else { names.iter().map(|n| n as &dyn rusqlite::ToSql).collect() };
+        let rows = st.query_map(args.as_slice(), |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))).ok()?;
+        for (p, c) in rows.flatten() {
             if let Ok(s) = Self::row_to_snapshot(p, c) {
                 return Some(s);
             }
@@ -410,6 +412,23 @@ mod tests {
         s.created_at = created.into();
         s.windows.push(WindowRecord { record_id: "r".into(), desktop_file_id: Some("a.desktop".into()), normalized_geometry: [0.0, 0.0, 1.0, 1.0], absolute_geometry: Rect::new(0, 0, 10, 10), ..Default::default() });
         s
+    }
+
+    #[test]
+    fn latest_of_a_mode_is_found_behind_many_newer_manual_saves() {
+        // Seen in the VM power-cut test: 542 manual saves after the last
+        // periodic snapshot hid it from the login restore.
+        let (mut st, d) = tmpdb();
+        let p = snap(SnapshotMode::Periodic, "2026-11-10T10:00:00+00:00");
+        st.save_snapshot(&p, false).unwrap();
+        for k in 0..300 {
+            st.save_snapshot(&snap(SnapshotMode::Manual, &format!("2026-11-10T10:{:02}:{:02}+00:00", 1 + k / 60, k % 60)), false).unwrap();
+        }
+        let got = st.latest_good(Some(&[SnapshotMode::Logout, SnapshotMode::Shutdown, SnapshotMode::Periodic])).unwrap();
+        assert_eq!(got.snapshot_id, p.snapshot_id);
+        assert_eq!(st.latest_good(None).unwrap().mode, SnapshotMode::Manual);
+        assert!(st.latest_good(Some(&[SnapshotMode::Logout])).is_none());
+        std::fs::remove_dir_all(d).unwrap();
     }
 
     #[test]

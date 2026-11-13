@@ -1,0 +1,27 @@
+2026-11-13T05:02:31.924 Info login session 5 (from the user's graphical session (logind User.Display))
+2026-11-13T05:02:31.926 Info session=x11 desktop=ubuntu:GNOME backend=X11
+2026-11-13T05:02:32.101 Info session locked=false
+2026-11-13T05:02:32.103 Info registered with gnome-session as /org/gnome/SessionManager/Client21
+2026-11-13T05:02:35.562 Info gnome-session: the session is ending; taking the logout snapshot now
+2026-11-13T05:02:35.668 Info signal 15: ending session
+2026-11-13T05:02:44.452 Info login session 18 (from the user's graphical session (logind User.Display))
+2026-11-13T05:02:44.455 Info session=x11 desktop=ubuntu:GNOME backend=X11
+2026-11-13T05:02:44.984 Info no snapshot from the previous session to restore
+2026-11-13T05:02:44.985 Info session locked=false
+2026-11-13T05:02:44.992 Info registered with gnome-session as /org/gnome/SessionManager/Client21
+2026-11-13T05:06:20.386 Info login session 5 (from the user's graphical session (logind User.Display))
+2026-11-13T05:06:20.388 Info session=x11 desktop=ubuntu:GNOME backend=X11
+2026-11-13T05:06:20.928 Info session locked=false
+2026-11-13T05:06:20.938 Info registered with gnome-session as /org/gnome/SessionManager/Client21
+2026-11-13T05:06:20.976 Info login restore decision=ask unclean=true snapshot=b06af105-2ec1-4e3e-b5f3-c26d2c943304
+2026-11-13T05:09:25.501 Info restore 29f61924-0923-40d5-92e0-f1e27d90a0ad started source=manual targets=15
+2026-11-13T05:09:40.411 Info restore 29f61924-0923-40d5-92e0-f1e27d90a0ad finished state=completed LAUNCHED_AND_PLACED=15 launches=15 14892ms
+2026-11-13T05:10:22.895 Info autosave eb671fc3-de36-4ad7-a59b-cef7552f9ccb (15 windows)
+2026-11-13T05:13:37.620 Info login session 5 (from the user's graphical session (logind User.Display))
+2026-11-13T05:13:37.623 Info session=x11 desktop=ubuntu:GNOME backend=X11
+2026-11-13T05:13:38.164 Info session locked=false
+2026-11-13T05:13:38.174 Info registered with gnome-session as /org/gnome/SessionManager/Client20
+2026-11-13T05:13:38.194 Info login restore decision=restore unclean=true snapshot=eb671fc3-de36-4ad7-a59b-cef7552f9ccb
+2026-11-13T05:13:41.238 Info restore ef2aeff4-5b28-40b8-841a-75a1a4b8dcdd started source=login targets=15
+2026-11-13T05:13:51.231 Info restore ef2aeff4-5b28-40b8-841a-75a1a4b8dcdd finished state=completed LAUNCHED_AND_PLACED=15 launches=15 9991ms
+2026-11-13T05:14:38.379 Info autosave 771ef44f-ea40-4906-9d20-4084b9e8ebc3 (15 windows)

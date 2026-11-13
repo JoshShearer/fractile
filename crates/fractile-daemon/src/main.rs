@@ -27,7 +27,7 @@ use std::time::Duration;
 
 const USAGE: &str = "fractiled - Fractile session service
 
-USAGE: fractiled [--autostart] [--replace] [--backend x11|gnome|kwin|hyprland|cosmic] [--verbose]
+USAGE: fractiled [--autostart] [--replace] [--backend x11|gnome|kwin|hyprland|sway|cosmic] [--verbose]
        fractiled --check     print environment and capability detection, then exit
        fractiled --version
 
@@ -80,6 +80,16 @@ fn make_adapter(env: &backend::Environment, forced: Option<&str>, log: &Logger) 
             Err(e) => {
                 log.log(logging::Level::Error, &format!("Hyprland adapter failed: {e}"));
                 Arc::new(backend::StubAdapter::hyprland(e))
+            }
+        },
+        backend::Backend::Sway => match fractile_adapter_sway::SwayAdapter::connect() {
+            Ok(a) => {
+                log.log(logging::Level::Info, &format!("Sway adapter connected: Sway {} at {}", a.version(), a.socket().display()));
+                Arc::new(a)
+            }
+            Err(e) => {
+                log.log(logging::Level::Error, &format!("Sway adapter failed: {e}"));
+                Arc::new(backend::StubAdapter::sway(e))
             }
         },
         backend::Backend::Cosmic => Arc::new(backend::StubAdapter::cosmic()),

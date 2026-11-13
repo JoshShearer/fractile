@@ -76,7 +76,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | RS-15 | Atomic, checksummed, backed-up store; corrupt latest falls back | VERIFIED (unit) | `corrupt_latest_falls_back_to_previous_good`, `refuses_newer_schema` |
 | RS-16 | Rolling retention (10 min, 30 recent, 7 daily) | VERIFIED | `retention_keeps_recent_daily_and_manual`, P07 |
 | RS-17 | Logout/shutdown capture without depending on it | VERIFIED | X22, W22 (logind PrepareForShutdown with a delay inhibitor); on GNOME the logout snapshot is taken at gnome-session's EndSession, before GNOME Shell stops (VM V06; at SIGTERM the extension is already gone), with the layout last seen as the fallback |
-| RS-18 | Unclean-session flag and policy | PARTIAL: unit (`sessions_detect_unclean`); no power-cut test | |
+| RS-18 | Unclean-session flag and policy | VERIFIED (E10 GNOME Xorg session, simulated power loss: QEMU `system_reset`): the next login is detected as unclean; the default policy asks first and Enter restores 15 windows (PC02); with power-loss policy "restore" they come back without a prompt (PC03). A real power cut on hardware not run | PC02, PC03, `sessions_detect_unclean` |
 | RS-19 | Lock-screen redaction | VERIFIED (GW) | W21 |
 | RS-20 | Private windows excluded | PARTIAL: VERIFIED (X11) for Firefox 159: a real private window ("... Mozilla Firefox Private Browsing") is left out of the snapshot while the two normal windows are recorded (A01e). NOT MET for Google Chrome 157: its incognito window has no marker in the title or in any X11 property, so it is recorded like a normal window; recorded as a known limitation (`known_limitations` in the evidence) and documented in the user guide with the workaround (turn off stored titles) | `e2e-x11-apps.json` |
 | RS-21 | No snapshot of a half-restored desktop | VERIFIED (X11): logout before the login restore starts (X28) and while a restore runs (P09) | X28, P09, `interrupted_restore_overlay` |
@@ -87,11 +87,11 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 |---|---|---|---|
 | LR-01 | Unlimited named layouts | VERIFIED (X11) | X26 |
 | LR-02 | Rules by app id, WM_CLASS, role, workspace, monitor, ordinal, opt-in title regex; explainable | VERIFIED (GW) for app-id on-create rules; others unit-tested | W20, rules tests |
-| LR-03 | Layout modes: position existing / launch missing / exact N | PARTIAL: position existing (X26); others unit-tested | |
-| LR-04 | Per-monitor variants | PARTIAL: implemented (layout variants by topology); no E2E | |
-| LR-05 | App groups, ordered/delayed launching | PARTIAL: concurrency limit and order; no delay E2E | |
+| LR-03 | Layout modes: position existing / launch missing / exact N | VERIFIED (X11, KW-X11): position existing leaves a missing app closed, launch missing launches and places it, exact N launches up to N and never closes extras | X26, X32, X33 |
+| LR-04 | Per-monitor variants | VERIFIED (X11, KW-X11): the variant for the current output count applies, with monitors changed at runtime through RandR (`xrandr --setmonitor` on Xephyr/Xvfb, not physical monitors) | X35 |
+| LR-05 | App groups, ordered/delayed launching | VERIFIED (X11, KW-X11): a dependent app starts only after the first has a window and its delay has passed (gap 3.0 s for a 2 s delay) | X34 |
 | LR-06 | Undo last action / pre-restore backup | VERIFIED | X07, X14 |
-| LR-07 | Profile auto-switch by monitor topology | PARTIAL: implemented; no E2E | |
+| LR-07 | Profile auto-switch by monitor topology | VERIFIED (X11, KW-X11): the docked profile becomes active and its layout is applied when its monitor setup appears (RandR monitors changed at runtime, not physical) | X36 |
 | LR-08 | Don't fight automatic tilers | VERIFIED (reports only; never changes settings) | diagnose warning; COSMIC never modified |
 | UX-01 | Keyboard-only operation | VERIFIED (X11, GW) | G06, W13 |
 | UX-02 | Snap commands (halves, thirds, quarters, center, maximize) | VERIFIED | G10, G16, M04 |
@@ -109,8 +109,8 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | CA-03 | GNOME X11 via EWMH/RandR | VERIFIED (X11) |
 | CA-04 | COSMIC | BLOCKED BY PLATFORM: no geometry API ([docs/compatibility/cosmic.md](docs/compatibility/cosmic.md)) |
 | CA-05 | KDE Plasma Wayland via KWin script | VERIFIED (KW, virtual backend) |
-| CA-06 | KDE Plasma X11 | VERIFIED: the full X11 suite (39/39) with kwin_x11 5.27.11 as the window manager (Ubuntu 24.04 container, Xvfb, no plasmashell). Plasma 6.8 (Arch) ships no X11 session, so 5.27 is the newest Plasma X11 tested |
-| CA-07 | Sway/Hyprland (optional) | Hyprland: VERIFIED nested (Hyprland 0.57.2 inside a headless KWin, H00-H23, SEC7: 25/25); no real Hyprland login, Hyprland before 0.57 not supported ([docs/compatibility/hyprland.md](docs/compatibility/hyprland.md)). Sway: NOT IMPLEMENTED (reported unsupported, X24) |
+| CA-06 | KDE Plasma X11 | VERIFIED: the full X11 suite (44/44) with kwin_x11 5.27.11 as the window manager (Ubuntu 24.04 container, Xvfb, no plasmashell). Plasma 6.8 (Arch) ships no X11 session, so 5.27 is the newest Plasma X11 tested |
+| CA-07 | Sway/Hyprland (optional) | Hyprland: VERIFIED nested (Hyprland 0.57.2 inside a headless KWin, H00-H23, SEC7: 25/25); no real Hyprland login, Hyprland before 0.57 not supported ([docs/compatibility/hyprland.md](docs/compatibility/hyprland.md)). Sway: VERIFIED nested (Sway 1.12 inside a headless KWin, S00-S23, SEC7: 25/25); no real Sway login, Sway before 1.8 not supported ([docs/compatibility/sway.md](docs/compatibility/sway.md)). Other Wayland compositors reported unsupported (X24) |
 | CA-08 | Bridge authorization beyond bus names | VERIFIED (SEC5, SEC6) |
 
 ## Packaging (SRS 9)
@@ -136,13 +136,13 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | T06 | Shift and Alt | VERIFIED (X11) | G09, G15 |
 | T07 | Multi-monitor selection and cycle | VERIFIED (GW); NOT TESTED (X11, KW) | M01-M05 |
 | T08 | 100 placements on mixed DPI | VERIFIED (GW): 100 placements alternating a scale-2 and a scale-1 monitor, exact, no drift (D02); scale changed at runtime (D01); snapshot restore across both (D03). X11 and KW not run | D01-D03, M06 |
-| T09 | Named layout; launch missing apps | PARTIAL: layout (X26) and approved launch on restore (X18); layout launch-missing mode not run | |
+| T09 | Named layout; launch missing apps | VERIFIED (X11, KW-X11) | X26, X32, X33, X18 |
 | T10 | Reboot restore of 10 apps / 15 windows | VERIFIED (GW and X11, Ubuntu 24.04.5 VM, GNOME 46.0, Wayland and Xorg sessions): 10 apps / 15 windows on a 4x4 grid; after a real reboot and GDM login Fractile asks first and Enter restores all 15 where they were, no duplicates (V05); with asking off, after a real log-out and log-in all 15 come back automatically (V06). Plasma 5.27 X11 (x11 adapter): the same 7 checks pass in the VM; KWin Wayland: no real login | `vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, `tests/evidence/vm/` |
 | T11 | App open before restore: reuse | VERIFIED | X13, X19, X27 |
 | T12 | Two windows of one app | VERIFIED (X11): two windows of one app are listed separately and each returns to its own place, nothing duplicated (X30a, X30); real browsers and VS Code with two windows each (A01-A03); unit/sim (`two_windows_same_app_distinguished_by_title`, `indistinguishable_windows_use_ordinal_and_flag`) | X30, A01-A03 |
 | T13 | Monitor disconnect/reconnect | VERIFIED (GW): disconnect at runtime (D04-D06), reconnect with the same stable id; windows go back when the return option is on (D07) and stay put when it is off, the default (D08). X11 and KW not run | D04-D09 |
 | T14 | Browser/IDE native session restore | VERIFIED (X11) with real Firefox 159, Google Chrome 157 and VS Code 1.145 on throwaway profiles: after the app quits, a restore launches it once, it reopens its own two windows, both go back to where they were, no extra windows, nothing claimed about tabs or unsaved content, a second restore launches nothing (A01-A03). Such apps are on a built-in list that starts them once; the per-app setting overrides it. GW and KW not run | `e2e-x11-apps.json` |
-| T15 | Crash during snapshot write | PARTIAL: corrupt-row fallback (unit); SQLite WAL with synchronous=FULL; no power-cut test | |
+| T15 | Crash during snapshot write | VERIFIED (E10, simulated power loss: QEMU `system_reset` during back-to-back snapshot writes, twice): SQLite integrity check ok and every listed snapshot (580, then 858) reads back with a valid checksum (PC01, PC03); corrupt-row fallback (unit) | PC01, PC03 |
 | T16 | Crash during restore + retry | VERIFIED (X11) | X21 |
 | T17 | Unsupported compositor / extension failure | VERIFIED | X24, W16, K00, K14 |
 | T18 | COSMIC auto-tiling | BLOCKED BY PLATFORM: no window control on COSMIC; Fractile never touches tiling settings | |

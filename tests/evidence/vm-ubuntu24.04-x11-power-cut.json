@@ -1,0 +1,65 @@
+{
+  "suite": "vm-ubuntu24.04-x11-power-cut",
+  "when": "2026-11-13T05:17:22+0000",
+  "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, x11 session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "results": [
+    {
+      "id": "V00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V01",
+      "name": "apt installs the .deb on Ubuntu 24.04 desktop (dependencies from the Ubuntu archive)",
+      "ok": true,
+      "detail": "Ubuntu 24.04.5 LTS; GNOME Shell 46.0; 6.8.0-149-generic :: No user sessions are running outdated binaries.\n\nNo VM guests are running outdated hypervisor (qemu) binaries on this host.\nfractile\t0.9.0-1"
+    },
+    {
+      "id": "V02",
+      "name": "started from the app menu in a real x11 login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
+      "ok": true,
+      "detail": "session x11, service socket True; {\"extension\": 0, \"extension_info\": [\"  Version: 0.9.0\", \"  Enabled: Yes\", \"  State: ACTIVE\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"policy\": \"last_clean\"}"
+    },
+    {
+      "id": "V03",
+      "name": "after a real log-out and the next login, the systemd user unit started the service and it controls windows",
+      "ok": true,
+      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; adapter x11 window_control True session x11"
+    },
+    {
+      "id": "V04",
+      "name": "10 apps / 15 windows opened and placed on a 4x4 grid",
+      "ok": true,
+      "detail": "15 windows, 10 apps; tests/evidence/vm/x11-01-before-reboot.png; "
+    },
+    {
+      "id": "PC00",
+      "name": "with a 1 min autosave interval, a periodic snapshot of the placed layout is written",
+      "ok": true,
+      "detail": "2026-11-13T05:03:45.151 Info autosave b06af105-2ec1-4e3e-b5f3-c26d2c943304 (15 windows)"
+    },
+    {
+      "id": "PC01",
+      "name": "after a power cut in the middle of back-to-back snapshot writes, the store passes SQLite's integrity check and every snapshot listed reads back with a valid checksum",
+      "ok": true,
+      "detail": "{'saves_before_cut': '574', 'boot_before': '1fe4336f-49a3-438c-8179-6057eaecf095', 'qmp': True}; new boot True; {'integrity': 'ok', 'rows': 580, 'listed': 580, 'unreadable': 0}"
+    },
+    {
+      "id": "PC02",
+      "name": "the next login treats the session as ended unexpectedly: with the default power-loss policy it asks first, and Enter restores all 15 windows from the last periodic snapshot",
+      "ok": true,
+      "detail": "2026-11-13T05:06:20.976 Info login restore decision=ask unclean=true snapshot=b06af105-2ec1-4e3e-b5f3-c26d2c943304; Enter True; tests/evidence/vm/x11-pc1-prompt.png; last restore completed LAUNCHED_AND_PLACED=15; "
+    },
+    {
+      "id": "PC03",
+      "name": "a second power cut, with nothing moved since the last restore: the store is intact, and with \"last known session\" and power-loss policy \"restore\" all 15 windows come back without a prompt",
+      "ok": true,
+      "detail": "{'saves_before_cut': '265', 'boot_before': '25475b82-5c52-42b4-930e-a6a8cc17a427', 'qmp': True}; {'integrity': 'ok', 'rows': 858, 'listed': 858, 'unreadable': 0}; 2026-11-13T05:13:38.194 Info login restore decision=restore unclean=true snapshot=eb671fc3-de36-4ad7-a59b-cef7552f9ccb; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/x11-pc2-after.png"
+    }
+  ],
+  "log": [
+    "[05:04:01] power cut (pc1) after 574 snapshot saves: {'return': {}}",
+    "[05:11:10] power cut (pc2) after 265 snapshot saves: {'return': {}}"
+  ]
+}

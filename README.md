@@ -12,11 +12,12 @@ launches apps you approved.
 
 - **Works on:** GNOME on X11 and Wayland (Wayland needs the bundled extension),
   KDE Plasma on Wayland (needs the bundled KWin script), Hyprland 0.57 or later
-  (through its own IPC; placed windows become floating), and X11 window managers.
+  and Sway 1.8 or later (through their own IPC; placed windows become
+  floating), and X11 window managers.
 - **Does not work on:** COSMIC. It offers no API for moving other programs'
   windows; see [docs/compatibility/cosmic.md](docs/compatibility/cosmic.md).
-  Other Wayland compositors (Sway, ...) are not supported either. Fractile says
-  so instead of pretending.
+  Other Wayland compositors (river, Wayfire, labwc, ...) are not supported
+  either. Fractile says so instead of pretending.
 - **Does not restore window contents.** Unsaved documents, tabs and terminal
   sessions come back only if the application restores them itself.
 
@@ -53,6 +54,7 @@ python3 tests/integration/e2e_gnome_wayland.py          # headless GNOME Wayland
 python3 tests/integration/e2e_gnome_wayland_multimon.py # two monitors
 bash tests/kwin/e2e-kwin-in-container.sh                # KWin Wayland in a container
 bash tests/hyprland/e2e-hyprland-in-container.sh        # Hyprland, nested in a headless KWin
+bash tests/sway/e2e-sway-in-container.sh                # Sway, nested in a headless KWin
 FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py   # SLOs + soak
 bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb
 bash packaging/test/arch-in-container.sh

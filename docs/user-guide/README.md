@@ -6,7 +6,7 @@ your window layout and can put it back after you log in again.
 
 Fractile 0.9.0. Where your desktop is supported is in
 [PLATFORM_MATRIX.md](../../PLATFORM_MATRIX.md). In short: GNOME (X11 and Wayland),
-KDE Plasma on Wayland and Hyprland 0.57 or later work. COSMIC does not, because it has no API for
+KDE Plasma on Wayland, Hyprland 0.57 or later and Sway 1.8 or later work. COSMIC does not, because it has no API for
 moving other programs' windows (see [compatibility/cosmic.md](../compatibility/cosmic.md)).
 
 ## Install
@@ -30,6 +30,13 @@ Then:
   uwsm, `fractile autostart on` starts it at login; without uwsm, start
   `fractiled --autostart` from your Hyprland configuration. Windows you place
   become floating. Details: [compatibility/hyprland.md](../compatibility/hyprland.md).
+- **Sway:** nothing to enable. Fractile uses Sway's IPC. If your Sway session
+  starts `graphical-session.target` (uwsm or a distribution's sway session),
+  `fractile autostart on` starts it at login; otherwise add
+  `exec fractiled --autostart` to your Sway configuration. Windows you place
+  become floating. A shortcut on keys your Sway configuration already binds is
+  reported as a conflict, and your binding keeps working. Details:
+  [compatibility/sway.md](../compatibility/sway.md).
 
 Start Fractile from the application menu. The first time, a short setup asks
 for a panel shortcut. It only offers keys that are free on your desktop. It also

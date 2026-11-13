@@ -25,6 +25,8 @@ docker run --rm -v fractile-vm-cache:/cache --user 0 "$tag" chown "$(id -u)" /ca
 [[ $what != soak ]] && args=(--session "$what" --deb "/src/${deb#"$root"/}")
 # Debug: keep the VM up for FRACTILE_VM_HOLD s at FRACTILE_VM_HOLD_AT (login|after-reboot).
 [[ -n ${FRACTILE_VM_HOLD:-} ]] && args+=(--hold "$FRACTILE_VM_HOLD" --hold-at "${FRACTILE_VM_HOLD_AT:-login}")
+# RS-18/T15: FRACTILE_VM_POWER_CUT=1 runs the power-cut scenario instead of reboot/log-out.
+[[ -n ${FRACTILE_VM_POWER_CUT:-} ]] && args+=(--power-cut)
 [[ $what == provision ]] && args=(--session wayland --deb /dev/null --provision-only)
 if [[ $what == soak ]]; then
   # T27 in the VM: detached, so the run survives the terminal; follow it with

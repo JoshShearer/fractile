@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-11T14:58:42+0000",
+  "when": "2026-11-13T04:44:54+0000",
   "environment": "xvfb with kwin_x11 4:5.27.11-0ubuntu3 (Plasma X11 window manager, no plasmashell)",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 154"
+      "detail": "pid 160"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "48 ms incl. polling"
+      "detail": "53 ms incl. polling"
     },
     {
       "id": "X10",
@@ -97,7 +97,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1752 ms"
+      "detail": "1762 ms"
     },
     {
       "id": "X14",
@@ -230,6 +230,36 @@
       "name": "a transient dialog is seen (list-windows --all) but never offered for placement, recorded, or moved by a restore",
       "ok": true,
       "detail": "all ['Main', 'Main dialog']; placeable ['Main']; recorded ['Main']; dialog frame {'h': 160, 'w': 300, 'x': 651, 'y': 521} -> {'h': 160, 'w': 300, 'x': 651, 'y': 521}"
+    },
+    {
+      "id": "X32",
+      "name": "layout modes (LR-03): position_existing leaves a missing app closed; launch_missing launches it and places it",
+      "ok": true,
+      "detail": "position_existing exit 6, launched False; launch_missing exit 0 ; frame {'h': 1200, 'w': 800, 'x': 800, 'y': 0} want {'x': 800, 'y': 0, 'w': 800, 'h': 1200}"
+    },
+    {
+      "id": "X33",
+      "name": "layout mode exact_n (LR-03): 3 instances wanted with 1 open launches 2; applying again launches none; asking for 2 with 3 open closes nothing",
+      "ok": true,
+      "detail": "exit 0/0/0; windows 3, after re-apply 3, after asking for 2: 3"
+    },
+    {
+      "id": "X34",
+      "name": "ordered, delayed launching (LR-05): the dependent app starts only after the first has a window, at least its 2 s delay later; both placed",
+      "ok": true,
+      "detail": "first window 0.46325135231018066 s, second 2.9870893955230713 s (gap 2.52 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
+    },
+    {
+      "id": "X35",
+      "name": "per-monitor variants (LR-04): with one monitor the one-monitor variant applies; with two, the two-monitor variant puts the window on the second",
+      "ok": true,
+      "detail": "one monitor {'h': 1200, 'w': 800, 'x': 0, 'y': 0} (exit 0); setmonitor 1/0; outputs ['conn-fr-b-800x1200', 'conn-screen-1600x1200']; two monitors {'h': 1200, 'w': 400, 'x': 1200, 'y': 0} want {'x': 1200, 'y': 0, 'w': 400, 'h': 1200} (exit 0)"
+    },
+    {
+      "id": "X36",
+      "name": "profile auto-switch (LR-07): when the docked monitor setup appears, its profile becomes active and its layout is applied",
+      "ok": true,
+      "detail": "active profile 'docked'; window {'h': 1200, 'w': 400, 'x': 1200, 'y': 0}; [\"2026-11-13T04:44:52.729 Info monitor topology matched profile 'docked'\"]"
     },
     {
       "id": "X24",

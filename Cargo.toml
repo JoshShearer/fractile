@@ -6,6 +6,7 @@ members = [
     "crates/fractile-core",
     "adapters/x11",
     "adapters/hyprland",
+    "adapters/sway",
     "crates/fractile-ipc",
     "crates/fractile-session",
 ]
@@ -41,6 +42,7 @@ fractile-ipc = { path = "crates/fractile-ipc" }
 fractile-session = { path = "crates/fractile-session" }
 fractile-adapter-x11 = { path = "adapters/x11" }
 fractile-adapter-hyprland = { path = "adapters/hyprland" }
+fractile-adapter-sway = { path = "adapters/sway" }
 
 [profile.release]
 opt-level = 3

@@ -53,6 +53,9 @@ APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-edi
 
 HOLD = 0
 HOLD_AT = "login"
+POWER_CUT = False
+DB = "~/.local/share/fractile/fractile.db"
+CLI_ENV = "XDG_RUNTIME_DIR=/run/user/$(id -u)"
 results: list[dict] = []
 log_lines: list[str] = []
 
@@ -293,6 +296,23 @@ class VM:
         except Exception as ex:  # noqa: BLE001  a missing screenshot is not a test failure
             return f"(screenshot failed: {ex})"
 
+    def qmp(self, command: str, arguments: dict | None = None) -> dict:
+        s = socket.socket(socket.AF_UNIX)
+        s.connect(QMP)
+        f = s.makefile("rw")
+        f.readline()
+        r: dict = {}
+        msgs = [{"execute": "qmp_capabilities"}, {"execute": command, **({"arguments": arguments} if arguments else {})}]
+        for msg in msgs:
+            f.write(json.dumps(msg) + "\n")
+            f.flush()
+            while True:
+                r = json.loads(f.readline())
+                if "return" in r or "error" in r:
+                    break
+        s.close()
+        return r
+
     def key(self, qcode: str) -> bool:
         """A key press on the VM's virtual keyboard (real input, as a user
         would type it)."""
@@ -454,6 +474,10 @@ def run(session: str, deb: str) -> None:
                      len(before) == 15 and len(apps) == 10, f"{len(before)} windows, {len(apps)} apps; {shot}; {json.dumps(lay)[:300] if len(before) != 15 else ''}"):
             return
 
+        if POWER_CUT:
+            power_cut(vm, session, stype, before)
+            return
+
         # Real reboot.
         boot0 = s2.get("boot_id")
         vm.ssh("sudo systemctl reboot", timeout=20)
@@ -463,7 +487,7 @@ def run(session: str, deb: str) -> None:
         hold("after-reboot")
         # The default asks first: the user answers the "Restore your windows
         # from last time?" dialog with Enter (its default button).
-        asked = wait_for(lambda: "decision=ask" in vm.ssh("grep 'login restore decision' ~/.local/state/fractile/fractile.log | tail -1").stdout, 120, 3)
+        asked = wait_for(lambda: "decision=ask" in vm.ssh("grep -a 'login restore decision' ~/.local/state/fractile/fractile.log | tail -1").stdout, 120, 3)
         time.sleep(8)
         ask_shot = vm.screenshot(f"{session}-02a-restore-prompt")
         pressed = bool(asked) and vm.key("ret")
@@ -485,7 +509,7 @@ def run(session: str, deb: str) -> None:
         wait_session(vm, stype)
         after2 = wait_restore_done(vm, not_run=runs[0].get("run_id"))
         shot = vm.screenshot(f"{session}-03-after-logout")
-        decision = vm.ssh("grep -E 'starting pid|login session|login restore|snapshot|capture|previous session|stopping|SIGTERM|signal' ~/.local/state/fractile/fractile.log | tail -14").stdout.strip()
+        decision = vm.ssh("grep -a -E 'starting pid|login session|login restore|snapshot|capture|previous session|stopping|SIGTERM|signal' ~/.local/state/fractile/fractile.log | tail -14").stdout.strip()
         ok2, notes2 = compare(before, after2.get("windows") or [])
         runs2 = (after2.get("restore") or {}).get("recent_runs") or [{}]
         check("V06", "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
@@ -497,6 +521,104 @@ def run(session: str, deb: str) -> None:
         (EVID / "vm" / f"{session}-fractile-log.txt").write_text(logs)
     finally:
         vm.stop()
+
+
+# After a power cut the service log can end in a block of NUL bytes (data
+# the kernel had not written yet), so every grep on it uses -a.
+
+
+def db_check(vm: VM) -> dict:
+    """SQLite's own integrity check on the store, and every snapshot row's
+    payload read back through Fractile (checksum verified)."""
+    py = ("import sqlite3,os,json;p=os.path.expanduser('" + DB + "');c=sqlite3.connect('file:'+p+'?mode=ro',uri=True);"
+          "print(json.dumps({'integrity':c.execute('pragma integrity_check').fetchone()[0],"
+          "'rows':c.execute('select count(*) from snapshots').fetchone()[0]}))")
+    r = vm.ssh(f"python3 -c \"{py}\"")
+    try:
+        out = json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return {"error": (r.stdout + r.stderr)[-400:]}
+    lst = vm.ssh(f"{CLI_ENV} fractile --json list-snapshots --limit 1000").stdout
+    try:
+        snaps = json.loads(lst)
+    except ValueError:
+        snaps = []
+    bad = 0
+    for sn in snaps:
+        sid = sn.get("snapshot_id") or sn.get("id")
+        if vm.ssh(f"{CLI_ENV} fractile --json snapshot export {sid} /dev/null").returncode != 0:
+            bad += 1
+    out.update({"listed": len(snaps), "unreadable": bad})
+    return out
+
+
+def cut_power_while_writing(vm: VM, tag: str) -> dict:
+    """Snapshots written back to back (manual saves, each a SQLite
+    transaction with synchronous=FULL), then the VM is reset with no
+    shutdown: the guest kernel, every process and the guest's page cache
+    are gone at once, as at a power cut."""
+    vm.ssh(f"setsid nohup bash -c 'i=0; while true; do {CLI_ENV} fractile save --name {tag}-$i >/dev/null 2>&1; i=$((i+1)); echo $i > /tmp/saves; done' "
+           "> /dev/null 2>&1 < /dev/null &", timeout=20)
+    time.sleep(12)
+    n = vm.ssh("cat /tmp/saves").stdout.strip()
+    boot = vm.ssh("cat /proc/sys/kernel/random/boot_id").stdout.strip()
+    r = vm.qmp("system_reset")
+    say(f"power cut ({tag}) after {n} snapshot saves: {r}")
+    vm.wait_down(60)
+    vm.wait_ssh(600)
+    return {"saves_before_cut": n, "boot_before": boot, "qmp": "return" in r}
+
+
+def power_cut(vm: VM, session: str, stype: str, before: list[dict]) -> None:
+    """RS-18 / T15. Two power cuts during snapshot writes:
+      1. defaults (restore last clean session, ask on power loss): after the
+         cut the store is intact, the session is marked unclean, the user is
+         asked ("ended unexpectedly"), and Enter restores the layout.
+      2. "restore last known session" with power-loss policy "restore", and
+         nothing moved since the restore: restored without asking."""
+    env = CLI_ENV
+    vm.ssh(f"{env} fractile config set session.autosave_interval_min 1", check_rc=True)
+    wait_for(lambda: vm.ssh("grep -a -q ' autosave ' ~/.local/state/fractile/fractile.log").returncode == 0, 200, 5)
+    al = vm.ssh("grep -a ' autosave ' ~/.local/state/fractile/fractile.log | tail -1").stdout.strip()
+    check("PC00", "with a 1 min autosave interval, a periodic snapshot of the placed layout is written", bool(al), al[-200:])
+
+    c1 = cut_power_while_writing(vm, "pc1")
+    s = wait_session(vm, stype)
+    dbc = db_check(vm)
+    check("PC01", "after a power cut in the middle of back-to-back snapshot writes, the store passes SQLite's integrity check and every snapshot listed reads back with a valid checksum",
+          c1["qmp"] and s.get("boot_id") != c1["boot_before"] and dbc.get("integrity") == "ok" and dbc.get("unreadable") == 0 and dbc.get("listed", 0) > 0,
+          f"{c1}; new boot {s.get('boot_id') != c1['boot_before']}; {dbc}")
+    asked = wait_for(lambda: "decision=ask unclean=true" in vm.ssh("grep -a 'login restore decision' ~/.local/state/fractile/fractile.log | tail -1").stdout, 180, 3)
+    dec = vm.ssh("grep -a 'login restore decision' ~/.local/state/fractile/fractile.log | tail -1").stdout.strip()
+    time.sleep(8)
+    shot = vm.screenshot(f"{session}-pc1-prompt")
+    pressed = bool(asked) and vm.key("ret")
+    after = wait_restore_done(vm)
+    ok, notes = compare(before, after.get("windows") or [])
+    runs = (after.get("restore") or {}).get("recent_runs") or [{}]
+    check("PC02", "the next login treats the session as ended unexpectedly: with the default power-loss policy it asks first, and Enter restores all 15 windows from the last periodic snapshot",
+          bool(asked) and pressed and ok and runs[0].get("state") == "completed",
+          f"{dec[-200:]}; Enter {pressed}; {shot}; last restore {runs[0].get('state')} {runs[0].get('summary')}; {'; '.join(notes)[:500]}")
+
+    vm.ssh(f"{env} fractile config set session.policy last_known && {env} fractile config set session.power_loss_policy restore", check_rc=True)
+    # Longer than the autosave interval, with nothing moved since the restore.
+    time.sleep(75)
+    run1 = runs[0].get("run_id")
+    c2 = cut_power_while_writing(vm, "pc2")
+    s = wait_session(vm, stype)
+    dbc2 = db_check(vm)
+    decided = wait_for(lambda: (lambda l: l if "login restore decision" in l and l != dec else None)(
+        vm.ssh("grep -a -E 'login restore decision|no snapshot from the previous session' ~/.local/state/fractile/fractile.log | tail -1").stdout.strip()), 180, 3)
+    after2 = wait_restore_done(vm, not_run=run1)
+    ok2, notes2 = compare(before, after2.get("windows") or [])
+    runs2 = (after2.get("restore") or {}).get("recent_runs") or [{}]
+    shot2 = vm.screenshot(f"{session}-pc2-after")
+    check("PC03", "a second power cut, with nothing moved since the last restore: the store is intact, and with \"last known session\" and power-loss policy \"restore\" all 15 windows come back without a prompt",
+          dbc2.get("integrity") == "ok" and dbc2.get("unreadable") == 0 and bool(decided) and "decision=restore unclean=true" in (decided or "") and ok2
+          and runs2[0].get("run_id") != run1 and runs2[0].get("state") == "completed" and runs2[0].get("source") == "login",
+          f"{c2}; {dbc2}; {decided}; last restore {runs2[0].get('state')} source {runs2[0].get('source')} {runs2[0].get('summary')}; {'; '.join(notes2)[:500]}; {shot2}")
+    logs = vm.ssh("grep -a -iE 'warn|error|restore|unclean|autosave|session' ~/.local/state/fractile/fractile.log | tail -60").stdout
+    (EVID / "vm" / f"{session}-power-cut-log.txt").write_text(logs)
 
 
 def wait_for(fn, timeout, step=2):
@@ -627,10 +749,12 @@ def main() -> int:
     ap.add_argument("--deb")
     ap.add_argument("--soak-minutes", type=float, default=0, help="run the T27 soak in the VM instead of the login tests")
     ap.add_argument("--provision-only", action="store_true")
+    ap.add_argument("--power-cut", action="store_true", help="RS-18/T15: power cuts during snapshot writes instead of the reboot/log-out tests")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
     ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail"])
     a = ap.parse_args()
-    global HOLD, HOLD_AT
+    global HOLD, HOLD_AT, POWER_CUT
+    POWER_CUT = a.power_cut
     HOLD = min(a.hold, 2400)
     HOLD_AT = a.hold_at
     if a.soak_minutes:
@@ -646,10 +770,11 @@ def main() -> int:
         import traceback
         traceback.print_exc()
         check("VXX", "run crashed", False, repr(ex))
-    ev = {"suite": f"vm-ubuntu24.04-{a.session}", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    suite = f"vm-ubuntu24.04-{a.session}" + ("-power-cut" if POWER_CUT else "")
+    ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
           "environment": f"Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}
-    out = EVID / f"vm-ubuntu24.04-{a.session}.json"
+    out = EVID / f"{suite}.json"
     out.write_text(json.dumps(ev, indent=2) + "\n")
     print(f"{sum(r['ok'] for r in results)}/{len(results)} checks passed; evidence: {out}")
     return 0 if results and all(r["ok"] for r in results) else 1

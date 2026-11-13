@@ -11,14 +11,20 @@ use std::collections::{BTreeMap, HashSet};
 pub const APP_MATCH_THRESHOLD: u32 = 40;
 
 /// Threshold for one record, based on the evidence it carries. A record with
-/// a desktop id or app id must match one of them (score >= 40). A record that
-/// only has WM_CLASS (no desktop file could be identified at capture) can at
-/// best match class + instance; that is the strongest evidence available, so
-/// it is accepted, but never class alone when an instance was recorded.
+/// a desktop id must match it, or app id and WM_CLASS together (score >= 40).
+/// A record with an app id but no desktop id (a layout entry matched by app
+/// id alone) must match the app id exactly (25): an exact app id is a
+/// deterministic identifier, and nothing else in the record could add to it.
+/// A record that only has WM_CLASS (no desktop file could be identified at
+/// capture) can at best match class + instance; that is the strongest
+/// evidence available, so it is accepted, but never class alone when an
+/// instance was recorded.
 pub fn match_threshold(target: &WindowRecord) -> u32 {
     let has = |o: &Option<String>| o.as_deref().map(|s| !s.is_empty()).unwrap_or(false);
-    if has(&target.desktop_file_id) || has(&target.app_id) {
+    if has(&target.desktop_file_id) {
         APP_MATCH_THRESHOLD
+    } else if has(&target.app_id) {
+        if has(&target.wm_class) { APP_MATCH_THRESHOLD } else { 25 }
     } else if has(&target.wm_class) && has(&target.wm_class_instance) {
         25
     } else if has(&target.wm_class) || has(&target.wm_class_instance) {
@@ -245,6 +251,21 @@ mod tests {
             absolute_geometry: Rect::new(0, 0, 10, 10),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn app_id_alone_matches_exactly_and_only_that_app() {
+        // A layout entry matched by app id only (no desktop id, no class).
+        let t = WindowRecord { record_id: "e".into(), app_id: Some("org.example.Editor".into()), ..Default::default() };
+        let mine = WindowInfo { id: "w1".into(), app_id: Some("org.example.Editor".into()), desktop_file_id: Some("org.example.Editor.desktop".into()), wm_class: Some("Editor".into()), ..Default::default() };
+        let other = WindowInfo { id: "w2".into(), app_id: Some("org.example.Other".into()), wm_class: Some("org.example.Editor".into()), ..Default::default() };
+        let a = assign(std::slice::from_ref(&t), &[other.clone(), mine], &HashSet::new());
+        assert_eq!(a[0].window_id.as_deref(), Some("w1"));
+        let a = assign(&[t], &[other], &HashSet::new());
+        assert_eq!(a[0].window_id, None, "another app's window is not taken");
+        // With a desktop id recorded, an app id match alone is still not enough.
+        let t2 = WindowRecord { record_id: "d".into(), desktop_file_id: Some("a.desktop".into()), app_id: Some("org.example.Editor".into()), ..Default::default() };
+        assert_eq!(match_threshold(&t2), APP_MATCH_THRESHOLD);
     }
 
     #[test]

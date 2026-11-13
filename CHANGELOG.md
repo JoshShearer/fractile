@@ -29,8 +29,9 @@ desktops only. See PLATFORM_MATRIX.md.
 - **Adapters.** X11 (EWMH, ICCCM, RandR with EDID ids). GNOME Shell extension
   for Wayland (45-48 declared; see PLATFORM_MATRIX.md for the versions run). KWin script for Plasma Wayland (6.x,
   6.8.2 tested). Hyprland 0.57 or later through Hyprland's own IPC (nothing to
-  enable; 0.57.2 tested, nested only). COSMIC and other Wayland compositors
-  (Sway, ...) are reported as unsupported, with reasons.
+  enable; 0.57.2 tested, nested only). Sway 1.8 or later through Sway's IPC
+  (1.12 tested, nested only). COSMIC and other Wayland compositors (river,
+  Wayfire, ...) are reported as unsupported, with reasons.
 - **UI.** A PyQt6 panel, settings (General, Appearance, Shortcuts, Session,
   Rules, Monitors, Diagnostics, About), dashboard, first-run wizard, recovery
   dialog and tray icon.
@@ -68,8 +69,29 @@ desktops only. See PLATFORM_MATRIX.md.
   rule; moving a window onto another monitor moves it to that monitor's
   workspace; the service exits with a saved layout when Hyprland exits. No
   preview overlay on Hyprland. See docs/compatibility/hyprland.md.
+- **Sway.** Window tree, outputs and workspaces from Sway's IPC; placement
+  with `floating enable, resize set, move absolute position` on the one
+  window, verified by reading the frame back and waiting until the client
+  stops changing its size; shortcuts as runtime `bindsym ... nop <token>`,
+  re-added after a config reload; keys bound in the Sway configuration (and
+  the files it includes, with `set $var`) are reported as conflicts instead of
+  being silently replaced; minimize is the scratchpad; the service exits with
+  a saved layout when Sway exits. No preview overlay. See
+  docs/compatibility/sway.md.
 
 ### Fixed during validation
+
+- A layout entry matching on app id alone (no desktop file, no WM_CLASS)
+  never matched its window, because the score needed was above what an app id
+  alone can reach. Such an entry now matches exactly that app id (X32).
+- Login restore with "last clean session" or "last known state" could find no
+  snapshot when more than 200 newer manual saves existed, because the newest
+  200 rows were fetched before filtering by kind. The filter now runs in the
+  query (store test, VM power-cut run).
+- A layout applied in "position existing" mode with every app closed reported
+  the run as failed; it is now reported as partial, with each window skipped.
+- Hyprland: the service now checks the socket owner (`SO_PEERCRED`) on every
+  connection and no longer falls back to the shared `/tmp/hypr` directory.
 
 - KDE kept Fractile's shortcuts as dead entries after exit. They are now
   unregistered on exit (K17).
@@ -189,6 +211,10 @@ desktops only. See PLATFORM_MATRIX.md.
   login (uwsm, display manager) or on Omarchy; versions before 0.57 are not
   supported. Without uwsm the systemd unit does not start; start
   `fractiled --autostart` from the Hyprland configuration.
+- Sway: tested nested inside a headless KWin only (Sway 1.12), not in a real
+  Sway login. `bindcode` bindings in the Sway configuration are not checked
+  for conflicts, and bindings added at runtime by other tools are invisible to
+  Fractile (Sway's IPC cannot list bindings).
 - Google Chrome and Chromium incognito windows cannot be detected (no marker
   in the title or the window properties) and are recorded in snapshots like
   normal windows. Firefox private windows are left out.

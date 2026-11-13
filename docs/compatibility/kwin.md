@@ -10,7 +10,7 @@
 | Environment | Result | Evidence |
 |---|---|---|
 | KWin 6.8.2, `kwin_wayland --virtual` (no Xwayland), in an `archlinux:latest` container with the host's NVIDIA render node passed in | all checks pass | `tests/evidence/e2e-kwin-wayland.json` (`tests/kwin/e2e-kwin-in-container.sh`) |
-| kwin_x11 5.27.11 on Xvfb (no plasmashell), Ubuntu 24.04 container: the X11 suite | 39/39 | `tests/evidence/e2e-x11-kwin.json` (`tests/kwin-x11/e2e-kwin-x11-in-container.sh`) |
+| kwin_x11 5.27.11 on Xvfb (no plasmashell), Ubuntu 24.04 container: the X11 suite | 44/44 | `tests/evidence/e2e-x11-kwin.json` (`tests/kwin-x11/e2e-kwin-x11-in-container.sh`) |
 | Ubuntu 24.04.5 with kde-plasma-desktop (plasma-workspace 5.27.12, kwin-x11 5.27.11) in a QEMU/KVM VM, the Plasma X11 session started by GDM: `apt install`, start from the app menu, real log-out (Plasma's own) and log-in, real reboot, restore of 10 apps / 15 windows | 7/7 | `tests/evidence/vm-ubuntu24.04-plasma-x11.json` (`tests/vm/vm-e2e.sh plasma-x11`) |
 
 This is a real KWin running real native Wayland GTK4 and Qt clients, the real

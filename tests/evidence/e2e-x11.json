@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-11T10:44:16-0600",
+  "when": "2026-11-12T22:43:06-0600",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 1687238"
+      "detail": "pid 2537939"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "54 ms incl. polling"
+      "detail": "116 ms incl. polling"
     },
     {
       "id": "X10",
@@ -97,7 +97,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1778 ms"
+      "detail": "1814 ms"
     },
     {
       "id": "X14",
@@ -223,13 +223,43 @@
       "id": "X30",
       "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
       "ok": true,
-      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 767, 'x': 66, 'y': 32} want {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; Doc 2 at {'h': 1168, 'w': 767, 'x': 833, 'y': 32} want {'h': 1168, 'w': 767, 'x': 833, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2179, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 767, \"x\": 833, \"y\": 616}, \"record_"
+      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 767, 'x': 66, 'y': 32} want {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; Doc 2 at {'h': 1168, 'w': 767, 'x': 833, 'y': 32} want {'h': 1168, 'w': 767, 'x': 833, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2240, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 767, \"x\": 833, \"y\": 616}, \"record_"
     },
     {
       "id": "X31",
       "name": "a transient dialog is seen (list-windows --all) but never offered for placement, recorded, or moved by a restore",
       "ok": true,
       "detail": "all ['Main', 'Main dialog']; placeable ['Main']; recorded ['Main']; dialog frame {'h': 197, 'w': 300, 'x': 66, 'y': 32} -> {'h': 197, 'w': 300, 'x': 66, 'y': 32}"
+    },
+    {
+      "id": "X32",
+      "name": "layout modes (LR-03): position_existing leaves a missing app closed; launch_missing launches it and places it",
+      "ok": true,
+      "detail": "position_existing exit 6, launched False; launch_missing exit 0 ; frame {'h': 1168, 'w': 767, 'x': 833, 'y': 32} want {'x': 833, 'y': 32, 'w': 767, 'h': 1168}"
+    },
+    {
+      "id": "X33",
+      "name": "layout mode exact_n (LR-03): 3 instances wanted with 1 open launches 2; applying again launches none; asking for 2 with 3 open closes nothing",
+      "ok": true,
+      "detail": "exit 0/0/0; windows 3, after re-apply 3, after asking for 2: 3"
+    },
+    {
+      "id": "X34",
+      "name": "ordered, delayed launching (LR-05): the dependent app starts only after the first has a window, at least its 2 s delay later; both placed",
+      "ok": true,
+      "detail": "first window 0.864011287689209 s, second 3.8705244064331055 s (gap 3.01 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
+    },
+    {
+      "id": "X35",
+      "name": "per-monitor variants (LR-04): with one monitor the one-monitor variant applies; with two, the two-monitor variant puts the window on the second",
+      "ok": true,
+      "detail": "one monitor {'h': 1168, 'w': 767, 'x': 66, 'y': 32} (exit 0); setmonitor 0/0; outputs ['conn-fr-a-800x1200', 'conn-fr-b-800x1200']; two monitors {'h': 1168, 'w': 400, 'x': 1200, 'y': 32} want {'x': 1200, 'y': 32, 'w': 400, 'h': 1168} (exit 0)"
+    },
+    {
+      "id": "X36",
+      "name": "profile auto-switch (LR-07): when the docked monitor setup appears, its profile becomes active and its layout is applied",
+      "ok": true,
+      "detail": "active profile 'docked'; window {'h': 1168, 'w': 400, 'x': 1200, 'y': 32}; [\"2026-11-12T22:43:03.987 Info monitor topology matched profile 'docked'\"]"
     },
     {
       "id": "X24",

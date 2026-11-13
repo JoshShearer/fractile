@@ -491,13 +491,178 @@ def run_all(e: Env) -> None:
     # T20: unicode names and titles, title changes, transient dialogs
     t20(e)
 
+    # LR-03/LR-04/LR-05/LR-07: layout modes, per-monitor variants, ordered
+    # and delayed launching, profile switch on a monitor change
+    layouts_lr(e, g)
+
     # no-WM / unsupported desktop honesty
     env2 = dict(e.env)
-    env2.update(XDG_SESSION_TYPE="wayland", WAYLAND_DISPLAY="wayland-fake", XDG_CURRENT_DESKTOP="sway")
+    env2.update(XDG_SESSION_TYPE="wayland", WAYLAND_DISPLAY="wayland-fake", XDG_CURRENT_DESKTOP="river")
     out = subprocess.run([str(BIN / "fractiled"), "--check"], env=env2, capture_output=True, text=True)
     caps = json.loads(out.stdout)["capabilities"]
     levels = {v["level"] for v in caps["operations"].values()}
     check("X24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, f"adapter={caps['adapter']} levels={levels}")
+
+
+def layouts_lr(e: Env, g: str) -> None:
+    LM, UN = "org.fractile.Launchme", "org.fractile.Unicode"
+
+    def wins(app):
+        return [w for w in e.cli_json("list-windows") if w.get("app_id") == app]
+
+    def close_all(*apps):
+        for app in apps:
+            for w in wins(app):
+                try:
+                    os.kill(w["pid"], signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+        e.wait_for(lambda: not any(wins(a) for a in apps), 10.0, 0.3)
+
+    def entry(eid, app, rect, launch=None, instances=1, output=None):
+        en = {"id": eid, "label": app, "matcher": {"app_id": app},
+              "placement": {"kind": "normalized", "rect": rect}, "instances": instances}
+        if output is not None:
+            en["output"] = output
+        if launch is not None:
+            en["launch"] = {"desktop_id": f"{app}.desktop", "policy": "if_missing", **launch}
+        return en
+
+    def save(layout):
+        c = e.client()
+        try:
+            return c.call("layout_save", {"layout": {"schema_version": 1, **layout}})
+        finally:
+            c.close()
+
+    def apply(name, mode, *extra):
+        return e.run("layout", "apply", name, "--mode", mode, "--approve-all", *extra, timeout=120)
+
+    def out_of(frame):
+        for o in e.cli_json("list-outputs"):
+            r = o["rect"]
+            cx, cy = frame["x"] + frame["w"] // 2, frame["y"] + frame["h"] // 2
+            if r["x"] <= cx < r["x"] + r["w"] and r["y"] <= cy < r["y"] + r["h"]:
+                return o
+        return None
+
+    def expect(o, rect):
+        wa = o["work_area"]
+        return {"x": wa["x"] + round(rect["x"] * wa["w"]), "y": wa["y"] + round(rect["y"] * wa["h"]),
+                "w": round(rect["w"] * wa["w"]), "h": round(rect["h"] * wa["h"])}
+
+    close_all(LM, UN)
+    c = e.client()
+    c.call("set_config", {"patch": {"session": {"policy": "manual"}}})
+    c.close()
+    right = {"x": 0.5, "y": 0.0, "w": 0.5, "h": 1.0}
+    left = {"x": 0.0, "y": 0.0, "w": 0.5, "h": 1.0}
+
+    # LR-03 position_existing: a missing app is not launched
+    save({"name": "lr-launch", "variants": [{"entries": [entry("lm", LM, right, launch={})]}]})
+    pe = apply("lr-launch", "position_existing")
+    time.sleep(3)
+    none_launched = not wins(LM)
+    # LR-03 launch_missing: launched and placed
+    lmr = apply("lr-launch", "launch_missing")
+    lw = e.wait_for(lambda: wins(LM), 15.0, 0.3)
+    o0 = e.cli_json("list-outputs")[0]
+    placed = bool(lw) and e.wait_for(lambda: rect_eq(e.frame(lw[0]["id"]), expect(o0, right), 3), 8.0, 0.3)
+    check("X32", "layout modes (LR-03): position_existing leaves a missing app closed; launch_missing launches it and places it",
+          pe.returncode == 6 and none_launched and lmr.returncode == 0 and bool(placed),
+          f"position_existing exit {pe.returncode}, launched {not none_launched}; launch_missing exit {lmr.returncode} {lmr.stderr.strip()[-200:]}; frame {lw and e.frame(lw[0]['id'])} want {expect(o0, right)}")
+
+    # LR-03 exact_n: 3 instances wanted, 1 open -> 2 launched; with 3 open, none
+    save({"name": "lr-three", "variants": [{"entries": [entry("lm", LM, right, launch={}, instances=3)]}]})
+    ex = apply("lr-three", "exact_n")
+    three = e.wait_for(lambda: (lambda l: l if len(l) == 3 else None)(wins(LM)), 30.0, 0.5)
+    time.sleep(2)
+    ex2 = apply("lr-three", "exact_n")
+    time.sleep(4)
+    n_after = len(wins(LM))
+    save({"name": "lr-two", "variants": [{"entries": [entry("lm", LM, right, launch={}, instances=2)]}]})
+    ex3 = apply("lr-two", "exact_n")
+    time.sleep(2)
+    n_kept = len(wins(LM))
+    check("X33", "layout mode exact_n (LR-03): 3 instances wanted with 1 open launches 2; applying again launches none; asking for 2 with 3 open closes nothing",
+          ex.returncode == 0 and bool(three) and ex2.returncode == 0 and n_after == 3 and ex3.returncode in (0, 6) and n_kept == 3,
+          f"exit {ex.returncode}/{ex2.returncode}/{ex3.returncode}; windows {len(three or [])}, after re-apply {n_after}, after asking for 2: {n_kept}")
+    close_all(LM, UN)
+
+    # LR-05: an app group in order, the second after the first has a window
+    # and a 2 s delay
+    save({"name": "lr-stack", "variants": [{"entries": [
+        entry("un", UN, right, launch={"depends_on": ["lm"], "delay_ms": 2000, "group": "stack"}),
+        entry("lm", LM, left, launch={"group": "stack"})]}]})
+    t0 = time.time()
+    seen: dict[str, float] = {}
+    proc = subprocess.Popen([str(BIN / "fractile"), "layout", "apply", "lr-stack", "--mode", "launch_missing", "--approve-all"], env=e.env,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    while time.time() - t0 < 30 and len(seen) < 2:
+        for w in e.cli_json("list-windows"):
+            if w.get("app_id") in (LM, UN) and w["app_id"] not in seen:
+                seen[w["app_id"]] = time.time() - t0
+        time.sleep(0.05)
+    proc.wait(60)
+    run = e.cli_json("restore-status")["recent_runs"][0]
+    gap = seen.get(UN, 0) - seen.get(LM, 1e9)
+    lmw, unw = wins(LM), wins(UN)
+    ok_place = bool(lmw and unw) and rect_eq(e.frame(lmw[0]["id"]), expect(o0, left), 3) and rect_eq(e.frame(unw[0]["id"]), expect(o0, right), 3)
+    check("X34", "ordered, delayed launching (LR-05): the dependent app starts only after the first has a window, at least its 2 s delay later; both placed",
+          proc.returncode == 0 and LM in seen and UN in seen and gap >= 2.0 and ok_place,
+          f"first window {seen.get(LM)} s, second {seen.get(UN)} s (gap {gap:.2f} s); exit {proc.returncode}; run {run.get('state')} {run.get('summary')}; placed {ok_place}")
+    close_all(LM, UN)
+
+    # LR-04 / LR-07: two monitors appear (RandR monitors on the Xephyr
+    # screen); a layout's per-monitor variant and a profile switch follow
+    xr = lambda *a: subprocess.run(["xrandr", *a], env=e.env, capture_output=True, text=True)
+    ga = right
+    save({"name": "lr-topo", "variants": [
+        {"when_output_count": 1, "entries": [entry("g", "org.fractile.G", left)]},
+        {"when_output_count": 2, "entries": [entry("g", "org.fractile.G", ga, output={"kind": "index", "value": 1})]}]})
+    gw = next((w for w in e.cli_json("list-windows") if w["id"] == g), None)
+    gapp = gw and gw.get("app_id")
+    if gapp != "org.fractile.G":
+        # matchers use the editor's real app id
+        save({"name": "lr-topo", "variants": [
+            {"when_output_count": 1, "entries": [entry("g", gapp, left)]},
+            {"when_output_count": 2, "entries": [entry("g", gapp, ga, output={"kind": "index", "value": 1})]}]})
+    one = apply("lr-topo", "position_existing")
+    f1 = e.frame(g)
+    ok1 = one.returncode == 0 and rect_eq(f1, expect(e.cli_json("list-outputs")[0], left), 3)
+    # profile for the two-monitor setup: its login layout is lr-topo
+    r1 = xr("--setmonitor", "fr-a", "800/200x1200/300+0+0", "default")
+    r2 = xr("--setmonitor", "fr-b", "800/200x1200/300+800+0", "none")
+    outs = e.wait_for(lambda: (lambda o: o if len(o) == 2 else None)(e.cli_json("list-outputs")), 10.0, 0.3) or []
+    sig = "+".join(sorted(f"{o['stable_id']}@{o['rect']['w']}x{o['rect']['h']}" for o in outs))
+    two = apply("lr-topo", "position_existing")
+    f2 = e.frame(g)
+    ob = sorted(outs, key=lambda o: o["rect"]["x"])[1] if len(outs) == 2 else None
+    ok2 = two.returncode == 0 and ob is not None and rect_eq(f2, expect(ob, ga), 3)
+    check("X35", "per-monitor variants (LR-04): with one monitor the one-monitor variant applies; with two, the two-monitor variant puts the window on the second",
+          ok1 and ok2, f"one monitor {f1} (exit {one.returncode}); setmonitor {r1.returncode}/{r2.returncode}; outputs {[o['stable_id'] for o in outs]}; two monitors {f2} want {ob and expect(ob, ga)} (exit {two.returncode})")
+    # back to one monitor, move the window, then let the profile switch do it
+    xr("--delmonitor", "fr-b")
+    xr("--delmonitor", "fr-a")
+    e.wait_for(lambda: len(e.cli_json("list-outputs")) == 1, 10.0, 0.3)
+    e.cli_json("snap", "center", "--window", g)
+    c = e.client()
+    c.call("set_config", {"patch": {"auto_switch_profiles": True, "active_profile": None,
+                                    "profiles": [{"name": "docked", "topology": sig, "login_layout": "lr-topo"}]}})
+    c.close()
+    xr("--setmonitor", "fr-a", "800/200x1200/300+0+0", "default")
+    xr("--setmonitor", "fr-b", "800/200x1200/300+800+0", "none")
+    moved = e.wait_for(lambda: ob is not None and rect_eq(e.frame(g), expect(ob, ga), 3), 15.0, 0.3)
+    active = e.cli_json("config", "get", "active_profile")
+    logl = [l for l in (e.base / "daemon.out").read_text().splitlines() if "matched profile" in l][-1:]
+    check("X36", "profile auto-switch (LR-07): when the docked monitor setup appears, its profile becomes active and its layout is applied",
+          bool(moved) and active == "docked", f"active profile {active!r}; window {e.frame(g)}; {logl}")
+    xr("--delmonitor", "fr-b")
+    xr("--delmonitor", "fr-a")
+    e.wait_for(lambda: len(e.cli_json("list-outputs")) == 1, 10.0, 0.3)
+    c = e.client()
+    c.call("set_config", {"patch": {"auto_switch_profiles": False, "active_profile": None, "profiles": []}})
+    c.close()
 
 
 UNI_TITLE = "Résumé 履歴書 Ünïcode ✓ 🎉"

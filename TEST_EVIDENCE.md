@@ -25,14 +25,15 @@ cannot show.
 | E8 | fedora:39 / 41 / 42 containers | GNOME Shell 45.10 / 47.10 / 48.8 headless Wayland | the five GNOME Wayland suites |
 | E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0 (Wayland and Xorg sessions) and Plasma 5.27 X11 (kde-plasma-desktop), real GDM logins | VM E2E (`tests/vm/`) |
 | E10 | archlinux:latest container on the host kernel, host GPU render node | Hyprland 0.57.2 nested in `kwin_wayland --virtual` (KWin is only the parent display); native Wayland GTK4/Qt clients; keys with wtype | Hyprland E2E |
+| E11 | archlinux:latest container on the host kernel | Sway 1.12 nested in `kwin_wayland --virtual` (wlroots Wayland backend, pixman renderer); native Wayland GTK4/Qt clients; keys with wtype | Sway E2E |
 
 ## Results
 
 | Suite | Command | Env | Result | Evidence |
 |---|---|---|---|---|
 | Rust unit, property and restore-simulation tests | `cargo test --workspace` | host | all pass | (console) |
-| X11 E2E | `python3 tests/integration/e2e_x11.py` | E1 | 39/39 | `tests/evidence/e2e-x11.json` |
-| X11 E2E under Plasma X11 | `bash tests/kwin-x11/e2e-kwin-x11-in-container.sh` | E7 | 39/39 | `tests/evidence/e2e-x11-kwin.json` |
+| X11 E2E | `python3 tests/integration/e2e_x11.py` | E1 | 44/44 | `tests/evidence/e2e-x11.json` |
+| X11 E2E under Plasma X11 | `bash tests/kwin-x11/e2e-kwin-x11-in-container.sh` | E7 | 44/44 | `tests/evidence/e2e-x11-kwin.json` |
 | Real apps (T14: browsers, editors, terminals) | `python3 tests/integration/e2e_x11_apps.py` | E1 | 13/13, Chrome incognito recorded as a known limitation | `tests/evidence/e2e-x11-apps.json` |
 | GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/` |
 | Settings and shortcut editor (X11) | `python3 tests/gui/settings_x11.py` | E1 | 18/18 | `tests/evidence/settings-x11.json` |
@@ -45,7 +46,9 @@ cannot show.
 | GNOME 45 / 47 / 48 (all five GNOME Wayland suites) | `bash tests/gnome/e2e-gnome-in-container.sh fedora:39` (`:41`, `:42`) | E8 | all pass on each | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 19/19 | `tests/evidence/e2e-kwin-wayland.json` |
 | Hyprland E2E | `bash tests/hyprland/e2e-hyprland-in-container.sh` | E10 | 25/25 | `tests/evidence/e2e-hyprland.json` |
+| Sway E2E | `bash tests/sway/e2e-sway-in-container.sh` | E11 | 25/25 (and 25/25 on three more runs after the placement-settling fix) | `tests/evidence/e2e-sway.json` |
 | Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` / `plasma-x11` | E9 | 7/7 on GNOME Wayland, 7/7 on GNOME Xorg, 7/7 on Plasma 5.27 X11 | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, screenshots `tests/evidence/vm/` |
+| VM power loss (T15, RS-18): QEMU `system_reset` during back-to-back snapshot writes, twice, then the next login | `FRACTILE_VM_POWER_CUT=1 bash tests/vm/vm-e2e.sh x11` | E9 (GNOME Xorg session) | 9/9 | `tests/evidence/vm-ubuntu24.04-x11-power-cut.json`, `tests/evidence/vm/x11-power-cut-log.txt`, `x11-pc1-prompt.png`, `x11-pc2-after.png` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
 | 24-hour soak (T27) | `bash tests/vm/vm-e2e.sh soak 1440` | E9 (Xvfb + GNOME Shell 46.0 X11 in that VM) | 9/10 as run; P07 failed on a wrong bound in the check (see below) | `tests/evidence/perf-x11-24h.json`, `tests/evidence/vm/soak.log`, `soak-progress.log`, `soak-daemon-tail.log` |
 | .deb package lifecycle | `bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb` | E5 | passed | `tests/evidence/package-deb-ubuntu24.04.log` |
