@@ -28,8 +28,9 @@ desktops only. See PLATFORM_MATRIX.md.
   explanations.
 - **Adapters.** X11 (EWMH, ICCCM, RandR with EDID ids). GNOME Shell extension
   for Wayland (45-48 declared; see PLATFORM_MATRIX.md for the versions run). KWin script for Plasma Wayland (6.x,
-  6.8.2 tested). COSMIC and unknown Wayland compositors are reported as
-  unsupported, with reasons.
+  6.8.2 tested). Hyprland 0.57 or later through Hyprland's own IPC (nothing to
+  enable; 0.57.2 tested, nested only). COSMIC and other Wayland compositors
+  (Sway, ...) are reported as unsupported, with reasons.
 - **UI.** A PyQt6 panel, settings (General, Appearance, Shortcuts, Session,
   Rules, Monitors, Diagnostics, About), dashboard, first-run wizard, recovery
   dialog and tray icon.
@@ -57,6 +58,16 @@ desktops only. See PLATFORM_MATRIX.md.
   Chromium, Brave, Edge, Vivaldi, Epiphany, VS Code, VSCodium, Zed, JetBrains
   IDEs) are started once by a restore, and Fractile places the windows they
   open. A per-app setting overrides the built-in list (T14, A01-A03).
+
+- **Hyprland.** Window list, outputs and workspaces from Hyprland's JSON
+  queries; placement through Lua dispatch (a tiled window becomes floating
+  at the chosen rectangle, border included in the frame, verified by reading
+  it back); shortcuts as runtime Hyprland binds, re-added after a config
+  reload, reported as a conflict when the Hyprland configuration binds the
+  same keys, removed on exit; Fractile's panel floats through a runtime window
+  rule; moving a window onto another monitor moves it to that monitor's
+  workspace; the service exits with a saved layout when Hyprland exits. No
+  preview overlay on Hyprland. See docs/compatibility/hyprland.md.
 
 ### Fixed during validation
 
@@ -174,6 +185,10 @@ desktops only. See PLATFORM_MATRIX.md.
   may have closed by then (Plasma reopens those itself). If the display is
   already gone, the layout last seen (up to about 10 s old) is saved.
 - COSMIC: no window control (platform limitation).
+- Hyprland: tested nested inside a headless KWin only, not in a real Hyprland
+  login (uwsm, display manager) or on Omarchy; versions before 0.57 are not
+  supported. Without uwsm the systemd unit does not start; start
+  `fractiled --autostart` from the Hyprland configuration.
 - Google Chrome and Chromium incognito windows cannot be detected (no marker
   in the title or the window properties) and are recorded in snapshots like
   normal windows. Firefox private windows are left out.

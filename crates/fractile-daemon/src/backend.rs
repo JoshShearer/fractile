@@ -21,6 +21,10 @@ pub struct Environment {
     pub cosmic_comp_running: bool,
     /// kwin_wayland runs for this user. (kwin_x11 says nothing about a Wayland session.)
     pub kwin_running: bool,
+    /// HYPRLAND_INSTANCE_SIGNATURE from the environment, when set.
+    pub hyprland_signature: Option<String>,
+    /// A Hyprland compositor runs for this user.
+    pub hyprland_running: bool,
 }
 
 fn proc_running(name: &str) -> bool {
@@ -60,6 +64,8 @@ pub fn detect() -> Environment {
         gnome_shell_version: gsv,
         cosmic_comp_running: proc_running("cosmic-comp"),
         kwin_running: proc_running("kwin_wayland"),
+        hyprland_signature: std::env::var("HYPRLAND_INSTANCE_SIGNATURE").ok().filter(|v| !v.is_empty()),
+        hyprland_running: proc_running("Hyprland"),
     }
 }
 
@@ -69,6 +75,7 @@ pub enum Backend {
     X11,
     GnomeShell,
     KWin,
+    Hyprland,
     Cosmic,
     Unsupported,
 }
@@ -85,11 +92,17 @@ impl Environment {
             Some("x11") => return Backend::X11,
             Some("gnome") => return Backend::GnomeShell,
             Some("kwin") => return Backend::KWin,
+            Some("hyprland") => return Backend::Hyprland,
             Some("cosmic") => return Backend::Cosmic,
             _ => {}
         }
         if !self.is_wayland() {
             return if self.x_display.is_some() { Backend::X11 } else { Backend::Unsupported };
+        }
+        // Hyprland first: a Hyprland session nested in (or next to) KDE still
+        // names itself in XDG_CURRENT_DESKTOP and the instance signature.
+        if self.desktop_has("Hyprland") || self.hyprland_signature.is_some() {
+            return Backend::Hyprland;
         }
         if self.desktop_has("GNOME") || self.desktop_has("ubuntu") && self.gnome_shell_version.is_some() {
             Backend::GnomeShell
@@ -97,6 +110,8 @@ impl Environment {
             Backend::KWin
         } else if self.desktop_has("COSMIC") || self.cosmic_comp_running {
             Backend::Cosmic
+        } else if self.hyprland_running {
+            Backend::Hyprland
         } else {
             Backend::Unsupported
         }
@@ -124,6 +139,16 @@ impl StubAdapter {
                 "BLOCKED BY PLATFORM: window geometry control needs a compositor-side hook; see docs/compatibility/cosmic.md for the upstream proposal.".into(),
                 "COSMIC auto-tiling is never modified by Fractile.".into(),
             ],
+        }
+    }
+    /// Hyprland was detected but its IPC could not be used.
+    pub fn hyprland(reason: String) -> StubAdapter {
+        StubAdapter {
+            name: "hyprland".into(),
+            session_type: "wayland".into(),
+            compositor: "Hyprland".into(),
+            reason: format!("no window control on Hyprland: {reason}"),
+            notes: vec!["Fractile reaches Hyprland through its IPC socket in $XDG_RUNTIME_DIR/hypr. See docs/compatibility/hyprland.md.".into()],
         }
     }
     pub fn unsupported(env: &Environment) -> StubAdapter {
@@ -196,6 +221,10 @@ impl CompositorAdapter for StubAdapter {
 
 /// Detect automatic tiling managers that would fight floating placement.
 pub fn detect_tiling(env: &Environment) -> Option<String> {
+    if env.choose(None) == Backend::Hyprland {
+        // A tiling compositor: windows Fractile places become floating.
+        return Some("hyprland".into());
+    }
     if env.desktop_has("COSMIC") || env.cosmic_comp_running {
         let home = std::env::var("HOME").unwrap_or_default();
         let p = format!("{home}/.config/cosmic/com.system76.CosmicComp/v1/autotile");

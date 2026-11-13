@@ -5,8 +5,8 @@ want, and the window moves and resizes to exactly that rectangle. It also saves
 your window layout and can put it back after you log in again.
 
 Fractile 0.9.0. Where your desktop is supported is in
-[PLATFORM_MATRIX.md](../../PLATFORM_MATRIX.md). In short: GNOME (X11 and Wayland)
-and KDE Plasma on Wayland work. COSMIC does not, because it has no API for
+[PLATFORM_MATRIX.md](../../PLATFORM_MATRIX.md). In short: GNOME (X11 and Wayland),
+KDE Plasma on Wayland and Hyprland 0.57 or later work. COSMIC does not, because it has no API for
 moving other programs' windows (see [compatibility/cosmic.md](../compatibility/cosmic.md)).
 
 ## Install
@@ -26,6 +26,10 @@ Then:
 - **KDE Plasma:** enable "Fractile" in System Settings > Window Management >
   KWin Scripts.
 - **GNOME on X11:** nothing more.
+- **Hyprland:** nothing to enable. Fractile uses Hyprland's own IPC. With
+  uwsm, `fractile autostart on` starts it at login; without uwsm, start
+  `fractiled --autostart` from your Hyprland configuration. Windows you place
+  become floating. Details: [compatibility/hyprland.md](../compatibility/hyprland.md).
 
 Start Fractile from the application menu. The first time, a short setup asks
 for a panel shortcut. It only offers keys that are free on your desktop. It also

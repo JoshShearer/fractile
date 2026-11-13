@@ -1,0 +1,157 @@
+{
+  "suite": "e2e-hyprland",
+  "when": "2026-11-13T04:19:43+0000",
+  "environment": "Hyprland 0.57.2 built from branch v0.57.2 at commit 11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947 clean (VERSION: bump to 0.57.2). nested in kwin_wayland --virtual, archlinux container (render device: nvidia); keys pressed with wtype",
+  "results": [
+    {
+      "id": "H00",
+      "name": "Hyprland is detected and the adapter connects over Hyprland's IPC; window control available",
+      "ok": true,
+      "detail": "Hyprland 0.57.2"
+    },
+    {
+      "id": "H23",
+      "name": "Hyprland detected but its instance unreachable: every operation unsupported, with the reason",
+      "ok": true,
+      "detail": "no window control on Hyprland: HYPRLAND_INSTANCE_SIGNATURE=0000_not_running, but no Hyprland socket of this user answers at /tmp/rt/hypr/0000_not_running/.socke"
+    },
+    {
+      "id": "H01",
+      "name": "capabilities are reported honestly (placement partial: tiled windows float; no preview overlay)",
+      "ok": true,
+      "detail": "{\"activate\": \"full\", \"get_active_window\": \"full\", \"get_geometry\": \"full\", \"get_outputs\": \"full\", \"get_permissions\": \"full\", \"get_workspaces\": \"partial\", \"list_w"
+    },
+    {
+      "id": "H02",
+      "name": "native Wayland GTK4 and Qt windows are listed with app id, pid and workspace; Hyprland tiled them",
+      "ok": true,
+      "detail": "org.fractile.TestGtk / org.fractile.TestQt ws=0"
+    },
+    {
+      "id": "H03",
+      "name": "outputs are listed with logical size, a stable id and a work area",
+      "ok": true,
+      "detail": "conn-WAYLAND-1-1600x1200 {'h': 1200, 'w': 1600, 'x': 0, 'y': 0} {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "H04",
+      "name": "grid placements land on the requested rectangle (GTK4); the placed window is now floating",
+      "ok": true,
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+    },
+    {
+      "id": "H05",
+      "name": "grid placement on a Qt Wayland window",
+      "ok": true,
+      "detail": "err=0px note=the window was tiled; Hyprland now floats it at the placed size"
+    },
+    {
+      "id": "H06",
+      "name": "1x1 selection fills the work area exactly (border included in the frame)",
+      "ok": true,
+      "detail": "{'h': 1200, 'w': 1600, 'x': 0, 'y': 0} vs {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}; box ([1, 1], [1598, 1198])"
+    },
+    {
+      "id": "H07",
+      "name": "undo restores the previous geometry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H08",
+      "name": "activating a window focuses it",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H09",
+      "name": "a fullscreen window leaves fullscreen and lands on the cell",
+      "ok": true,
+      "detail": "was fullscreen True, err=0px"
+    },
+    {
+      "id": "H10",
+      "name": "shortcut registered as a Hyprland bind; pressing the keys places the focused window",
+      "ok": true,
+      "detail": "binds={'Fractile: panel': 12, 'Fractile: t-left-third': 12} errors={} wtype=0 frame={'h': 1200, 'w': 533, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "H11",
+      "name": "a key combination the Hyprland config already binds is reported as a conflict; the user's bind stays",
+      "ok": true,
+      "detail": "{\"t-conflict\": \"Super+Q: conflict: Hyprland already binds Super+Q (HL.Dispatcher(close))\"}"
+    },
+    {
+      "id": "SEC7",
+      "name": "a shortcut id with Lua syntax in it stays data (no code runs in Hyprland)",
+      "ok": true,
+      "detail": "bound with the literal id"
+    },
+    {
+      "id": "H12",
+      "name": "a window moves to another workspace (created on demand) and back",
+      "ok": true,
+      "detail": "workspaces seen: ['1', '2']"
+    },
+    {
+      "id": "H13",
+      "name": "snapshot restore puts Hyprland windows back exactly",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H14",
+      "name": "panel shortcut starts the Wayland UI; the panel floats (Fractile's own window rule), is focused, inside the work area and flagged own",
+      "ok": true,
+      "detail": "{'h': 362, 'w': 354, 'x': 623, 'y': 419} floating=True"
+    },
+    {
+      "id": "H15",
+      "name": "Fractile UI windows are never offered as placement targets",
+      "ok": true,
+      "detail": "1 own"
+    },
+    {
+      "id": "H22",
+      "name": "panel keyboard selection (arrows, Shift+arrows, Enter) places the window; the panel closes and focus returns",
+      "ok": true,
+      "detail": "want {'h': 600, 'w': 800, 'x': 533, 'y': 0} got {'h': 600, 'w': 800, 'x': 533, 'y': 0}; closed True focus back True"
+    },
+    {
+      "id": "H16",
+      "name": "after `hyprctl reload` the shortcuts are bound again and still work",
+      "ok": true,
+      "detail": "marker bind dropped by the reload: True; Fractile binds 2 -> 2"
+    },
+    {
+      "id": "H17",
+      "name": "a second monitor is listed, and a window moves onto it",
+      "ok": true,
+      "detail": "second output FR-2 {'h': 1024, 'w': 1280, 'x': 1600, 'y': 0}; window {'h': 512, 'w': 640, 'x': 2026, 'y': 0} hypr monitor=1 ws={'address': '2', 'id': 2, 'type': 'normal', 'name': '2'}"
+    },
+    {
+      "id": "H18",
+      "name": "on exit Fractile removes its Hyprland binds",
+      "ok": true,
+      "detail": "0 left"
+    },
+    {
+      "id": "H19",
+      "name": "after a crash, a new service (without HYPRLAND_INSTANCE_SIGNATURE) finds Hyprland and replaces the stale binds",
+      "ok": true,
+      "detail": "stale 2, now 2 dup=False control=True placed=True frame={'h': 1200, 'w': 533, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "H20",
+      "name": "UI logged no Python errors",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H21",
+      "name": "when Hyprland exits the service saves the last seen layout and exits",
+      "ok": true,
+      "detail": "ms | 2026-11-13T04:19:43.401 Warn the display closed (Hyprland closed its event socket (the compositor exited)): the desktop session has ended; exiting | 2026-11-13T04:19:43.494 Info fractiled stopped"
+    }
+  ]
+}

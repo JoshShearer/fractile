@@ -13,12 +13,13 @@ This page covers components, protocols and data.
 | `crates/fractile-daemon` | `fractiled`: the daemon state (`daemon.rs`), the RPC server (`ipc.rs`), adapter selection (`backend.rs`), the GNOME/KWin bridge (`bridge.rs`), KWin's D-Bus endpoint (`kwin_dbus.rs`), KGlobalAccel (`kglobalaccel.rs`), logind lock and shutdown (`logind.rs`), autostart (`autostart.rs`), session flows (`session.rs`), and the log with title tagging (`logging.rs`). |
 | `crates/fractile-cli` | `fractile`, the command-line client |
 | `adapters/x11` | the X11 adapter (x11rb: EWMH, ICCCM, RandR with EDID, XGrabKey) |
+| `adapters/hyprland` | the Hyprland adapter (Hyprland's IPC sockets: JSON queries, Lua dispatch, the event socket; runtime binds for shortcuts) |
 | `adapters/gnome-shell/fractile@fractile.io` | the GNOME Shell extension (GJS) |
 | `adapters/kwin/fractile` | the KWin script (JS) |
 | `adapters/cosmic` | empty: see [compatibility/cosmic.md](../compatibility/cosmic.md) |
 | `ui/fractile_ui` | the PyQt6 UI: panel and grid, overlay, settings, dashboard, wizard, palette, recovery dialog, tray |
 | `packaging/` | `install.sh` (shared layout), `.deb` builder, PKGBUILD, systemd user unit, desktop entry, metainfo, container package tests |
-| `tests/` | E2E suites (`integration/`, `gui/`, `kwin/`, `perf/`), tools (`tools/`), evidence (`evidence/`) |
+| `tests/` | E2E suites (`integration/`, `gui/`, `kwin/`, `hyprland/`, `perf/`), tools (`tools/`), evidence (`evidence/`) |
 
 ## RPC protocol
 

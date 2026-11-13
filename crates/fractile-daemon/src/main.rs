@@ -27,7 +27,7 @@ use std::time::Duration;
 
 const USAGE: &str = "fractiled - Fractile session service
 
-USAGE: fractiled [--autostart] [--replace] [--backend x11|gnome|kwin|cosmic] [--verbose]
+USAGE: fractiled [--autostart] [--replace] [--backend x11|gnome|kwin|hyprland|cosmic] [--verbose]
        fractiled --check     print environment and capability detection, then exit
        fractiled --version
 
@@ -72,6 +72,16 @@ fn make_adapter(env: &backend::Environment, forced: Option<&str>, log: &Logger) 
         },
         backend::Backend::GnomeShell => bridge::install(Arc::new(bridge::BridgeAdapter::gnome())),
         backend::Backend::KWin => bridge::install(Arc::new(bridge::BridgeAdapter::kwin())),
+        backend::Backend::Hyprland => match fractile_adapter_hyprland::HyprlandAdapter::connect() {
+            Ok(a) => {
+                log.log(logging::Level::Info, &format!("Hyprland adapter connected: Hyprland {} at {}", a.version(), a.instance_dir().display()));
+                Arc::new(a)
+            }
+            Err(e) => {
+                log.log(logging::Level::Error, &format!("Hyprland adapter failed: {e}"));
+                Arc::new(backend::StubAdapter::hyprland(e))
+            }
+        },
         backend::Backend::Cosmic => Arc::new(backend::StubAdapter::cosmic()),
         _ => Arc::new(backend::StubAdapter::unsupported(env)),
     }

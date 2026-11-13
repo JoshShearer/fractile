@@ -1,0 +1,13 @@
+[package]
+name = "fractile-adapter-hyprland"
+description = "Hyprland IPC compositor adapter for Fractile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+fractile-core.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+libc.workspace = true

@@ -104,13 +104,13 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 
 | ID | Requirement | Status |
 |---|---|---|
-| CA-01 | Adapter API with per-operation support levels and version negotiation | VERIFIED (W23, K00, X24, bridge unit test) |
+| CA-01 | Adapter API with per-operation support levels and version negotiation | VERIFIED (W23, K00, X24, H01, bridge unit test) |
 | CA-02 | GNOME Wayland via Shell extension and restricted IPC | VERIFIED (GW) |
 | CA-03 | GNOME X11 via EWMH/RandR | VERIFIED (X11) |
 | CA-04 | COSMIC | BLOCKED BY PLATFORM: no geometry API ([docs/compatibility/cosmic.md](docs/compatibility/cosmic.md)) |
 | CA-05 | KDE Plasma Wayland via KWin script | VERIFIED (KW, virtual backend) |
 | CA-06 | KDE Plasma X11 | VERIFIED: the full X11 suite (39/39) with kwin_x11 5.27.11 as the window manager (Ubuntu 24.04 container, Xvfb, no plasmashell). Plasma 6.8 (Arch) ships no X11 session, so 5.27 is the newest Plasma X11 tested |
-| CA-07 | Sway/Hyprland (optional) | NOT IMPLEMENTED (reported unsupported, X24) |
+| CA-07 | Sway/Hyprland (optional) | Hyprland: VERIFIED nested (Hyprland 0.57.2 inside a headless KWin, H00-H23, SEC7: 25/25); no real Hyprland login, Hyprland before 0.57 not supported ([docs/compatibility/hyprland.md](docs/compatibility/hyprland.md)). Sway: NOT IMPLEMENTED (reported unsupported, X24) |
 | CA-08 | Bridge authorization beyond bus names | VERIFIED (SEC5, SEC6) |
 
 ## Packaging (SRS 9)

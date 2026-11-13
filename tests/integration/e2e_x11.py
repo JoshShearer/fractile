@@ -493,7 +493,7 @@ def run_all(e: Env) -> None:
 
     # no-WM / unsupported desktop honesty
     env2 = dict(e.env)
-    env2.update(XDG_SESSION_TYPE="wayland", WAYLAND_DISPLAY="wayland-fake", XDG_CURRENT_DESKTOP="Hyprland")
+    env2.update(XDG_SESSION_TYPE="wayland", WAYLAND_DISPLAY="wayland-fake", XDG_CURRENT_DESKTOP="sway")
     out = subprocess.run([str(BIN / "fractiled"), "--check"], env=env2, capture_output=True, text=True)
     caps = json.loads(out.stdout)["capabilities"]
     levels = {v["level"] for v in caps["operations"].values()}

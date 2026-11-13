@@ -1,0 +1,118 @@
+# Hyprland
+
+| Session | Adapter | How |
+|---|---|---|
+| Hyprland 0.57 or later (Wayland) | `hyprland` | The Fractile service talks to Hyprland's own IPC: the request socket `$XDG_RUNTIME_DIR/hypr/<instance>/.socket.sock` (JSON queries, Lua dispatch expressions) and the event socket `.socket2.sock`. Nothing has to be installed or enabled in Hyprland. |
+| Hyprland before 0.57 | none | Not supported. Fractile's adapter speaks the Lua dispatch form only, and `fractile status` says so with the version it found. |
+
+Hyprland 0.57 reads a Lua configuration (`~/.config/hypr/hyprland.lua`) and
+evaluates every `hyprctl dispatch` argument as a Lua expression. The classic
+forms (`dispatch movewindowpixel ...`, `keyword bind ...`) are refused there
+("unknown request" or a Lua syntax error), which is why older Hyprland
+versions are not covered by this adapter.
+
+## Tested
+
+| Environment | Result | Evidence |
+|---|---|---|
+| Hyprland 0.57.2 (Arch package) nested inside `kwin_wayland --virtual`, in an `archlinux:latest` container with the host's NVIDIA render node; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 25/25 | `tests/evidence/e2e-hyprland.json` (`tests/hyprland/e2e-hyprland-in-container.sh`) |
+
+The suite covers: detection and connection, and an unreachable instance
+reported with the reason; window, output and workspace
+lists; grid placements on GTK4 and Qt windows (0 px error); 1x1 filling the
+work area; undo; activation; leaving fullscreen to place; global shortcuts as
+Hyprland binds pressed through Hyprland's keyboard path; a conflict with a
+bind of the user's own configuration (reported, the user's bind untouched); a
+shortcut id full of Lua syntax staying data; moving windows between
+workspaces; snapshot restore; the panel opened by its shortcut, floating,
+focused and driven with the keyboard; `hyprctl reload` (Fractile's binds come
+back); a second monitor and moving a window onto it; binds removed on exit;
+a killed service's binds replaced by the next one (found without
+`HYPRLAND_INSTANCE_SIGNATURE`); and the service saving and exiting when
+Hyprland exits.
+
+This is a real Hyprland with real clients, but **not** a real Hyprland login:
+it runs as a window of a headless KWin (Hyprland cannot start without a DRM
+or Wayland backend), with no bar, no portal for Hyprland, no uwsm and no
+display manager.
+
+The harness sets `input.resolve_binds_by_sym = true` in the test
+configuration. `wtype` uploads its own keymap with keysyms at arbitrary
+keycodes, so Hyprland must match binds by keysym for the harness key presses
+to reach them. A physical keyboard needs no such setting.
+
+**Not tested:** a real login (with uwsm, a display manager or from a TTY),
+Omarchy or any other preconfigured Hyprland setup, physical monitors, a
+monitor scale other than 1 (the conversion from Hyprland's physical mode to
+logical size is covered by a unit test only), XWayland applications, window
+groups, special (scratchpad) workspaces, session restore across a real log-out
+and log-in, and Hyprland versions other than 0.57.2.
+
+## Setting it up
+
+1. Install the package.
+2. The systemd user unit starts with `graphical-session.target`. Hyprland
+   started through **uwsm** reaches that target and passes its environment
+   (`WAYLAND_DISPLAY`, `HYPRLAND_INSTANCE_SIGNATURE`) to user services; enable
+   the unit with `fractile autostart on`.
+   Started without uwsm, nothing starts `graphical-session.target`. Start the
+   service from the Hyprland configuration instead, for example
+   `hl.on("hyprland.start", function() hl.exec_cmd("fractiled --autostart") end)`
+   (the form shown in Hyprland's generated `hyprland.lua`; not run by the test
+   suite).
+3. `fractile status` should show `Window control: available` and adapter
+   `hyprland`.
+
+If `HYPRLAND_INSTANCE_SIGNATURE` is not set, the service uses this user's
+newest running Hyprland instance in `$XDG_RUNTIME_DIR/hypr`. The UI needs
+`WAYLAND_DISPLAY` from the session.
+
+## How Fractile behaves on Hyprland
+
+- **Tiled windows become floating when placed.** Hyprland tiles new windows,
+  and a tiled window's size is decided by the layout. Placing a window on the
+  grid makes that window floating at the chosen rectangle (the placement
+  result says so). Hyprland's layout settings are never changed, and other
+  windows stay tiled. `fractile status` lists Hyprland as the tiling manager.
+- **Frames include the border.** Hyprland draws the border outside the
+  window. Fractile treats the border as part of the frame, so the visible
+  window, border included, fills the grid cell (`general:border_size` is read
+  at start and after each config reload).
+- **Fractile's own windows float.** At start the service adds a runtime
+  window rule, `fractile-own-windows`, that floats only Fractile's panel,
+  palette, preview and small dialogs (app id `io.fractile.Fractile`, matched
+  by title), so opening the panel does not re-tile the desktop. Settings and
+  the dashboard are tiled like other windows. The rule is not written to any
+  file; Hyprland drops it on a config reload and Fractile adds it again.
+- **Shortcuts are runtime binds.** Each global shortcut is added with
+  `hl.bind` and the description `Fractile: <shortcut id>`, so it shows up in
+  `hyprctl binds`. A key combination your Hyprland configuration already binds
+  is reported as a conflict and left alone. Hyprland drops runtime binds on a
+  config reload; Fractile adds them again then, unless the reloaded
+  configuration now binds the same keys (`fractile diagnose` then lists those
+  shortcuts in the adapter notes). On exit they are removed (each
+  through its own handle, so a bind of yours on the same keys is never
+  touched). Binds left by a service that was killed are replaced by the next
+  one.
+- **Workspaces** are Hyprland's numbered workspaces (index = id - 1). Moving a
+  window to a workspace that does not exist yet creates it, as Hyprland does.
+  Special workspaces are not listed; a window on one counts as minimized.
+- **Multiple monitors.** A floating window moved by coordinates stays on its
+  monitor's workspace in Hyprland. When a placement targets another monitor,
+  Fractile first moves the window to the workspace that monitor shows.
+- **Not available:** the drag preview overlay (Hyprland has no IPC to draw
+  one; the panel shows the selection), minimize and keep-above (Hyprland has
+  neither). Session lock state comes from logind's `LockedHint`.
+- **Log-out.** When Hyprland exits, its event socket closes; the service saves
+  the layout last seen and exits.
+
+## Security
+
+The IPC directory is in the user's runtime directory. The service uses an
+instance directory and socket only when they are owned by the user. Values
+Fractile sends to Hyprland go into Lua string literals that pass only
+letters, digits and a few punctuation characters, and write every other byte
+as an escape, so a shortcut id or window address cannot end the literal (unit
+test `lua_strings_cannot_be_escaped`, E2E SEC7). Anything running as the same
+user can use the same sockets; Fractile adds no access to Hyprland beyond
+what the user already has.

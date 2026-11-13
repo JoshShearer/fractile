@@ -24,6 +24,7 @@ cannot show.
 | E7 | ubuntu:24.04 container | kwin_x11 4:5.27.11 (Plasma X11) on Xvfb, no plasmashell | X11 E2E under KWin |
 | E8 | fedora:39 / 41 / 42 containers | GNOME Shell 45.10 / 47.10 / 48.8 headless Wayland | the five GNOME Wayland suites |
 | E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0 (Wayland and Xorg sessions) and Plasma 5.27 X11 (kde-plasma-desktop), real GDM logins | VM E2E (`tests/vm/`) |
+| E10 | archlinux:latest container on the host kernel, host GPU render node | Hyprland 0.57.2 nested in `kwin_wayland --virtual` (KWin is only the parent display); native Wayland GTK4/Qt clients; keys with wtype | Hyprland E2E |
 
 ## Results
 
@@ -43,6 +44,7 @@ cannot show.
 | Tray on GNOME Wayland (AppIndicator extension) | `python3 tests/gui/tray_gnome_wayland.py` | E2 | 12/12 | `tests/evidence/tray-gnome-wayland.json` |
 | GNOME 45 / 47 / 48 (all five GNOME Wayland suites) | `bash tests/gnome/e2e-gnome-in-container.sh fedora:39` (`:41`, `:42`) | E8 | all pass on each | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 19/19 | `tests/evidence/e2e-kwin-wayland.json` |
+| Hyprland E2E | `bash tests/hyprland/e2e-hyprland-in-container.sh` | E10 | 25/25 | `tests/evidence/e2e-hyprland.json` |
 | Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` / `plasma-x11` | E9 | 7/7 on GNOME Wayland, 7/7 on GNOME Xorg, 7/7 on Plasma 5.27 X11 | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, screenshots `tests/evidence/vm/` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
 | 24-hour soak (T27) | `bash tests/vm/vm-e2e.sh soak 1440` | E9 (Xvfb + GNOME Shell 46.0 X11 in that VM) | 9/10 as run; P07 failed on a wrong bound in the check (see below) | `tests/evidence/perf-x11-24h.json`, `tests/evidence/vm/soak.log`, `soak-progress.log`, `soak-daemon-tail.log` |

@@ -70,6 +70,18 @@ exe check: a user who installs another binary with `cap_sys_nice`, named
 `kwin_wayland`, could pass. Installing such a binary needs root, which is outside
 the threat model.
 
+**Hyprland** is the other way round: there is no integration to attach.
+The service is a client of Hyprland's own IPC sockets in
+`$XDG_RUNTIME_DIR/hypr/<instance>/` and uses an instance only when the
+directory and socket are owned by the user. Values sent to Hyprland are
+embedded in Lua string literals that keep only letters, digits and a few
+punctuation characters and escape every other byte, so a shortcut id cannot
+end the literal and run code in the compositor (SEC7, unit test
+`lua_strings_cannot_be_escaped`). Hotkey events arrive as Hyprland custom
+events whose names carry a random per-service part, so binds left by an
+earlier service do not trigger actions. Any same-uid process can use these
+sockets too; Fractile adds no access beyond what the user already has.
+
 After `Attach`, KWin's `Poll`, `Result` and `Event` calls are accepted only from
 the D-Bus connection that attached. A second live integration is refused while
 the first one's process exists.
@@ -128,7 +140,12 @@ execute anything.
 ## Things Fractile never does silently
 
 - It never changes desktop or tiling settings. When an automatic tiler is active,
-  Fractile reports it and leaves the tiler's settings alone.
+  Fractile reports it and leaves the tiler's settings alone. On Hyprland, a
+  window the user places becomes floating (the capability report and the
+  placement result say so); Fractile's shortcuts are runtime binds and its own
+  panel floats through a runtime window rule matching only Fractile's app id.
+  None of this is written to the user's configuration, and it is listed in
+  docs/compatibility/hyprland.md.
 - It never enables its GNOME extension or KWin script. The packages ship them
   disabled, and the user enables them.
 - It never closes or replaces user windows.
