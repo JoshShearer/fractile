@@ -51,6 +51,7 @@ cannot show.
 | VM power loss (T15, RS-18): QEMU `system_reset` during back-to-back snapshot writes, twice, then the next login | `FRACTILE_VM_POWER_CUT=1 bash tests/vm/vm-e2e.sh x11` | E9 (GNOME Xorg session) | 9/9 | `tests/evidence/vm-ubuntu24.04-x11-power-cut.json`, `tests/evidence/vm/x11-power-cut-log.txt`, `x11-pc1-prompt.png`, `x11-pc2-after.png` |
 | Performance and soak | `FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py` | E1 | see below | `tests/evidence/perf-x11.json` |
 | 24-hour soak (T27) | `bash tests/vm/vm-e2e.sh soak 1440` | E9 (Xvfb + GNOME Shell 46.0 X11 in that VM) | 9/10 as run; P07 failed on a wrong bound in the check (see below) | `tests/evidence/perf-x11-24h.json`, `tests/evidence/vm/soak.log`, `soak-progress.log`, `soak-daemon-tail.log` |
+| 4-hour soak with memory by process and the UI's RSS (T27) | `bash tests/vm/vm-e2e.sh soak 240` | E9 (as above) | 11/11 | `tests/evidence/perf-x11-240min.json`, `tests/evidence/vm/soak-240min.log`, `soak-240min-progress.log`, `soak-240min-daemon-tail.log` |
 | .deb package lifecycle | `bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb` | E5 | passed | `tests/evidence/package-deb-ubuntu24.04.log` |
 | Arch package lifecycle | `bash packaging/test/arch-in-container.sh` | E6 | passed | `tests/evidence/package-arch.log` |
 
@@ -67,7 +68,8 @@ cites. Each JSON file lists every check with its name and measured detail.
 | Idle CPU median < 0.5% of a core | median 0.0%, max 0.0% over 60 s | P03 PASS |
 | Soak: no crash, no leak (T27, shortened) | 20 minutes, 300 cycles (~3000 placements, 300 save+restore); RSS 11.5 to 14.3 MiB (max 14.4), fds 16 and threads 9 flat, 0 errors | P06 PASS |
 | Soak, 24 hours (T27; VM, release build, 3 GiB cap) | 1440 minutes, 21537 cycles (~215000 placements, 21537 save+restore), 0 errors. fractiled RSS 13.1 MiB at start, 17.0 MiB at 4 h, 17.3 MiB at 24 h (median of the first tenth 16.5); fds 19 and threads 11 flat; no zombie children | P06 PASS |
-| Whole test memory during the 24 h (cgroup: GNOME Shell, Xvfb, the UI, test windows, page cache) | 622 MiB at 1 min, 804 MiB at 4 h, 1026 MiB at 14.5 h, 1166 MiB at 24 h; growth slowing (about +45 MiB/h in the first 4 h, +15 MiB/h in the last 4 h). Not attributed: that run logged only the cgroup total | not a check |
+| Whole test memory during the 24 h (cgroup: GNOME Shell, Xvfb, the UI, test windows, page cache) | 622 MiB at 1 min, 804 MiB at 4 h, 1026 MiB at 14.5 h, 1166 MiB at 24 h; growth slowing (about +45 MiB/h in the first 4 h, +15 MiB/h in the last 4 h). That run logged only the cgroup total; the 4 h run below attributes it | not a check |
+| Soak, 4 hours, memory by process (T27; VM, release build, 3 GiB cap) | 240 minutes, 3602 cycles, 0 errors. Whole test 623 to 787 MiB, as in the first 4 h of the 24 h run. Of the growth: `mutter-x11-frames` (GNOME's X11 window-frame helper, part of the test desktop) 120 to 246 MiB, page cache 34 to 68 MiB; gnome-shell 273 to 274 MiB and the test windows flat. fractiled 14.8 to 17.4 MiB; the Fractile UI 56.9 to 57.5 MiB (median of the first and last tenth of 451 samples, every 30 s) | P06 PASS, P06u PASS (11/11) |
 | Automatic snapshots bounded | 21 automatic snapshots after 300 restores with max_recent=20 (20 minutes); 22 after 21537 restores (24 h, the run crossed midnight) | P07 PASS (20 min); FAIL as run (24 h), see below |
 | Repeated relogins | 10/10 restored, no ghost processes, no duplicate windows, service ready p50 105 ms | P08 PASS |
 | Logouts during a running restore | 6/6 interrupted while running; layout and the user's changes restored; automatic restore never paused | P09 PASS |
@@ -88,10 +90,16 @@ allows one extra per calendar day the run touches. The 24-hour run was not
 repeated with the corrected check; its JSON keeps the FAIL as recorded.
 
 The whole test grew by about 540 MiB over the 24 hours while fractiled stayed
-flat. That run did not record which process grew. The memory line now also
-prints the cgroup's anonymous and file (page cache) memory and the four
-largest processes by RSS, so a repeat run can attribute it; until then the
-UI's long-run memory is not measured.
+flat. That run did not record which process grew, so a 4-hour run repeated it
+with the cgroup's anonymous and page-cache memory, the four largest processes
+and the UI's RSS logged every minute (`tests/evidence/perf-x11-240min.json`,
+`tests/evidence/vm/soak-240min*.log`). It grew the same way in those 4 hours
+(623 to 787 MiB), and the growth is the test desktop: `mutter-x11-frames`
+(+126 MiB) and page cache (+34 MiB). Fractile's UI grew 0.6 MiB (56.9 to
+57.5 MiB), slowing, and the service 2.6 MiB. The UI's memory was measured
+over 4 hours, not 24. In that run P02's single idle sample missed the UI
+process (it had not reconnected yet: the service showed 8 threads and 15 fds
+instead of 11 and 19); P06u sampled it 451 times out of 451.
 
 Method: `tests/perf/soak_x11.py` header. RSS and CPU are read from
 `/proc/<fractiled>`; placement latency is the service's own timing from
@@ -161,6 +169,6 @@ run left its headless shell running.
   on a GNOME Wayland or KDE session. Earlier attempts on the developer's
   desktop were stopped (SIGTTIN after 2 minutes; then a run without a memory
   cap stopped while the desktop was short of memory); the VM run is the
-  evidence. The UI process's memory over 24 hours is not attributed (see
-  above), and the relogins in the soak are simulated (real logins: the VM
+  evidence. The UI process's memory was measured over 4 hours (see above), not
+  24, and the relogins in the soak are simulated (real logins: the VM
   suites).
