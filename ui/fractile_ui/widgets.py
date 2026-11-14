@@ -1,6 +1,9 @@
 """Shared widgets: shortcut capture with conflict feedback, grid picker."""
 from __future__ import annotations
 
+import os
+import sys
+
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSpinBox, QToolButton, QVBoxLayout, QWidget
 
@@ -49,7 +52,18 @@ class ShortcutEdit(QWidget):
         if self.capturing:
             self.btn.setText("Press keys…  (Esc to cancel)")
             self._pause(True)
+            # Keys reach this editor through the grab, or, if the grab is
+            # refused, through ordinary focus; take both.
+            self.window().activateWindow()
+            self.setFocus(Qt.FocusReason.OtherFocusReason)
             self.grabKeyboard()
+            h = self.window().windowHandle()
+            grabbed = bool(h and h.setKeyboardGrabEnabled(True))
+            print(f"fractile-ui: shortcut editor listening; keyboard grab {'taken' if grabbed else 'refused'}; "
+                  f"window active={self.window().isActiveWindow()}", file=sys.stderr, flush=True)
+            self.info.setText("Listening. Press the combination you want." if grabbed else
+                              "\u26a0 The keyboard is held by another program, so keys may not arrive here. "
+                              "If nothing happens, press Esc and close that program's menu or remote-control window first.")
         else:
             self.releaseKeyboard()
             self._pause(False)
@@ -82,6 +96,8 @@ class ShortcutEdit(QWidget):
     def keyPressEvent(self, ev):
         if not self.capturing:
             return super().keyPressEvent(ev)
+        if os.environ.get("FRACTILE_DEBUG_KEYS"):
+            print(f"fractile-ui: shortcut editor key {ev.key():#x} mods={int(ev.modifiers().value):#x} native={ev.nativeVirtualKey():#x}", file=sys.stderr, flush=True)
         if ev.key() == Qt.Key.Key_Escape and not ev.modifiers():
             self.btn.setChecked(False)
             self.toggle()

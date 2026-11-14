@@ -87,6 +87,15 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Setup said the panel's own shortcut was "already used".** The wizard
+  checked its suggestions without saying they were for the panel shortcut, so
+  the panel's current binding was reported as taken by "Show/hide panel".
+  The shortcut editor now also takes focus explicitly when it starts
+  listening. If another program holds the keyboard, it says so instead of
+  waiting silently, and it logs whether the keyboard grab was taken.
+  `FRACTILE_DEBUG_KEYS=1` logs each key it receives. This is for a
+  recording that timed out on a Pop!_OS desktop reached over VNC: the key
+  never arrived, and the cause is not found yet.
 - **An upgrade left the old service running.** A package replaces
   `/usr/bin/fractiled`, but the running service kept executing the old binary
   until the next login, and a package cannot reliably restart a per-user

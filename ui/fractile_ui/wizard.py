@@ -83,7 +83,8 @@ class FirstRunWizard(QWizard):
             # Keep a shortcut the user already set and that is working.
             free = current
         for c in ([] if free else CANDIDATES):
-            r = self.app.bridge.try_call("shortcut_check", {"accelerator": c})
+            # As the panel shortcut itself: its own current binding is not "in use".
+            r = self.app.bridge.try_call("shortcut_check", {"accelerator": c, "own_id": "panel"})
             if r and r.get("free"):
                 free = c
                 break
