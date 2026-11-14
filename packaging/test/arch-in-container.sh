@@ -5,13 +5,17 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 tarball=$("$root/packaging/arch/make-srctar.sh")
-docker run --rm -v "$root/packaging/arch/PKGBUILD:/in/PKGBUILD:ro" -v "$tarball:/in/$(basename "$tarball"):ro" archlinux:latest bash -euo pipefail -c '
+# FRACTILE_ARCH_OUT=DIR also keeps the built package in DIR
+out=${FRACTILE_ARCH_OUT:-}
+outmount=(); [ -n "$out" ] && { mkdir -p "$out"; outmount=(-v "$(cd "$out" && pwd):/out"); }
+docker run --rm "${outmount[@]}" -v "$root/packaging/arch/PKGBUILD:/in/PKGBUILD:ro" -v "$tarball:/in/$(basename "$tarball"):ro" archlinux:latest bash -euo pipefail -c '
 pacman -Syu --noconfirm --needed base-devel rust python-pyqt6 xorg-server-xvfb openbox xorg-xeyes >/tmp/pacman.log 2>&1 || { tail -20 /tmp/pacman.log; exit 1; }
 useradd -m builder
 mkdir /build && cp /in/* /build/ && chown -R builder /build
 su builder -s /bin/bash -c "cd /build && makepkg --noconfirm >/tmp/makepkg.log 2>&1" || { tail -40 /tmp/makepkg.log; exit 1; }
 grep -E "^test result|Finished" /tmp/makepkg.log | tail -4
 pkg=$(ls /build/fractile-*.pkg.tar.zst | head -1); echo "== built $(basename "$pkg")"
+[ -d /out ] && { cp "$pkg" /out/; chown --reference=/out /out/"$(basename "$pkg")"; }
 pacman -U --noconfirm "$pkg" >/dev/null
 echo "== integrations shipped:"; pacman -Ql fractile | grep -E "extensions/fractile@fractile.io/metadata.json|kwin/scripts/fractile/metadata.json"
 pacman -Qi fractile | grep -E "^(Name|Version|Depends On)"
