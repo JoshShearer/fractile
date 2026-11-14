@@ -235,6 +235,13 @@ desktops only. See PLATFORM_MATRIX.md.
   Pop!_OS with GNOME on Xorg). A UI started only for the tray now leaves when
   another UI is attached, and of two tray-only UIs the newer one leaves
   (`tests/gui/ui-restart-in-container.sh`).
+- On GNOME Shell 46 with Xorg and two monitors (Pop!_OS, seen on a real
+  desktop), the panel for the second monitor opened on the first, at 120,120:
+  a frameless window asking for a position on another monitor than the
+  primary is mapped there, and a move after the map is honoured. Two grids
+  showed on the first monitor, and a cell picked in the misplaced one moved
+  the window to the other monitor. On X11 the UI now checks its panels and
+  the command palette after they are mapped and moves them back.
 - Test harnesses: the nested X11 desktop leaked D-Bus-activated host services
   and FUSE mounts, and `xdotool --sync` could hang forever. Both are fixed.
 

@@ -1,7 +1,7 @@
 """Command palette: type to find any placement, layout or session action."""
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtGui import QCursor, QGuiApplication
 from PyQt6.QtWidgets import QFrame, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout
 
@@ -54,8 +54,13 @@ class CommandPalette(QFrame):
         self.filter("")
         scr = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
         g = scr.availableGeometry()
-        self.move(g.x() + (g.width() - self.width()) // 2, g.y() + g.height() // 4)
+        x, y = g.x() + (g.width() - self.width()) // 2, g.y() + g.height() // 4
+        self.move(x, y)
         self.show()
+        if not self.app.wayland:
+            # Frameless windows on a second monitor can be mapped elsewhere
+            # on GNOME Xorg; position_own moves them back (see there).
+            self.app.position_own(self, QRect(x, y, self.width(), self.height()))
         self.raise_()
         self.activateWindow()
         self.q.setFocus()

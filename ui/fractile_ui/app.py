@@ -181,6 +181,26 @@ class FractileApp:
         integration to do it. On X11, Qt's move() already did."""
         if self.wayland:
             self.bridge.call_async("place_own_window", {"title": w.windowTitle(), "rect": {"x": rect.x(), "y": rect.y(), "w": rect.width(), "h": rect.height()}})
+            return
+        # GNOME Shell 46 on Xorg (two monitors, Pop!_OS) maps a frameless
+        # window whose requested position is on a monitor other than the
+        # primary at 120,120 on the primary; a move after it is mapped is
+        # honoured. Without this, the panel for the second monitor sat on
+        # the first one, and picking a cell in it moved the window to the
+        # other monitor. Until the window manager has answered, Qt reports
+        # the position it asked for, so a match is not proof: look again at
+        # fixed times after the map and move it back whenever it is off.
+        target = rect.topLeft()
+
+        def check() -> None:
+            if not w.isVisible():
+                return
+            p = w.pos()
+            if abs(p.x() - target.x()) > 2 or abs(p.y() - target.y()) > 2:
+                w.move(target)
+
+        for ms in (80, 250, 600, 1200):
+            QTimer.singleShot(ms, check)
 
     # ---- windows ----
     def show_settings(self, page: str | None = None):
