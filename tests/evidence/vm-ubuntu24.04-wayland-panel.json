@@ -1,0 +1,110 @@
+{
+  "suite": "vm-ubuntu24.04-wayland-panel",
+  "when": "2026-11-14T19:47:27+0000",
+  "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "results": [
+    {
+      "id": "P00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P01",
+      "name": "the .deb installs (Ubuntu 24.04.5 LTS; GNOME Shell 46.0)",
+      "ok": true,
+      "detail": "fractile\t0.9.0-1"
+    },
+    {
+      "id": "P02",
+      "name": "real wayland login: the service runs from the systemd unit and controls windows",
+      "ok": true,
+      "detail": "adapter gnome session wayland; setup {\"extension\": 0, \"extension_info\": [\"  Version: 0.9.0\", \"  Enabled: Yes\", \"  State: ACTIVE\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.confi; prep {\"set_env\": 0, \"restart\": 0, \"service_up\": true, \"shortcut\": 0, \"first_run\": 0, \"status\": {\"adapter\": \"gnome\", \"session_type\": \"wayland\", \"window_control\": true, \"global_shortcuts\": true, \"hotkey_errors\": {}, \"ui_attached\": true}}"
+    },
+    {
+      "id": "P03",
+      "name": "a second service started by hand says it is already running and leaves the running one alone (one instance)",
+      "ok": true,
+      "detail": "fractiled: already running\nrc=0; service pid 5210 -> 5210"
+    },
+    {
+      "id": "P04",
+      "name": "the target app (Text Editor) is up and placeable",
+      "ok": true,
+      "detail": "outputs [('conn-Virtual-1-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0})]"
+    },
+    {
+      "id": "P05",
+      "name": "the panel shortcut opens the panel for the focused window",
+      "ok": true,
+      "detail": "{\"grids\": [{\"output\": \"conn-Virtual-1-1600x1200\", \"x\": 712, \"y\": 486, \"w\": 241, \"h\": 241, \"ox\": 133, \"oy\": 62, \"cols\": 6, \"rows\": 6, \"active\": true, \"panel\": {\"h\": 383, \"w\": 507, \"x\": 579, \"y\": 424}, "
+    },
+    {
+      "id": "P06",
+      "name": "dragging across the grid places the window exactly",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 767, 'x': 66, 'y': 32} got {'h': 1168, 'w': 767, 'x': 66, 'y': 32}"
+    },
+    {
+      "id": "P08",
+      "name": "the panel closes after placing and focus returns to the window",
+      "ok": true,
+      "detail": "active gnome:3068178367"
+    },
+    {
+      "id": "P09",
+      "name": "Esc closes the panel without moving the window and focus returns to it",
+      "ok": true,
+      "detail": "{'h': 1168, 'w': 767, 'x': 66, 'y': 32} -> {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; active gnome:3068178367"
+    },
+    {
+      "id": "P10",
+      "name": "Alt+= / Alt+Shift+= add a column / row, and the size is kept the next time the panel opens",
+      "ok": true,
+      "detail": "(6, 6) -> (7, 7)"
+    },
+    {
+      "id": "P11",
+      "name": "Shift+drag places the window and keeps the panel open",
+      "ok": true,
+      "detail": "want {'h': 389, 'w': 512, 'x': 1088, 'y': 32} got {'h': 389, 'w': 512, 'x': 1088, 'y': 32} open True"
+    },
+    {
+      "id": "P12",
+      "name": "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly",
+      "ok": true,
+      "detail": "want {'h': 818, 'w': 921, 'x': 142, 'y': 90} got {'h': 818, 'w': 921, 'x': 142, 'y': 90}"
+    },
+    {
+      "id": "P13",
+      "name": "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
+      "ok": true,
+      "detail": "in panel {'h': 1168, 'w': 767, 'x': 66, 'y': 32}; after close {'h': 584, 'w': 767, 'x': 449, 'y': 324} (centered {'h': 584, 'w': 767, 'x': 449, 'y': 324})"
+    },
+    {
+      "id": "P14",
+      "name": "with reset on open, a grid changed with Alt+= is back to the default 6x6 next time",
+      "ok": true,
+      "detail": "(6, 6) -> (6, 6)"
+    },
+    {
+      "id": "P15",
+      "name": "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves",
+      "ok": true,
+      "detail": "panel True gone True open True; editor {'h': 584, 'w': 767, 'x': 449, 'y': 324} -> {'h': 584, 'w': 767, 'x': 449, 'y': 324}; tests/evidence/vm/panel-wayland-15-target-closed.png"
+    },
+    {
+      "id": "P16",
+      "name": "starting Fractile again from the app menu opens the panel for the focused window",
+      "ok": true,
+      "detail": "panel True target gnome:3068178367 (editor gnome:3068178367)"
+    },
+    {
+      "id": "P17",
+      "name": "no Python errors in the UI's output",
+      "ok": true,
+      "detail": "['0']"
+    }
+  ],
+  "log": []
+}

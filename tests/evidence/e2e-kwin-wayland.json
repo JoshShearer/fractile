@@ -1,6 +1,6 @@
 {
   "suite": "e2e-kwin-wayland",
-  "when": "2026-11-14T19:39:51+0000",
+  "when": "2026-11-14T19:48:36+0000",
   "environment": "kwin 6.8.2 --virtual (Wayland, no Xwayland) in an archlinux container (render device: nvidia); Fractile KWin script",
   "results": [
     {
@@ -82,6 +82,12 @@
       "detail": ""
     },
     {
+      "id": "K20",
+      "name": "10px margins and a 10px gap: halves sit inside the work area with the gap between them",
+      "ok": true,
+      "detail": "work area {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}; left {'h': 1180, 'w': 785, 'x': 10, 'y': 10}; right {'h': 1180, 'w': 785, 'x': 805, 'y': 10}"
+    },
+    {
       "id": "K12",
       "name": "panel shortcut starts the Wayland UI; panel shown, focused, inside the work area and flagged own",
       "ok": true,
@@ -115,7 +121,7 @@
       "id": "K17",
       "name": "on exit Fractile unregisters its KDE global shortcuts",
       "ok": true,
-      "detail": "after exit: method return time=1794685191.894564 sender=:1.0 -> destination=:1.48 serial=488 reply_serial=2 array [ ]"
+      "detail": "after exit: method return time=1794685716.552596 sender=:1.0 -> destination=:1.50 serial=526 reply_serial=2 array [ ]"
     }
   ]
 }

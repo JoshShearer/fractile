@@ -354,6 +354,24 @@ def run_all(e: Env) -> None:
     check("W11", "snapshot restore puts Wayland windows back exactly", rep["state"] == "completed" and rect_eq(e.frame(g), want_g, 2) and rect_eq(e.frame(q), want_q, 2),
           f"{rep['report']['duration_ms']} ms")
 
+    # margins and gaps (DV-22, DV-23), checked with independent arithmetic as in X25
+    c = e.client()
+    c.call("set_config", {"patch": {"appearance": {"spacing": {"margins_enabled": True, "gaps_enabled": True}}}})
+    c.close()
+    e.cli_json("snap", "left-half", "--window", g)
+    e.cli_json("snap", "right-half", "--window", q)
+    time.sleep(0.5)
+    fg, fq = e.frame(g), e.frame(q)
+    m = gap = 10
+    t = 2  # what the compositor rounds (the other placement checks use the same)
+    ok = bool(fg and fq) and (abs(fg["x"] - (wa["x"] + m)) <= t and abs(fg["y"] - (wa["y"] + m)) <= t and abs(fg["h"] - (wa["h"] - 2 * m)) <= t
+          and abs(fq["y"] - (wa["y"] + m)) <= t and abs(fq["x"] + fq["w"] - (wa["x"] + wa["w"] - m)) <= t
+          and abs(fq["x"] - (fg["x"] + fg["w"]) - gap) <= t and abs(fg["w"] - fq["w"]) <= t)
+    check("W30", "10px margins and a 10px gap: halves sit inside the work area with the gap between them", ok, f"work area {wa}; left {fg}; right {fq}")
+    c = e.client()
+    c.call("set_config", {"patch": {"appearance": {"spacing": {"margins_enabled": False, "gaps_enabled": False}}}})
+    c.close()
+
     # The UI on Wayland: panel opened by the shortcut, positioned and
     # focused through the extension, driven with the keyboard.
     e.activate(g)
