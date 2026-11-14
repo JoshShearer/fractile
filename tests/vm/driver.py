@@ -592,7 +592,7 @@ def run_panel(session: str, deb: str) -> None:
         vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
         rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {PLASMA_VERSIONS if plasma else 'gnome-shell --version'}").stdout.strip().replace("\n", "; ")
         inst = vm.ssh("for i in 1 2 3; do sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 "
-                      "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb > /tmp/apt.log 2>&1 && break; sleep 30; "
+                      "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb python3-evdev > /tmp/apt.log 2>&1 && break; sleep 30; "
                       "sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; dpkg-query -W fractile", timeout=1800)
         if not check("P01", f"the .deb installs ({rel})", inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, inst.stdout.strip()[-200:]):
             return
@@ -834,6 +834,42 @@ def run_panel(session: str, deb: str) -> None:
 
         log = vm.ssh("grep -c Traceback ~/.local/state/fractile/ui.log 2>/dev/null; journalctl --user -q --no-pager | grep -c 'Traceback' ").stdout.split()
         check("P17", "no Python errors in the UI's output", all(x == "0" for x in log), f"{log}")
+
+        # DV-19 / DV-02: the tray icon in the desktop's own tray
+        if plasma:
+            vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set general.tray_icon true")
+            tr = vm.vmctl("tray")
+            shot = vm.screenshot(f"panel-{session}-18-tray")
+            check("P18", "with the tray icon on, Fractile's icon is registered in the desktop's tray (StatusNotifierWatcher) and active",
+                  tr.get("registered") and "Active" in (tr.get("status") or ""), f"{json.dumps(tr)[:300]}; {shot}")
+            vm.call("activate_window", {"window": wid})
+            time.sleep(0.8)
+            vm.ssh("rm -f /run/user/$(id -u)/fractile-panel-geometry.json")
+            act = vm.vmctl("tray-activate")
+            g = wait_for(lambda: (vm.vmctl("panel-geom").get("grids") or [None])[0], 15, 0.5)
+            tgt = (vm.call("panel_state").get("result") or {}).get("target") or {}
+            check("P19", "a left click on the tray icon (StatusNotifierItem.Activate, what the tray sends) shows the panel for the focused window",
+                  bool(g) and tgt.get("id") == wid, f"{act}; panel {bool(g)} target {tgt.get('id')} (editor {wid})")
+            close_if_open()
+
+            # DV-14, DV-25, DV-26: the Settings window, keys from a uinput keyboard
+            vm.ssh("mkdir -p ~/t/tests/gui ~/t/tests/tools; XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set general.tray_icon false")
+            # the probe is the UI now (the pattern must not match this ssh shell's own command line)
+            vm.ssh("pkill -u tester -f '^/usr/bin/python3 .*/fractile-[u]i'; pkill -u tester -f '^python3 .*/fractile-[u]i'; true")
+            vm.scp("/src/tests/gui/settings_probe.py", "/home/tester/t/tests/gui/settings_probe.py")
+            vm.scp("/src/tests/tools/uinput_keys.py", "/home/tester/t/tests/tools/uinput_keys.py")
+            out = vm.vmctl("settings-probe", timeout=900)
+            if not out.get("results"):
+                check("P-SXX", "the Settings probe produced results", False, json.dumps(out)[:1500])
+            for r in out.get("results") or []:
+                check(f"P-{r['id']}", r["name"], r["ok"], r.get("detail", ""))
+            vm.screenshot(f"panel-{session}-20-after-settings")
+            vm.call("activate_window", {"window": wid})
+            time.sleep(0.8)
+            vm.combo("ctrl+alt+shift+f9")
+            want = rect(2, 1, 0, 0, 0, 0)
+            got = placed(want)
+            check("P-S11", "pressing the shortcut created in Settings places the window (left half)", near(got, want), f"want {want} got {got}")
         hold("end")
     finally:
         vm.stop()

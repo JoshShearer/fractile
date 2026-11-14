@@ -503,8 +503,8 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
         // compositor passes the keys to it (Wayland has no client grab).
         "hotkeys_pause" => {
             let secs = p.get("seconds").and_then(|v| v.as_u64()).unwrap_or(60).clamp(1, 300);
-            d.pause_hotkeys(c.id, secs);
-            Ok(json!({"paused": true, "seconds": secs}))
+            let (_, desktop) = d.pause_hotkeys(c.id, secs);
+            Ok(json!({"paused": true, "seconds": secs, "desktop_held": desktop}))
         }
         "hotkeys_resume" => Ok(json!({"resumed": d.resume_hotkeys(Some(c.id))})),
         "shortcut_check" => Ok(d.probe_accelerator(req_s(p, "accelerator")?, s(p, "own_id"))),

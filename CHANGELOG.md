@@ -17,7 +17,8 @@ desktops only. See PLATFORM_MATRIX.md.
   tests/vm/vm-e2e.sh plasma-wayland`): the panel driven with the VM's virtual
   keyboard and USB tablet through QEMU: one instance, drag, preview, Esc, grid
   keys, Shift+drag, Alt subdivision, local shortcut, reset, target closing,
-  relaunch from the app menu. 18/18 on Plasma 6.6 (Ubuntu 26.04).
+  relaunch from the app menu, the tray icon, and the whole Settings probe
+  with keys from a uinput test keyboard. 38/38 on Plasma 6.6 (Ubuntu 26.04).
 - **Glass panel.** The placement panel is a translucent, rounded slab with a
   rim light. The cells are frosted panes, and the selection is drawn as one lit
   pane spanning its cells. It fades in over 120 ms on X11. On compositors that
@@ -111,6 +112,19 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Shortcut editor could not record a combination Plasma uses.** On Plasma
+  Wayland, KWin acted on its own shortcuts while the editor listened, so
+  pressing Ctrl+Alt+Delete opened the logout screen instead of being reported
+  as taken. Now the service holds every KDE global shortcut while an editor
+  listens, as KDE's own shortcut editor does (KGlobalAccel
+  blockGlobalShortcuts). The hold ends when the editor stops listening, when
+  the UI disconnects, after 60 s, or when the service exits. A service that
+  dies mid-hold releases it on its next start. A conflict now names the KDE
+  shortcut that owns the keys ("Show Logout Screen", Session Management). The
+  editor no longer shows "The keyboard is held by another program" on every
+  Wayland session, where a refused grab is normal. Where the desktop cannot
+  hold its shortcuts (GNOME), it says that desktop combinations may not
+  arrive. Found in a real Plasma 6.6 Wayland login (VM Settings probe).
 - **No placement preview on Plasma Wayland.** The UI asked the KWin script to
   draw the preview; KWin scripts cannot draw, so there was none, and only the
   panel's grid showed the selection. The UI now draws the preview as its own

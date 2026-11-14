@@ -19,6 +19,12 @@ the systemd user manager's environment. Prints one JSON object per command.
                                    (FRACTILE_UI_TEST_GEOMETRY), panel shortcut
                                    Ctrl+Alt+G, service restarted with that
   vmctl.py panel-geom              where the open panel's grid is on screen
+  vmctl.py tray                    Fractile's item in the desktop's tray
+                                   (StatusNotifierWatcher) and its properties
+  vmctl.py tray-activate           what a left click on the tray icon sends
+                                   (StatusNotifierItem.Activate)
+  vmctl.py settings-probe          tests/gui/settings_probe.py against the
+                                   installed UI, keys from a uinput keyboard
 """
 from __future__ import annotations
 
@@ -326,10 +332,61 @@ def cmd_panel_geom() -> dict:
     return {"grids": grids, "mtime": os.path.getmtime(GEOM)}
 
 
+def _gdbus(*args) -> str:
+    return run("gdbus", "call", "--session", *args).stdout.strip()
+
+
+def tray_item():
+    """(service, path) of Fractile's StatusNotifierItem, or None."""
+    out = run("gdbus", "call", "--session", "--dest", "org.kde.StatusNotifierWatcher", "--object-path", "/StatusNotifierWatcher",
+              "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierWatcher", "RegisteredStatusNotifierItems").stdout
+    import re
+    for item in re.findall(r"'([^']+)'", out):
+        svc, _, path = item.partition("/")
+        path = "/" + path if path else "/StatusNotifierItem"
+        title = _gdbus("--dest", svc, "--object-path", path, "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierItem", "Title")
+        ident = _gdbus("--dest", svc, "--object-path", path, "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierItem", "Id")
+        if "Fractile" in title or "fractile" in ident.lower():
+            return svc, path, title, ident
+    return None
+
+
+def cmd_tray() -> dict:
+    it = wait_for(tray_item, 20.0)
+    if not it:
+        return {"registered": False, "watcher": run("gdbus", "introspect", "--session", "--dest", "org.kde.StatusNotifierWatcher",
+                                                    "--object-path", "/StatusNotifierWatcher").returncode == 0}
+    svc, path, title, ident = it
+    status = _gdbus("--dest", svc, "--object-path", path, "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierItem", "Status")
+    return {"registered": True, "service": svc, "path": path, "title": title, "id": ident, "status": status}
+
+
+def cmd_tray_activate() -> dict:
+    it = tray_item()
+    if not it:
+        return {"activated": False}
+    svc, path = it[0], it[1]
+    p = run("gdbus", "call", "--session", "--dest", svc, "--object-path", path, "--method", "org.kde.StatusNotifierItem.Activate", "800", "1180")
+    return {"activated": p.returncode == 0, "stderr": p.stderr.strip()[-200:]}
+
+
+def cmd_settings_probe() -> dict:
+    env = dict(ENV, PYTHONPATH="/usr/lib/fractile", PYTHONDONTWRITEBYTECODE="1",
+               FRACTILE_TEST_KEYS_CMD="sudo -n python3 /home/tester/t/tests/tools/uinput_keys.py",
+               QT_QPA_PLATFORM="wayland" if ENV.get("XDG_SESSION_TYPE") == "wayland" else "xcb")
+    os.makedirs("/tmp/shots", exist_ok=True)
+    p = subprocess.run(["python3", "/home/tester/t/tests/gui/settings_probe.py", "/tmp/shots"], env=env, capture_output=True, text=True, timeout=600)
+    try:
+        return json.loads(p.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return {"results": [{"id": "SXX", "name": "probe produced results", "ok": False, "detail": (p.stdout + p.stderr)[-800:]}]}
+
+
 def main() -> int:
     cmd = sys.argv[1]
     fn = {"session": cmd_session, "setup": cmd_setup, "open-apps": cmd_open_apps, "state": cmd_state, "logout": cmd_logout, "launch": cmd_launch,
-          "call": cmd_call, "panel-prep": cmd_panel_prep, "panel-geom": cmd_panel_geom}[cmd]
+          "call": cmd_call, "panel-prep": cmd_panel_prep, "panel-geom": cmd_panel_geom,
+          "tray": cmd_tray, "tray-activate": cmd_tray_activate, "settings-probe": cmd_settings_probe}[cmd]
     print(json.dumps(fn()))
     return 0
 

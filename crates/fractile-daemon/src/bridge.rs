@@ -63,6 +63,10 @@ struct Attached {
 pub trait HotkeyService: Send + Sync {
     fn register(&self, binding_id: &str, accel: &fractile_core::accel::Accelerator) -> AResult<()>;
     fn unregister(&self, binding_id: &str) -> AResult<()>;
+    /// See `CompositorAdapter::block_desktop_shortcuts`.
+    fn block_all(&self, _on: bool) -> bool {
+        false
+    }
 }
 
 /// The peer must be running a root-owned, not group/world-writable
@@ -470,6 +474,10 @@ impl CompositorAdapter for BridgeAdapter {
             return Ok(());
         }
         self.call("ungrab_accelerator", json!({"binding_id": binding_id})).map(|_| ())
+    }
+
+    fn block_desktop_shortcuts(&self, on: bool) -> bool {
+        self.hotkeys.lock().unwrap().clone().is_some_and(|h| h.block_all(on))
     }
 
     fn set_own_windows(&self, ids: &[String]) {

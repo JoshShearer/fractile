@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import select
+import shlex
 import subprocess
 import sys
 import time
@@ -37,6 +38,7 @@ shots: list[str] = []
 
 def check(cid: str, name: str, ok: bool, detail: str = "") -> bool:
     results.append({"id": cid, "name": name, "ok": bool(ok), "detail": detail})
+    print(f"{'PASS' if ok else 'FAIL'} {cid} {name} :: {detail}", file=sys.stderr, flush=True)
     return ok
 
 
@@ -83,8 +85,11 @@ def start_injector() -> None:
     it is started before any window is focused."""
     global INJ
     if WAYLAND and INJ is None:
-        INJ = subprocess.Popen([sys.executable, str(ROOT / "tests" / "tools" / "wlkeys.py"), "--stdin"],
-                               stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        # FRACTILE_TEST_KEYS_CMD: another injector with the same stdin protocol
+        # (the VM run uses a uinput keyboard, tests/tools/uinput_keys.py).
+        cmd = shlex.split(os.environ["FRACTILE_TEST_KEYS_CMD"]) if os.environ.get("FRACTILE_TEST_KEYS_CMD") \
+            else [sys.executable, str(ROOT / "tests" / "tools" / "wlkeys.py"), "--stdin"]
+        INJ = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         _inj_wait("ready", 10.0)
 
 
@@ -155,9 +160,12 @@ def drive_dialog(state: dict) -> None:
         # Ctrl+Alt+Delete is GNOME's log-out shortcut (media-keys) on every
         # GNOME version and distribution (Ctrl+Alt+T for the terminal is an
         # Ubuntu addition). The service reads the desktop's bindings.
+        # KDE binds the same combination to Log Out (ksmserver).
         msg = capture(ed, "ctrl+alt+delete")
-        check("S05", "a combination GNOME's settings assign is reported as taken, with where it is set",
-              msg.startswith("⚠") and "assigned in desktop settings" in msg and "logout" in msg and ed.value.startswith("Ctrl+Alt+Del"), f"{msg} (value {ed.value})")
+        kde = "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "").split(":")
+        named = ("log out" in msg.lower() or "logout" in msg.lower()) if kde else ("assigned in desktop settings" in msg and "logout" in msg)
+        check("S05", "a combination the desktop's own settings assign (log out) is reported as taken, with where it is set",
+              msg.startswith("⚠") and named and (ed.value or "").startswith("Ctrl+Alt+Del"), f"{msg} (value {ed.value})")
     else:
         msg = capture(ed, "ctrl+alt+shift+k")
         check("S05", "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",
@@ -178,7 +186,9 @@ def drive_dialog(state: dict) -> None:
     d.grab().save(state["shot_dir"] + "/14-shortcut-editor.png")
     shots.append("14-shortcut-editor.png")
     ok = next((b for b in d.findChildren(QPushButton) if b.text().replace("&", "") == "OK"), None)
-    if ok is None:
+    if ok is None or not ed.is_ok():
+        # OK would ask "Save anyway?" in a modal box nobody answers; the
+        # failed check above already says why.
         d.reject()
         return
     ok.click()

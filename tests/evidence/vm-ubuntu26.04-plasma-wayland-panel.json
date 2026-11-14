@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu26.04-plasma-wayland-panel",
-  "when": "2026-11-14T19:39:14+0000",
+  "when": "2026-11-14T20:43:50+0000",
   "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -25,7 +25,7 @@
       "id": "P03",
       "name": "a second service started by hand says it is already running and leaves the running one alone (one instance)",
       "ok": true,
-      "detail": "fractiled: already running\nrc=0; service pid 5850 -> 5850"
+      "detail": "fractiled: already running\nrc=0; service pid 5931 -> 5931"
     },
     {
       "id": "P04",
@@ -49,19 +49,19 @@
       "id": "P07",
       "name": "during the drag a preview window shows the exact target, the panel keeps keyboard focus, and the window has not moved yet",
       "ok": true,
-      "detail": "preview {'h': 1154, 'w': 800, 'x': 0, 'y': 0} want {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:4d1f644c-9588-4afe-b6f5-9bb6158414f7 (panel kwin:4d1f644c-9588-4afe-b6f5-9bb6158414f7); window then {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-06-drag-preview.png"
+      "detail": "preview {'h': 1154, 'w': 800, 'x': 0, 'y': 0} want {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:45430342-2e8f-4ab9-911a-4947f2397642 (panel kwin:45430342-2e8f-4ab9-911a-4947f2397642); window then {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-06-drag-preview.png"
     },
     {
       "id": "P08",
       "name": "the panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active kwin:63d31004-49f1-4724-8f11-164a13b393da"
+      "detail": "active kwin:4694434c-e3ae-4358-a413-af11e9383fd6"
     },
     {
       "id": "P09",
       "name": "Esc closes the panel without moving the window and focus returns to it",
       "ok": true,
-      "detail": "{'h': 1154, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:63d31004-49f1-4724-8f11-164a13b393da"
+      "detail": "{'h': 1154, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:4694434c-e3ae-4358-a413-af11e9383fd6"
     },
     {
       "id": "P10",
@@ -103,13 +103,133 @@
       "id": "P16",
       "name": "starting Fractile again from the app menu opens the panel for the focused window",
       "ok": true,
-      "detail": "panel True target kwin:63d31004-49f1-4724-8f11-164a13b393da (editor kwin:63d31004-49f1-4724-8f11-164a13b393da)"
+      "detail": "panel True target kwin:4694434c-e3ae-4358-a413-af11e9383fd6 (editor kwin:4694434c-e3ae-4358-a413-af11e9383fd6)"
     },
     {
       "id": "P17",
       "name": "no Python errors in the UI's output",
       "ok": true,
       "detail": "['0']"
+    },
+    {
+      "id": "P18",
+      "name": "with the tray icon on, Fractile's icon is registered in the desktop's tray (StatusNotifierWatcher) and active",
+      "ok": true,
+      "detail": "{\"registered\": true, \"service\": \":1.149\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}; tests/evidence/vm/panel-plasma-wayland-18-tray.png"
+    },
+    {
+      "id": "P19",
+      "name": "a left click on the tray icon (StatusNotifierItem.Activate, what the tray sends) shows the panel for the focused window",
+      "ok": true,
+      "detail": "{'activated': True, 'stderr': ''}; panel True target kwin:4694434c-e3ae-4358-a413-af11e9383fd6 (editor kwin:4694434c-e3ae-4358-a413-af11e9383fd6)"
+    },
+    {
+      "id": "P-S01",
+      "name": "Settings opens from the service request with all eight pages",
+      "ok": true,
+      "detail": "['General', 'Appearance', 'Shortcuts', 'Session Restore', 'Rules', 'Monitors', 'Diagnostics', 'About']"
+    },
+    {
+      "id": "P-S02",
+      "name": "every page renders (screenshots in tests/evidence/gui/)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P-S08",
+      "name": "a General change is only pending until Apply, then the service has it",
+      "ok": true,
+      "detail": "before=True pending_dirty=True service_before=True service_after=False"
+    },
+    {
+      "id": "P-S03",
+      "name": "a global shortcut without a modifier is refused and the editor keeps listening",
+      "ok": true,
+      "detail": "\u26a0 Global shortcuts need at least one modifier (Ctrl, Alt, Shift or Super). Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "P-S14",
+      "name": "while the editor listens, global shortcuts are paused so the desktop passes their keys to it",
+      "ok": true,
+      "detail": "hotkeys_paused=True"
+    },
+    {
+      "id": "P-S04",
+      "name": "a combination Fractile already uses is reported by name (the panel shortcut)",
+      "ok": true,
+      "detail": "\u26a0 already used by Fractile shortcut 'Show/hide panel'"
+    },
+    {
+      "id": "P-S05",
+      "name": "a combination the desktop's own settings assign (log out) is reported as taken, with where it is set",
+      "ok": true,
+      "detail": "\u26a0 conflict: Ctrl+Alt+Delete is already used by the KDE shortcut \u201cShow Logout Screen\u201d (Session Management), set in System Settings > Keyboard > Shortcuts (value Ctrl+Alt+Delete)"
+    },
+    {
+      "id": "P-S06",
+      "name": "a free combination is reported as available",
+      "ok": true,
+      "detail": "\u2713 Available. Note: some desktop shortcuts cannot be detected until they are pressed."
+    },
+    {
+      "id": "P-S07",
+      "name": "a panel shortcut on a navigation key is refused (reserved by the panel)",
+      "ok": true,
+      "detail": "\u26a0 The panel uses this key for keyboard navigation. Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "P-S09",
+      "name": "the new shortcut appears in the table, pending until Apply",
+      "ok": true,
+      "detail": "dialog=True modal=None add_button=True rows=14"
+    },
+    {
+      "id": "P-S15",
+      "name": "the pause ends when the editor closes",
+      "ok": true,
+      "detail": "hotkeys_paused=False"
+    },
+    {
+      "id": "P-S10",
+      "name": "after Apply the service saved and registered it; the table says active",
+      "ok": true,
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-13289d80', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+    },
+    {
+      "id": "P-S13",
+      "name": "the shortcut list shows the panel shortcut with its real keys; Edit\u2026 on it opens General",
+      "ok": true,
+      "detail": "keys=Ctrl+Alt+G status=active page after Edit=general"
+    },
+    {
+      "id": "P-S18",
+      "name": "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
+      "ok": true,
+      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-97940376', 'name': 'Probe left half (copy)', 'scope': 'global'}"
+    },
+    {
+      "id": "P-S19",
+      "name": "Export writes every shortcut (including pending ones) to the chosen file",
+      "ok": true,
+      "detail": "14 exported, names ['Left half', 'Right half', 'Top half', 'Bottom half']..."
+    },
+    {
+      "id": "P-S20",
+      "name": "Remove takes the copy out; after Apply the service has the original and not the copy",
+      "ok": true,
+      "detail": "service shortcuts ['Left half', 'Right half', 'Top half', 'Bottom half', 'Maximize (fill work area)', 'Center', 'Show/hide panel', 'Undo last placement', 'Move window to next monitor', 'Save current workspace', 'Restore latest snapshot', 'Command palette', 'Probe left half']"
+    },
+    {
+      "id": "P-S21",
+      "name": "Import of an exported file skips what is already there; a shortcut whose keys are taken comes in without keys, and the message says so",
+      "ok": true,
+      "detail": "messages ['Imported 1 shortcut. 13 were already here and left as is. Press Apply to check and save them.', 'Imported 1 shortcut. 1 came in without keys because those keys are already used; set new ones with Edit\u2026. Press Apply to check and save them.']; added 2"
+    },
+    {
+      "id": "P-S11",
+      "name": "pressing the shortcut created in Settings places the window (left half)",
+      "ok": true,
+      "detail": "want {'h': 1154, 'w': 800, 'x': 0, 'y': 0} got {'h': 1154, 'w': 800, 'x': 0, 'y': 0}"
     }
   ],
   "log": []

@@ -59,7 +59,7 @@ class ShortcutEdit(QWidget):
         if self.capturing:
             self.btn.setText("Press keys…  (Esc to cancel)")
             self.btn.setAccessibleName(f"{self.label}: listening, press the keys, or Escape to cancel")
-            self._pause(True)
+            held = self._pause(True)
             # Keys reach this editor through the grab, or, if the grab is
             # refused, through ordinary focus; take both.
             self.window().activateWindow()
@@ -69,22 +69,36 @@ class ShortcutEdit(QWidget):
             grabbed = bool(h and h.setKeyboardGrabEnabled(True))
             print(f"fractile-ui: shortcut editor listening; keyboard grab {'taken' if grabbed else 'refused'}; "
                   f"window active={self.window().isActiveWindow()}", file=sys.stderr, flush=True)
-            self.info.setText("Listening. Press the combination you want." if grabbed else
-                              "\u26a0 The keyboard is held by another program, so keys may not arrive here. "
-                              "If nothing happens, press Esc and close that program's menu or remote-control window first.")
+            self.info.setText(self.listening_text(grabbed, held))
         else:
             self.releaseKeyboard()
             self._pause(False)
             self._render()
 
-    def _pause(self, on: bool) -> None:
+    @staticmethod
+    def listening_text(grabbed: bool, desktop_held: bool) -> str:
+        """What the editor says while it listens. On Wayland no application
+        can grab the keyboard, so a refused grab is normal there: keys come
+        through ordinary focus. What can still go astray is a combination the
+        desktop itself uses, unless the desktop agreed to hold its shortcuts
+        (KDE does, through KGlobalAccel)."""
+        if grabbed or desktop_held:
+            return "Listening. Press the combination you want."
+        if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland":
+            return ("Listening. Press the combination you want. A combination the desktop uses itself may run "
+                    "its desktop action instead of arriving here; if nothing happens, it is taken.")
+        return ("\u26a0 The keyboard is held by another program, so keys may not arrive here. "
+                "If nothing happens, press Esc and close that program's menu or remote-control window first.")
+
+    def _pause(self, on: bool) -> bool:
         # Global shortcuts are paused while listening, so the desktop hands
         # the keys of an active Fractile shortcut to this editor (on Wayland
         # an application cannot grab the keyboard). Only global scope: panel
         # shortcuts are not registered with the desktop.
         if self.scope != "global" and on:
-            return
-        self.app.bridge.try_call("hotkeys_pause" if on else "hotkeys_resume", {"seconds": 60} if on else {})
+            return False
+        r = self.app.bridge.try_call("hotkeys_pause" if on else "hotkeys_resume", {"seconds": 60} if on else {})
+        return bool(on and r and r.get("desktop_held"))
 
     def setScope(self, scope: str) -> None:  # noqa: N802
         if self.capturing and scope != "global":

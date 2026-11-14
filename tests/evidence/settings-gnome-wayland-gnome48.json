@@ -1,6 +1,6 @@
 {
   "suite": "settings-gnome-wayland",
-  "when": "2026-11-14T19:26:02+0000",
+  "when": "2026-11-14T20:45:06+0000",
   "environment": "headless GNOME Shell 48.8 --wayland --no-x11, Fractile extension fractile@fractile.io, PyQt6 UI on Wayland",
   "screenshots": "tests/evidence/gui/wayland/",
   "results": [
@@ -48,7 +48,7 @@
     },
     {
       "id": "S05",
-      "name": "a combination GNOME's settings assign is reported as taken, with where it is set",
+      "name": "a combination the desktop's own settings assign (log out) is reported as taken, with where it is set",
       "ok": true,
       "detail": "\u26a0 assigned in desktop settings: org.gnome.settings-daemon.plugins.media-keys logout (value Ctrl+Alt+Delete)"
     },
@@ -80,7 +80,7 @@
       "id": "S10",
       "name": "after Apply the service saved and registered it; the table says active",
       "ok": true,
-      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-0045e8c7', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-b090b4c2', 'name': 'Probe left half', 'scope': 'global'}] status=active"
     },
     {
       "id": "S13",
@@ -92,7 +92,7 @@
       "id": "S18",
       "name": "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
       "ok": true,
-      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-80cee22f', 'name': 'Probe left half (copy)', 'scope': 'global'}"
+      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-96742cb9', 'name': 'Probe left half (copy)', 'scope': 'global'}"
     },
     {
       "id": "S19",
@@ -116,7 +116,7 @@
       "id": "S12",
       "name": "the UI logged no Python errors",
       "ok": true,
-      "detail": " listening; keyboard grab refused; window active=True\nfractile-ui: shortcut editor listening; keyboard grab refused; window active=True\nfractile-ui: shortcut editor listening; keyboard grab refused; window active=True\nfractile-ui: shortcut editor listening; keyboard grab refused; window active=True\n"
+      "detail": "thout keys, and the message says so :: messages ['Imported 1 shortcut. 13 were already here and left as is. Press Apply to check and save them.', 'Imported 1 shortcut. 1 came in without keys because those keys are already used; set new ones with Edit\u2026. Press Apply to check and save them.']; added 2\n"
     },
     {
       "id": "S11",

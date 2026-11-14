@@ -521,17 +521,27 @@ impl Daemon {
         actions.clear();
     }
 
+    /// Orderly exit or restart: give the desktop its shortcuts back if an
+    /// editor's pause is still holding them, then release Fractile's.
+    pub fn release_hotkeys_for_exit(&self) {
+        if self.hotkey_pause.lock().unwrap().take().is_some() {
+            self.adapter().block_desktop_shortcuts(false);
+        }
+        self.unregister_all_hotkeys();
+    }
+
     /// Pause every global shortcut while a shortcut editor listens for
     /// keys. On Wayland a client cannot grab the keyboard, so the
     /// compositor would otherwise act on Fractile's own active shortcuts (the
     /// panel opens instead of the editor seeing Ctrl+Alt+G). The pause ends
     /// with `resume_hotkeys`, when that connection closes, or after `secs`.
-    pub fn pause_hotkeys(self: &Arc<Self>, conn: u64, secs: u64) -> u64 {
+    pub fn pause_hotkeys(self: &Arc<Self>, conn: u64, secs: u64) -> (u64, bool) {
         static GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let gen = GEN.fetch_add(1, Ordering::SeqCst);
         *self.hotkey_pause.lock().unwrap() = Some((conn, gen));
         self.unregister_all_hotkeys();
-        info!(self.log, "global shortcuts paused while a shortcut editor listens (up to {secs} s)");
+        let desktop = self.adapter().block_desktop_shortcuts(true);
+        info!(self.log, "global shortcuts paused while a shortcut editor listens (up to {secs} s; desktop shortcuts held too: {desktop})");
         let d = self.clone();
         std::thread::Builder::new()
             .name("hotkey-pause".into())
@@ -543,7 +553,7 @@ impl Daemon {
                 }
             })
             .ok();
-        gen
+        (gen, desktop)
     }
 
     /// End a pause. `conn` = Some(id) ends it only if that connection made
@@ -557,6 +567,7 @@ impl Daemon {
                 _ => *p = None,
             }
         }
+        self.adapter().block_desktop_shortcuts(false);
         self.register_hotkeys();
         info!(self.log, "global shortcuts resumed");
         true

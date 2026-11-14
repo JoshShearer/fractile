@@ -311,7 +311,7 @@ fn main() {
     if let Some(j) = d.restore.lock().unwrap().as_ref() {
         j.cancel.store(true, Ordering::SeqCst);
     }
-    d.unregister_all_hotkeys();
+    d.release_hotkeys_for_exit();
     d.broadcast("daemon_exit", serde_json::json!({}));
     let _ = d.store.lock().unwrap().session_end(&d.session_key, true);
     let _ = std::fs::remove_file(paths::socket_path());

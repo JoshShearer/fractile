@@ -84,7 +84,7 @@ pub fn start(d: Arc<Daemon>) {
 
 fn restart(d: &Daemon, path: &Path) {
     info!(d.log, "restarting onto the new service binary {}", path.display());
-    d.unregister_all_hotkeys();
+    d.release_hotkeys_for_exit();
     d.broadcast("daemon_exit", serde_json::json!({"restarting": true}));
     // Hold the store so no write is cut off by the exec. Every other
     // descriptor (listening socket, lock file, X11 and D-Bus connections)

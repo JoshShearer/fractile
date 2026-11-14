@@ -183,6 +183,14 @@ pub trait CompositorAdapter: Send + Sync {
     /// Register a global hotkey. Returns Err(Conflict) when already taken.
     fn register_hotkey(&self, binding_id: &str, accelerator: &str) -> AResult<()>;
     fn unregister_hotkey(&self, binding_id: &str) -> AResult<()>;
+    /// Optional: hold or release every desktop global shortcut (not only
+    /// Fractile's) while a shortcut editor listens, the way the desktop's own
+    /// shortcut editor does, so a combination the desktop owns reaches the
+    /// editor and can be reported instead of running its desktop action.
+    /// Returns true when the desktop honoured it.
+    fn block_desktop_shortcuts(&self, _on: bool) -> bool {
+        false
+    }
     /// Declare windows that belong to Fractile (never targeted, never captured).
     fn set_own_windows(&self, ids: &[String]);
     /// Optional: a session-lock state, when the adapter can observe it.
