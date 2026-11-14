@@ -30,6 +30,12 @@ docker run --rm -v fractile-vm-cache:/cache --user 0 "$tag" chown "$(id -u)" /ca
 [[ -n ${FRACTILE_VM_POWER_CUT:-} ]] && args+=(--power-cut)
 # FRACTILE_VM_PANEL=1 drives the panel with the VM keyboard and tablet instead.
 [[ -n ${FRACTILE_VM_PANEL:-} ]] && args+=(--panel)
+# PK-06: FRACTILE_VM_UPGRADE_FROM="old1.deb old2.deb" (inside the repository,
+# oldest first) installs those, then upgrades to the .deb.
+if [[ -n ${FRACTILE_VM_UPGRADE_FROM:-} ]]; then
+  args+=(--upgrade-from)
+  for d in $FRACTILE_VM_UPGRADE_FROM; do d=$(realpath "$d"); args+=("/src/${d#"$root"/}"); done
+fi
 [[ $what == provision ]] && args=(--session "${2:-wayland}" --deb /dev/null --provision-only)
 if [[ $what == soak ]]; then
   # T27 in the VM: detached, so the run survives the terminal; follow it with

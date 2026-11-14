@@ -94,6 +94,9 @@ def chrome_spec(base: Path) -> dict:
     (ud / "First Run").write_text("")
     argv = ["google-chrome", f"--user-data-dir={ud}", "--no-first-run", "--no-default-browser-check", "--password-store=basic",
             "--disable-background-networking", "--disable-component-update", "--disable-sync", "--disable-features=Translate,MediaRouter"]
+    if os.environ.get("FRACTILE_CHROME_NO_SANDBOX"):
+        # docker's default seccomp profile blocks the user namespaces Chrome's sandbox needs
+        argv.append("--no-sandbox")
     return {
         "name": "Google Chrome", "desktop": "google-chrome.desktop", "wm_class": "google-chrome",
         "exec": " ".join(argv) + " %U",
@@ -256,6 +259,12 @@ def run_app(e: Env, key: str, n: int) -> None:
             # Fractile records them like normal windows. Reported, not passed.
             KNOWN.append({"id": f"{tid}e", "name": f"{spec['name']}: private windows cannot be detected and are recorded", "left_out": left_out, "detail": detail})
             print(f"KNOWN {tid}e {spec['name']}: private window not detectable :: {detail}")
+            # What Fractile does instead: it never stores this browser's
+            # titles (session.titles_never_stored_for), so nothing from the
+            # private window's content reaches the snapshot.
+            check(f"{tid}f", f"{spec['name']}: no title of this browser is stored, so the private window's title is not in the snapshot",
+                  bool(priv) and len(recs) >= 2 and all(h is None for h in hints) and "Secret" not in json.dumps(snap),
+                  f"recorded {len(recs)}; title hints {hints}")
     for pid in app_pids(e, EXE[key]):
         try:
             os.kill(pid, signal.SIGTERM)
@@ -268,7 +277,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--display", type=int, default=25)
     ap.add_argument("--keep", action="store_true")
-    ap.add_argument("--apps", default="firefox,chrome,code")
+    ap.add_argument("--apps", default=os.environ.get("FRACTILE_TEST_APPS", "firefox,chrome,code"))
     ap.add_argument("--log-dir", help="copy the service and app logs here before cleanup")
     ap.add_argument("--evidence", default=str(ROOT / "tests" / "evidence" / "e2e-x11-apps.json"))
     a = ap.parse_args()

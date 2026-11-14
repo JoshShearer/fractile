@@ -61,8 +61,9 @@ cat >"$stage/DEBIAN/postinst" <<'POST'
 #!/bin/sh
 set -e
 if [ "$1" = configure ] && [ -n "$2" ]; then
-  echo "fractile: upgraded. Running sessions keep the old service until it is restarted:"
-  echo "          systemctl --user restart fractile.service   (per user)"
+  echo "fractile: upgraded. A running Fractile service switches to the new version by itself"
+  echo "          within a couple of minutes, once it is idle. Versions before 0.8.5 do not:"
+  echo "          log out and in, or run: systemctl --user restart fractile.service"
 fi
 exit 0
 POST

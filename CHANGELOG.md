@@ -7,6 +7,15 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Added
 
+- **Titles are never stored for Chromium-family browsers**
+  (`session.titles_never_stored_for`, Chrome, Chromium, Brave, Edge and
+  Vivaldi by default). Their incognito windows carry no marker Fractile can
+  see, so this keeps a private window's page title out of every snapshot.
+  The window's position is still recorded. Checked with real Chrome 157.
+- **Upgrade test between released builds** (`FRACTILE_VM_UPGRADE_FROM` in
+  tests/vm/vm-e2e.sh): installs 0.8.0, then 0.8.5, then 0.9.0 over a running
+  session in a GNOME 46 VM and checks settings, shortcuts, snapshots, a single
+  service process and a reboot.
 - **Panel tests on GNOME Wayland** (tests/gui/panel_gnome_wayland.py): drag,
   the extension's preview, Esc, grid size keys, Shift+drag, Alt subdivision,
   the panel-local shortcut and grid reset, with the real UI on GNOME Shell
@@ -418,8 +427,10 @@ desktops only. See PLATFORM_MATRIX.md.
   for conflicts, and bindings added at runtime by other tools are invisible to
   Fractile (Sway's IPC cannot list bindings).
 - Google Chrome and Chromium incognito windows cannot be detected (no marker
-  in the title or the window properties) and are recorded in snapshots like
-  normal windows. Firefox private windows are left out.
+  in the title or the window properties) and are still recorded, but with
+  no title: titles are never stored for Chromium-family browsers, so only the
+  position and size of an incognito window are kept. Firefox private windows
+  are left out.
 - Fractile cannot restore application contents.
 - If the service is stopped within milliseconds of starting at a new login,
   before the login flow has picked a snapshot, the next login may find no

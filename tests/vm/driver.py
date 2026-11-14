@@ -574,6 +574,158 @@ def run(session: str, deb: str) -> None:
         vm.stop()
 
 
+def run_upgrade(session: str, old_debs: list[str], deb: str) -> None:
+    """PK-06 / SRS 9: upgrade a real install in a real login, keeping settings
+    and snapshots. old_debs are earlier builds (oldest first); the first is
+    installed and used, each next one is installed over it, then `deb`.
+
+    An upgrade from a build without the service's self-restart (before
+    ef1d4e3) needs the service restarted; the package says so, and the run
+    does what a user does: log out and in. From a build with it, the service
+    restarts onto the new binary in place inside the running session."""
+    base = base_for(session)
+    _xs, stype, shell = SESSIONS[session]
+    plasma = session.startswith("plasma")
+    vm = VM(base, f"upgrade-{session}")
+
+    def ver_of(path):
+        return subprocess.run(["dpkg-deb", "-f", path, "Version"], capture_output=True, text=True).stdout.strip()
+
+    def status():
+        return vm.call("status").get("result") or {}
+
+    def cfg():
+        return (vm.call("get_config").get("result") or {}).get("config") or {}
+
+    def relogin():
+        before = vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()
+        vm.vmctl("logout")
+        wait_for(lambda: (lambda pid: pid and pid != before)(vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()), 180, 3)
+        return wait_session(vm, stype)
+
+    def install(path, tag):
+        vm.scp(path, f"/tmp/{tag}.deb")
+        return vm.ssh(f"sudo DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/{tag}.deb > /tmp/apt-{tag}.log 2>&1; echo rc=$?; "
+                      f"grep -i 'fractile:' /tmp/apt-{tag}.log | head -3; dpkg-query -W fractile", timeout=900)
+
+    def frame(wid):
+        return next((x["frame"] for x in (vm.call("list_windows", {"all": True}).get("result") or []) if x["id"] == wid), None)
+
+    try:
+        if not check("U00", "the VM boots and answers over ssh", vm.wait_ssh(600)):
+            return
+        gdm_and_session(vm, session)
+        vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
+        first = old_debs[0]
+        v0 = ver_of(first)
+        vm.scp(first, "/tmp/old0.deb")
+        inst = vm.ssh("for i in 1 2 3; do sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 "
+                      "-o Acquire::http::Timeout=60 install -y /tmp/old0.deb > /tmp/apt.log 2>&1 && break; sleep 30; "
+                      "sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; dpkg-query -W fractile", timeout=1800)
+        if not check("U01", f"the old build installs ({v0})", inst.returncode == 0 and f"\t{v0}" in inst.stdout, inst.stdout.strip()[-200:]):
+            return
+        vm.ssh("sudo systemctl reboot", timeout=20)
+        vm.wait_down()
+        vm.wait_ssh(600)
+        wait_session_shell(vm, stype)
+        vm.vmctl("launch io.fractile.Fractile.desktop")
+        wait_for(lambda: vm.ssh("test -S /run/user/$(id -u)/fractile/fractile.sock").returncode == 0, 60)
+        setup = vm.vmctl("setup")
+        relogin()
+        st = status()
+        if not check("U02", f"the old build runs in a real {session} login and controls windows",
+                     st.get("version") == v0.split("-")[0] and (vm.vmctl("session").get("status") or {}).get("window_control"),
+                     f"version {st.get('version')}; setup {json.dumps(setup)[:200]}"):
+            return
+
+        # The user's settings, a shortcut of their own and a named snapshot.
+        c = cfg()
+        c["appearance"]["default_grid"] = {"cols": 8, "rows": 5}
+        c["general"]["panel_shortcut"] = "Ctrl+Alt+P"
+        c["shortcuts"].append({"id": "u-top-left", "name": "Upgrade test top left", "scope": "global", "accelerator": "Ctrl+Alt+Shift+F7",
+                               "cycle_monitors": False, "action": {"type": "place", "grid": {"cols": 2, "rows": 2},
+                                                                    "selection": {"col0": 0, "row0": 0, "col1": 0, "row1": 0}}})
+        vm.call("set_config", {"config": c})
+        vm.vmctl("launch org.gnome.TextEditor.desktop")
+        ed = wait_for(lambda: next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.TextEditor.desktop"), None), 60, 2)
+        if not check("U03", "settings, a shortcut and a window to snapshot are set up on the old build", bool(ed), f"editor {bool(ed)}"):
+            return
+        wid = ed["id"]
+        vm.call("place", {"window": wid, "grid": {"cols": 3, "rows": 2}, "selection": {"col0": 1, "row0": 0, "col1": 2, "row1": 0}})
+        time.sleep(1)
+        saved_frame = frame(wid)
+        snap = (vm.call("snapshot_save", {"name": "before upgrade"}).get("result") or {}).get("snapshot_id")
+
+        def kept(tag):
+            c2 = cfg()
+            lst = vm.call("snapshot_list", {"limit": 500}).get("result") or []
+            names = [x.get("name") for x in lst if isinstance(x, dict) and x.get("name")]
+            ok = (c2.get("appearance", {}).get("default_grid") == {"cols": 8, "rows": 5} and c2.get("general", {}).get("panel_shortcut") == "Ctrl+Alt+P"
+                  and any(x.get("id") == "u-top-left" for x in c2.get("shortcuts", [])) and "before upgrade" in names)
+            return ok, f"{tag}: grid {c2.get('appearance', {}).get('default_grid')} panel {c2.get('general', {}).get('panel_shortcut')} snapshots {names[:5]}"
+
+        steps = old_debs[1:] + [deb]
+        prev_ver = v0.split("-")[0]
+        for i, path in enumerate(steps, 1):
+            v = ver_of(path).split("-")[0]
+            pid0 = status().get("pid")
+            out = install(path, f"step{i}")
+            check(f"U1{i}a", f"{prev_ver} -> {v}: the package upgrades over the running install", "rc=0" in out.stdout and f"\t{v}-" in out.stdout,
+                  " ".join(out.stdout.split())[-250:])
+            # Self-restart in place (same pid) when the running build has it; otherwise the user logs out and in.
+            restarted = wait_for(lambda: status().get("version") == v, 150, 5)
+            how = f"restarted itself in place (pid {pid0} -> {status().get('pid')})" if restarted else ""
+            if not restarted:
+                relogin()
+                restarted = status().get("version") == v
+                how = "after a log-out and log-in (this build has no self-restart; the package said to restart the service)"
+            n = vm.ssh("pgrep -u tester -c -x fractiled").stdout.strip()
+            ws = wait_session(vm, stype, timeout=120)
+            check(f"U1{i}b", f"{prev_ver} -> {v}: the new service runs, once, and controls windows",
+                  restarted and n == "1" and (ws.get("status") or {}).get("window_control"), f"{how}; fractiled processes {n}")
+            ok, d = kept(v)
+            check(f"U1{i}c", f"{prev_ver} -> {v}: settings, the user's shortcut and the snapshot are kept", ok, d)
+            prev_ver = v
+
+        # The old snapshot restores with the new build.
+        def editor():
+            return next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.TextEditor.desktop"), None)
+
+        ed2 = editor()
+        if not ed2:
+            # the log-out after the first upgrade closed it
+            vm.vmctl("launch org.gnome.TextEditor.desktop")
+            ed2 = wait_for(editor, 60, 2)
+        if ed2:
+            vm.call("place", {"window": ed2["id"], "grid": {"cols": 2, "rows": 2}, "selection": {"col0": 0, "row0": 1, "col1": 0, "row1": 1}})
+            time.sleep(1)
+            r = vm.call("restore_start", {"snapshot": snap, "wait": True}).get("result") or {}
+            got = wait_for(lambda: (lambda f: f if f and saved_frame and all(abs(f[k] - saved_frame[k]) <= 4 for k in "xywh") else None)(frame(ed2["id"])), 30, 1) or frame(ed2["id"])
+            check("U20", "the snapshot saved by the oldest build restores with the new build", bool(got) and all(abs(got[k] - saved_frame[k]) <= 4 for k in "xywh"),
+                  f"saved {saved_frame} got {got}; run {json.dumps(r)[:200]}")
+        else:
+            check("U20", "the snapshot saved by the oldest build restores with the new build", False, "no editor window after the upgrade")
+        check("U21", "the user's global shortcuts are registered by the new build", not (vm.vmctl("session").get("status") or {}).get("hotkey_errors"),
+              json.dumps((vm.vmctl("session").get("status") or {}).get("hotkey_errors"))[:200])
+
+        # A reboot after the upgrade: one service, same settings.
+        vm.ssh("sudo systemctl reboot", timeout=20)
+        vm.wait_down()
+        vm.wait_ssh(600)
+        ws = wait_session(vm, stype)
+        n = vm.ssh("pgrep -u tester -c -x fractiled").stdout.strip()
+        ok, d = kept("after reboot")
+        check("U30", "after a reboot one new service starts from the unit, with the settings and snapshot kept",
+              status().get("version") == prev_ver and n == "1" and (ws.get("status") or {}).get("window_control") and ok, f"{d}; processes {n}")
+        dup = vm.ssh("ls ~/.config/autostart/ /etc/xdg/autostart/ 2>/dev/null | grep -ci fractile").stdout.strip()
+        check("U31", "no duplicate autostart entries after the upgrades", dup in ("0", "1"), f"{dup} autostart entries")
+    finally:
+        if HOLD and HOLD_AT in ("end", "fail"):
+            say(f"holding the VM for {HOLD} s (create /tmp/release in the container to go on)")
+            wait_for(lambda: Path("/tmp/release").exists(), HOLD, 2)
+        vm.stop()
+
+
 def run_panel(session: str, deb: str) -> None:
     """The panel in a real desktop login, driven with the VM's keyboard and
     tablet (DV-01, DV-02, DV-04, DV-05, DV-07, DV-09, DV-10, DV-11, DV-15,
@@ -1112,6 +1264,7 @@ def main() -> int:
     ap.add_argument("--provision-only", action="store_true")
     ap.add_argument("--power-cut", action="store_true", help="RS-18/T15: power cuts during snapshot writes instead of the reboot/log-out tests")
     ap.add_argument("--panel", action="store_true", help="the panel driven with the VM's keyboard and tablet instead of the reboot/log-out tests")
+    ap.add_argument("--upgrade-from", nargs="+", help="PK-06: earlier .debs (oldest first) installed before --deb")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
     ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail"])
     a = ap.parse_args()
@@ -1128,13 +1281,16 @@ def main() -> int:
         base_for(a.session)
         return 0
     try:
-        (run_panel if PANEL else run)(a.session, a.deb)
+        if a.upgrade_from:
+            run_upgrade(a.session, a.upgrade_from, a.deb)
+        else:
+            (run_panel if PANEL else run)(a.session, a.deb)
     except Exception as ex:  # noqa: BLE001  record, then still write evidence
         import traceback
         traceback.print_exc()
         check("VXX", "run crashed", False, repr(ex))
     ver = RELEASES[SESSION_RELEASE[a.session]] if a.session else "24.04"
-    suite = f"vm-ubuntu{ver}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "")
+    suite = f"vm-ubuntu{ver}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "") + ("-upgrade" if a.upgrade_from else "")
     ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
           "environment": f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}

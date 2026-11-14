@@ -1,0 +1,45 @@
+{
+  "suite": "e2e-x11-apps",
+  "when": "2026-11-14T22:07:09+0000",
+  "environment": "Xephyr nested GNOME Shell 46.0 (X11); throwaway profiles; {'chrome': 'Google Chrome 157.0.8103.78'}",
+  "results": [
+    {
+      "id": "A01a",
+      "name": "Google Chrome: two windows open with a throwaway profile, identified as google-chrome.desktop",
+      "ok": true,
+      "detail": "[('T14 Gamma - Google Chrome', 'Google-chrome', 'google-chrome.desktop'), ('T14 Delta - Google Chrome', 'Google-chrome', 'google-chrome.desktop')]"
+    },
+    {
+      "id": "A01b",
+      "name": "Google Chrome: restore launches it once, it reopens its own two windows, both are placed where they were; no extra windows",
+      "ok": true,
+      "detail": "launches=1 windows=2 placed={'T14 Gamma': {'h': 1168, 'w': 800, 'x': 0, 'y': 32}, 'T14 Delta': {'h': 1168, 'w': 800, 'x': 800, 'y': 32}} want={'T14 Gamma': {'h': 1168, 'w': 800, 'x': 0, 'y': 32}, 'T14 Delta': {'h': 1168, 'w': 800, 'x': 800, 'y': 32}} state=completed windows_closed_on_sigterm=True pids_signalled=13 killed_after_15s=[]"
+    },
+    {
+      "id": "A01c",
+      "name": "Google Chrome: the report covers both windows and claims nothing about tabs or unsaved content",
+      "ok": true,
+      "detail": "[{\"label\": \"google-chrome\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}, {\"label\": \"google-chrome #2\", \"status\": \"LAUNCHED_AND_PLACED\", \"launched\": true, \"message\": null}]"
+    },
+    {
+      "id": "A01d",
+      "name": "Google Chrome: restoring again launches nothing and opens nothing new",
+      "ok": true,
+      "detail": "launches=0 windows=2"
+    },
+    {
+      "id": "A01f",
+      "name": "Google Chrome: no title of this browser is stored, so the private window's title is not in the snapshot",
+      "ok": true,
+      "detail": "recorded 3; title hints [None, None, None]"
+    }
+  ],
+  "known_limitations": [
+    {
+      "id": "A01e",
+      "name": "Google Chrome: private windows cannot be detected and are recorded",
+      "left_out": false,
+      "detail": "private window title 'T14 Secret - Google Chrome'; open 3; recorded 3"
+    }
+  ]
+}

@@ -4,6 +4,8 @@
 # the host's display. Needs the debug build (cargo build).
 #   tests/gnome46-x11/run.sh [suite.py ...]
 # Default suites: X11 E2E, GUI, Settings, accessibility.
+# FRACTILE_INSTALL_CHROME=1 installs Google Chrome from Google's .deb first
+# (for tests/integration/e2e_x11_apps.py with FRACTILE_TEST_APPS=chrome).
 # Evidence: tests/evidence/<suite>-gnome46-x11.json.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
@@ -14,9 +16,16 @@ suites=("$@"); [ ${#suites[@]} -gt 0 ] || suites=(tests/integration/e2e_x11.py t
 # the shell that logind runs (it does not here), so move it aside. Then run
 # as a user with the host's uid, so the evidence files stay the host user's.
 uid=$(id -u); gid=$(id -g)
-docker run --rm -e UID_="$uid" -e GID_="$gid" ${FRACTILE_ORCA_LOG:+-e FRACTILE_ORCA_LOG=/evidence/$(basename "$FRACTILE_ORCA_LOG")} -v "$root:/src:ro" -v "$root/tests/evidence:/evidence" \
+docker run --rm -e UID_="$uid" -e GID_="$gid" -e FRACTILE_INSTALL_CHROME="${FRACTILE_INSTALL_CHROME:-}" -e FRACTILE_TEST_APPS="${FRACTILE_TEST_APPS:-}" -e FRACTILE_CHROME_NO_SANDBOX="${FRACTILE_INSTALL_CHROME:-}" ${FRACTILE_ORCA_LOG:+-e FRACTILE_ORCA_LOG=/evidence/$(basename "$FRACTILE_ORCA_LOG")} -v "$root:/src:ro" -v "$root/tests/evidence:/evidence" \
   fractile-gnome46-x11-test bash -c '
 mv /run/systemd/seats /tmp/seats.unused 2>/dev/null || true
 mkdir -p /run/dbus && dbus-daemon --system --fork
+if [ -n "$FRACTILE_INSTALL_CHROME" ]; then
+  { apt-get update -q >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -q ca-certificates curl >/tmp/chrome-apt.log 2>&1 &&
+    curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb &&
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -q /tmp/chrome.deb >>/tmp/chrome-apt.log 2>&1; } ||
+    { echo "Chrome install failed"; tail -5 /tmp/chrome-apt.log; exit 2; }
+  google-chrome --version
+fi
 groupadd -o -g "$GID_" t 2>/dev/null; useradd -o -u "$UID_" -g "$GID_" -m t
 exec su t -s /bin/bash -c "bash /src/tests/gnome46-x11/user.sh $*"' _ "${suites[@]}"

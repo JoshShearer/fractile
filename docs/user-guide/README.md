@@ -257,8 +257,13 @@ browsers that put such a marker in the window title, for example Firefox
 
 Google Chrome and Chromium do not: an incognito window is titled like a normal
 one ("Page - Google Chrome") and has no window property that tells it apart
-(checked with Chrome 157 on X11). Fractile cannot detect these windows and
-records them, including their title, like normal windows. If that matters to
-you, turn off "Store window titles" (`session.store_titles = false`), or close
-incognito windows before you log out. Chrome never reopens incognito windows,
-so a restore reports them as not reopened and does not open them.
+(checked with Chrome 157 on X11). Fractile cannot tell these windows apart,
+so it cannot leave them out. Instead it never stores a title for these
+browsers: Chrome, Chromium, Brave, Edge and Vivaldi are listed in
+`session.titles_never_stored_for`, and their windows are recorded with their
+position and size only. An incognito window therefore puts nothing from its
+pages into a snapshot. The cost is that Fractile has no title to tell two
+windows of the same browser apart on restore, so it matches them by order.
+To store titles for one of these browsers anyway, remove it from the list.
+Chrome never reopens incognito windows, so a restore reports a recorded
+incognito window as not reopened and does not open it.

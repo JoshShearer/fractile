@@ -183,6 +183,17 @@ pub enum PowerLossPolicy {
     Skip,
 }
 
+/// Chromium-based browsers: their incognito/private windows carry no marker
+/// (checked with Google Chrome 157 on X11: same title form, same WM_CLASS,
+/// role and every other property).
+pub fn default_untitled_apps() -> Vec<String> {
+    ["google-chrome", "google-chrome-beta", "google-chrome-unstable", "chromium", "chromium-browser", "org.chromium.Chromium",
+     "brave-browser", "com.brave.Browser", "microsoft-edge", "microsoft-edge-beta", "com.microsoft.Edge", "vivaldi-stable", "com.vivaldi.Vivaldi"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SessionConfig {
@@ -210,6 +221,13 @@ pub struct SessionConfig {
     pub readiness_timeout_s: u64,
     /// Store window titles (as disambiguation hints) in snapshots.
     pub store_titles: bool,
+    /// Apps whose titles are never stored, even with `store_titles` on:
+    /// browsers that give a private window no marker (no title text, no
+    /// window property), so a private window cannot be left out and its
+    /// title would otherwise land in the snapshot. Matched, ignoring case,
+    /// against the desktop file id (without ".desktop"), the Wayland app id
+    /// and the X11 WM_CLASS class and instance.
+    pub titles_never_stored_for: Vec<String>,
     /// Pause capture while the session is locked.
     pub skip_capture_when_locked: bool,
 }
@@ -242,6 +260,7 @@ impl Default for SessionConfig {
             max_consecutive_failures: 3,
             readiness_timeout_s: 60,
             store_titles: true,
+            titles_never_stored_for: default_untitled_apps(),
             skip_capture_when_locked: true,
         }
     }

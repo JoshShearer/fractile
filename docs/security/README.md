@@ -142,6 +142,10 @@ execute anything.
   --redacted`.
 - Windows whose titles match `session.private_title_patterns` (private and
   incognito browser windows by default) are left out of snapshots entirely.
+- Chromium-family incognito windows carry no marker, so they cannot be left
+  out. Titles are never stored for those browsers
+  (`session.titles_never_stored_for`), so such a window is recorded with its
+  position and size only.
 - The service log is local only. It mentions window titles in a tagged form, so
   that `fractile logs --redacted` and the diagnostics export reliably remove them
   (X20).
