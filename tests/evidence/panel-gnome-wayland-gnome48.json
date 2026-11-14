@@ -1,6 +1,6 @@
 {
   "suite": "panel-gnome-wayland",
-  "when": "2026-11-14T19:23:08+0000",
+  "when": "2026-11-14T21:33:28+0000",
   "environment": "headless GNOME Shell 48.8 --wayland --no-x11, Fractile extension fractile@fractile.io, PyQt6 UI on Wayland; input from Mutter's RemoteDesktop virtual keyboard and pointer (test harness)",
   "results": [
     {
@@ -37,7 +37,7 @@
       "id": "PW03",
       "name": "Esc closes the panel without moving the window and focus returns to it",
       "ok": true,
-      "detail": "active gnome:2968188142; {'h': 1168, 'w': 800, 'x': 0, 'y': 32} -> {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+      "detail": "active gnome:2134855201; {'h': 1168, 'w': 800, 'x': 0, 'y': 32} -> {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
     },
     {
       "id": "PW04",
@@ -73,7 +73,7 @@
       "id": "PW09",
       "name": "the UI logged no Python errors",
       "ok": true,
-      "detail": " files\nfractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)\n\n(python3:374): dbind-WARNING **: 19:22:37.696: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\n"
+      "detail": " files\nfractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)\n\n(python3:385): dbind-WARNING **: 21:32:58.223: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\n"
     }
   ]
 }

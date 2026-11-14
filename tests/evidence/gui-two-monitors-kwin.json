@@ -1,6 +1,6 @@
 {
   "suite": "gui-two-monitors",
-  "when": "2026-11-14T19:26:34+0000",
+  "when": "2026-11-14T21:34:48+0000",
   "environment": "Xvfb split into two RandR monitors 1600x1200+1280x1024, kwin_x11, PyQt6 UI",
   "results": [
     {

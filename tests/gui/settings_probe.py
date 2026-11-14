@@ -60,6 +60,10 @@ def wait(fn, sec: float = 5.0):
 
 
 WAYLAND = os.environ.get("XDG_SESSION_TYPE") == "wayland"
+# A test keyboard with the injector protocol (the VM runs use a uinput one on
+# X11 and Wayland alike); otherwise wlkeys on Wayland and xdotool on X11.
+KEYS_CMD = os.environ.get("FRACTILE_TEST_KEYS_CMD")
+USE_INJ = WAYLAND or bool(KEYS_CMD)
 INJ: subprocess.Popen | None = None
 
 
@@ -84,17 +88,17 @@ def start_injector() -> None:
     on the headless shell's private bus). Creating it moves keyboard focus, so
     it is started before any window is focused."""
     global INJ
-    if WAYLAND and INJ is None:
+    if USE_INJ and INJ is None:
         # FRACTILE_TEST_KEYS_CMD: another injector with the same stdin protocol
         # (the VM run uses a uinput keyboard, tests/tools/uinput_keys.py).
-        cmd = shlex.split(os.environ["FRACTILE_TEST_KEYS_CMD"]) if os.environ.get("FRACTILE_TEST_KEYS_CMD") \
+        cmd = shlex.split(KEYS_CMD) if KEYS_CMD \
             else [sys.executable, str(ROOT / "tests" / "tools" / "wlkeys.py"), "--stdin"]
         INJ = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         _inj_wait("ready", 10.0)
 
 
 def key(combo: str) -> None:
-    if WAYLAND:
+    if USE_INJ:
         # The Qt loop must keep dispatching while the keys go in; a blocking
         # wait here lost the events.
         start_injector()
@@ -167,9 +171,14 @@ def drive_dialog(state: dict) -> None:
         check("S05", "a combination the desktop's own settings assign (log out) is reported as taken, with where it is set",
               msg.startswith("⚠") and named and (ed.value or "").startswith("Ctrl+Alt+Del"), f"{msg} (value {ed.value})")
     else:
-        msg = capture(ed, "ctrl+alt+shift+k")
+        # The container suites start a client that holds Ctrl+Alt+Shift+K; in a
+        # real Plasma X11 login the VM run names a combination KDE itself
+        # holds with an X grab (Ctrl+Alt+Delete, log out).
+        held = os.environ.get("FRACTILE_PROBE_X11_HELD", "ctrl+alt+shift+k")
+        want = "+".join(p.capitalize() if len(p) > 1 else p.upper() for p in held.split("+"))
+        msg = capture(ed, held)
         check("S05", "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",
-              msg.startswith("⚠") and "another application already uses" in msg and ed.value == "Ctrl+Alt+Shift+K", msg)
+              msg.startswith("⚠") and "another application already uses" in msg and (ed.value or "").lower() == want.lower(), f"{msg} (value {ed.value})")
     msg = capture(ed, "ctrl+alt+shift+F9")
     check("S06", "a free combination is reported as available", msg.startswith("✓") and ed.value == "Ctrl+Alt+Shift+F9", msg)
     # Panel scope: navigation keys are reserved.
@@ -384,8 +393,24 @@ def main() -> int:
             check("SXX", "probe crashed", False, repr(ex))
         qapp.quit()
 
+    def watchdog(*_):
+        # Something modal nobody answers would otherwise hang the run until
+        # the caller kills it, with no results at all.
+        check("SXX", "probe finished within its time limit", False, f"stuck after {[r['id'] for r in results]}")
+        print(json.dumps({"results": results, "shots": shots}), flush=True)
+        os._exit(1)
+
+    import signal
+    signal.signal(signal.SIGALRM, watchdog)
+    signal.alarm(int(os.environ.get("FRACTILE_PROBE_LIMIT", "420")))
+    # Python handles the signal only when Python code runs; a modal box's
+    # event loop runs this timer, so the handler gets its turn.
+    tick = QTimer()
+    tick.timeout.connect(lambda: None)
+    tick.start(500)
     QTimer.singleShot(0, go)
     qapp.exec()
+    signal.alarm(0)
     if INJ is not None:
         INJ.stdin.close()
         INJ.wait(10)

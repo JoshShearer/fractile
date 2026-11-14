@@ -526,7 +526,13 @@ class PanelController:
         dismiss = bool(self.cfg.get("general", {}).get("dismiss_after_apply", True))
         if dismiss:
             self.hide()
-        self.app.bridge.call_async("run_shortcut", {"id": sid}, lambda _r: dismiss and self.return_focus(), lambda c, m: self.app.notify("Shortcut failed", m))
+        params = {"id": sid}
+        t = (self.payload or {}).get("target")
+        if t:
+            # the panel's own target, not "whatever is active": once the panel
+            # hides, KWin may report no active window for a moment
+            params["window"] = t["id"]
+        self.app.bridge.call_async("run_shortcut", params, lambda _r: dismiss and self.return_focus(), lambda c, m: self.app.notify("Shortcut failed", m))
 
     def undo(self):
         self.app.bridge.call_async("undo", {}, None, lambda c, m: self.app.notify("Nothing to undo", m))

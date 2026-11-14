@@ -466,7 +466,7 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             let id = req_s(p, "id")?;
             let cfg = d.config();
             let sc = cfg.shortcuts.iter().find(|x| x.id == id).ok_or_else(|| err("not_found", format!("no shortcut '{id}'")))?;
-            d.run_action(&sc.id, &sc.action, sc.cycle_monitors, None)
+            d.run_action(&sc.id, &sc.action, sc.cycle_monitors, None, s(p, "window"))
         }
 
         // ---- config ----

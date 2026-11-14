@@ -1,0 +1,49 @@
+{
+  "suite": "e2e-kwin-wayland-two-monitors",
+  "when": "2026-11-14T21:32:26+0000",
+  "environment": "kwin 6.8.2 --virtual --output-count 2 (two 1600x1200 outputs side by side, Wayland, no Xwayland) in an archlinux container (render device: nvidia); Fractile KWin script; PyQt6 UI on Wayland; pointer from KWin's fake-input protocol (test harness)",
+  "results": [
+    {
+      "id": "KM00",
+      "name": "two outputs are seen through the KWin script",
+      "ok": true,
+      "detail": "[('conn-Virtual-0-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}), ('conn-Virtual-1-1600x1200', {'h': 1200, 'w': 1600, 'x': 1600, 'y': 0})]"
+    },
+    {
+      "id": "KM01",
+      "name": "test window is up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "KM02",
+      "name": "the panel shortcut opens one panel per monitor, each on its own monitor (KWin Wayland)",
+      "ok": true,
+      "detail": "panels [{'h': 368, 'w': 465, 'x': 2167, 'y': 416}, {'h': 368, 'w': 465, 'x': 567, 'y': 416}]; grids [('conn-Virtual-0-1600x1200', 112, 56), ('conn-Virtual-1-1600x1200', 112, 56)]"
+    },
+    {
+      "id": "KM03",
+      "name": "dragging on the other monitor's panel places the window on that monitor exactly (KWin Wayland)",
+      "ok": true,
+      "detail": "want {'h': 800, 'w': 800, 'x': 1866, 'y': 200} got {'h': 800, 'w': 800, 'x': 1866, 'y': 200}"
+    },
+    {
+      "id": "KM04",
+      "name": "during that drag the preview window is on the other monitor at the exact target",
+      "ok": true,
+      "detail": "preview {'h': 800, 'w': 800, 'x': 1866, 'y': 200} want {'h': 800, 'w': 800, 'x': 1866, 'y': 200}"
+    },
+    {
+      "id": "KM05",
+      "name": "pressing the same placement shortcut again moves the window to the next monitor and back (a, b, a)",
+      "ok": true,
+      "detail": "['conn-Virtual-0-1600x1200', 'conn-Virtual-1-1600x1200', 'conn-Virtual-0-1600x1200']"
+    },
+    {
+      "id": "KM06",
+      "name": "the UI logged no Python errors",
+      "ok": true,
+      "detail": "fractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)\n"
+    }
+  ]
+}

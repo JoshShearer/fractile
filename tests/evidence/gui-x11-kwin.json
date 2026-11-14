@@ -1,6 +1,6 @@
 {
   "suite": "gui-x11",
-  "when": "2026-11-14T17:50:35+0000",
+  "when": "2026-11-14T21:34:36+0000",
   "environment": "Xvfb kwin_x11 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
@@ -14,7 +14,7 @@
       "id": "G01",
       "name": "hotkey starts the UI and shows the panel above all windows",
       "ok": true,
-      "detail": "0.6s incl. UI start; stack top 0x600006"
+      "detail": "0.6s incl. UI start; stack top 0xa00006"
     },
     {
       "id": "G02",
@@ -110,7 +110,7 @@
       "id": "G21",
       "name": "closing and reopening the panel straight away keeps the UI running and the panel open",
       "ok": true,
-      "detail": "ui pids [159] -> [159]"
+      "detail": "ui pids [162] -> [162]"
     },
     {
       "id": "G20",
@@ -122,7 +122,7 @@
       "id": "G17",
       "name": "relaunching from the app menu shows the panel for the focused window; no second UI stays running",
       "ok": true,
-      "detail": "exit 0; ui pids [159] -> [159]; got {'h': 200, 'w': 266, 'x': 0, 'y': 0}"
+      "detail": "exit 0; ui pids [162] -> [162]; got {'h': 200, 'w': 266, 'x': 0, 'y': 0}"
     },
     {
       "id": "G13",

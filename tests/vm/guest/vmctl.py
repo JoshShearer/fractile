@@ -315,6 +315,23 @@ def panel_windows():
             and not (w.get("state") or {}).get("minimized")]
 
 
+def cmd_x11_preview() -> dict:
+    """The mapped "Fractile preview" window on X11 (override-redirect, so only
+    the X server knows it), from xwininfo."""
+    import re
+    p = run("xwininfo", "-root", "-tree")
+    for line in p.stdout.splitlines():
+        if '"Fractile preview"' in line:
+            m = re.search(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)\s+\+(-?\d+)\+(-?\d+)", line)
+            if not m:
+                continue
+            w, h, _, _, x, y = map(int, m.groups())
+            st = run("xwininfo", "-id", line.split()[0])
+            if "IsViewable" in st.stdout:
+                return {"frame": {"x": x, "y": y, "w": w, "h": h}}
+    return {"frame": None, "rc": p.returncode, "err": p.stderr[-200:]}
+
+
 def cmd_panel_geom() -> dict:
     """The grid of each open panel in screen coordinates: the panel window's
     frame (from the compositor) plus the grid's offset inside it (from the UI;
@@ -374,6 +391,8 @@ def cmd_settings_probe() -> dict:
     env = dict(ENV, PYTHONPATH="/usr/lib/fractile", PYTHONDONTWRITEBYTECODE="1",
                FRACTILE_TEST_KEYS_CMD="sudo -n python3 /home/tester/t/tests/tools/uinput_keys.py",
                QT_QPA_PLATFORM="wayland" if ENV.get("XDG_SESSION_TYPE") == "wayland" else "xcb")
+    if PLASMA and ENV.get("XDG_SESSION_TYPE") != "wayland":
+        env["FRACTILE_PROBE_X11_HELD"] = "ctrl+alt+delete"
     os.makedirs("/tmp/shots", exist_ok=True)
     p = subprocess.run(["python3", "/home/tester/t/tests/gui/settings_probe.py", "/tmp/shots"], env=env, capture_output=True, text=True, timeout=600)
     try:
@@ -386,7 +405,7 @@ def main() -> int:
     cmd = sys.argv[1]
     fn = {"session": cmd_session, "setup": cmd_setup, "open-apps": cmd_open_apps, "state": cmd_state, "logout": cmd_logout, "launch": cmd_launch,
           "call": cmd_call, "panel-prep": cmd_panel_prep, "panel-geom": cmd_panel_geom,
-          "tray": cmd_tray, "tray-activate": cmd_tray_activate, "settings-probe": cmd_settings_probe}[cmd]
+          "tray": cmd_tray, "x11-preview": cmd_x11_preview, "tray-activate": cmd_tray_activate, "settings-probe": cmd_settings_probe}[cmd]
     print(json.dumps(fn()))
     return 0
 

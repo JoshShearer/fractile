@@ -696,14 +696,17 @@ impl Daemon {
         let d = self.clone();
         let b = binding.to_string();
         std::thread::spawn(move || {
-            if let Err(e) = d.run_action(&b, &action, cyc, Some(ts)) {
+            if let Err(e) = d.run_action(&b, &action, cyc, Some(ts), None) {
                 warn!(d.log, "shortcut '{name}' failed: {e}");
                 d.broadcast("notice", json!({"level": "warning", "message": format!("{name}: {}", e.message)}));
             }
         });
     }
 
-    pub fn run_action(self: &Arc<Self>, binding: &str, action: &ShortcutAction, cycle: bool, ts: Option<u32>) -> R<Value> {
+    /// `window`: the window to act on. None = the active window (a global
+    /// shortcut); the panel passes its target, because right after the panel
+    /// hides the desktop may report no active window for a moment.
+    pub fn run_action(self: &Arc<Self>, binding: &str, action: &ShortcutAction, cycle: bool, ts: Option<u32>, window: Option<&str>) -> R<Value> {
         match action {
             ShortcutAction::TogglePanel => Ok(self.toggle_panel(ts)),
             ShortcutAction::CommandPalette => {
@@ -711,23 +714,23 @@ impl Daemon {
                 Ok(json!({"ok": true}))
             }
             ShortcutAction::Place { grid, selection, output } => {
-                let w = self.resolve_window(None)?;
+                let w = self.resolve_window(window)?;
                 Ok(json!(self.run_place_shortcut(binding, *grid, *selection, output, cycle, &w)?))
             }
             ShortcutAction::Snap { action } => {
-                let w = self.resolve_window(None)?;
+                let w = self.resolve_window(window)?;
                 Ok(json!(self.snap(&w, *action, &OutputSel::Current)?))
             }
             ShortcutAction::MoveToNextOutput => {
-                let w = self.resolve_window(None)?;
+                let w = self.resolve_window(window)?;
                 Ok(json!(self.move_to_output_step(&w, 1)?))
             }
             ShortcutAction::MoveToPrevOutput => {
-                let w = self.resolve_window(None)?;
+                let w = self.resolve_window(window)?;
                 Ok(json!(self.move_to_output_step(&w, -1)?))
             }
             ShortcutAction::MoveToWorkspace { index } => {
-                let w = self.resolve_window(None)?;
+                let w = self.resolve_window(window)?;
                 self.require(Operation::MoveToWorkspace)?;
                 self.adapter().move_to_workspace(&w, *index).map_err(|e| err("adapter", e.to_string()))?;
                 Ok(json!({"ok": true}))

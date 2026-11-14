@@ -1,0 +1,49 @@
+{
+  "suite": "panel-gnome-wayland-two-monitors",
+  "when": "2026-11-14T21:32:49+0000",
+  "environment": "headless GNOME Shell 48.8 --wayland --no-x11, two virtual monitors (1600x1200, 1280x1024), Fractile extension fractile@fractile.io, PyQt6 UI on Wayland; input from Mutter's RemoteDesktop virtual keyboard and pointer (test harness)",
+  "results": [
+    {
+      "id": "PM00",
+      "name": "two monitors are seen",
+      "ok": true,
+      "detail": "[('mon-MetaVendor-MetaVirtualMonitor-0x00', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}), ('mon-MetaVendor-MetaVirtualMonitor-0x01', {'h': 1024, 'w': 1280, 'x': 1600, 'y': 0})]"
+    },
+    {
+      "id": "PM01",
+      "name": "test window is up and the GNOME integration is connected (Wayland)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "PM02",
+      "name": "the shortcut opens one panel per monitor, each on its own monitor (Wayland)",
+      "ok": true,
+      "detail": "panels [{'h': 388, 'w': 531, 'x': 1974, 'y': 318}, {'h': 388, 'w': 531, 'x': 534, 'y': 422}]; grids [('mon-MetaVendor-MetaVirtualMonitor-0x00', 145, 67), ('mon-MetaVendor-MetaVirtualMonitor-0x01', 145, 67)]"
+    },
+    {
+      "id": "PM03",
+      "name": "dragging on the other monitor's panel places the window on that monitor exactly (Wayland)",
+      "ok": true,
+      "detail": "want {'h': 683, 'w': 640, 'x': 1813, 'y': 170} got {'h': 683, 'w': 640, 'x': 1813, 'y': 170} (from mon-MetaVendor-MetaVirtualMonitor-0x00 to mon-MetaVendor-MetaVirtualMonitor-0x01)"
+    },
+    {
+      "id": "PM04",
+      "name": "during that drag the preview is on the other monitor at the exact target",
+      "ok": true,
+      "detail": "preview {'x': 1813, 'y': 170, 'w': 640, 'h': 683, 'reactive': False} want {'h': 683, 'w': 640, 'x': 1813, 'y': 170}"
+    },
+    {
+      "id": "PM05",
+      "name": "both panels close after the placement",
+      "ok": true,
+      "detail": "0 open"
+    },
+    {
+      "id": "PM06",
+      "name": "the UI logged no Python errors",
+      "ok": true,
+      "detail": " files\nfractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)\n\n(python3:661): dbind-WARNING **: 21:32:41.962: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\n"
+    }
+  ]
+}

@@ -13,6 +13,15 @@ desktops only. See PLATFORM_MATRIX.md.
   45, 47 and 48 Wayland. Keys and pointer come from Mutter's RemoteDesktop
   virtual devices (test harness only). The two-monitor X11 suite also checks
   that a repeated placement shortcut cycles the monitors (G25).
+- **Two-monitor panel tests on Wayland**: KWin Wayland with two virtual
+  outputs (tests/kwin/e2e_kwin_two.py, pointer from KWin's fake-input
+  protocol, test harness only) and GNOME Shell 48 with two virtual monitors
+  (tests/gui/panel_gnome_wayland_two.py). They check one panel per monitor,
+  an exact drag on the second monitor's panel with the preview there, and on
+  KWin a repeated shortcut cycling the monitors.
+- **Panel tests in a real Plasma X11 login** (`FRACTILE_VM_PANEL=1
+  tests/vm/vm-e2e.sh plasma-x11`): the same 38 checks as on Plasma Wayland,
+  including the tray and the Settings probe. 38/38 on Plasma 5.27.
 - **Panel tests in a real Plasma Wayland login** (`FRACTILE_VM_PANEL=1
   tests/vm/vm-e2e.sh plasma-wayland`): the panel driven with the VM's virtual
   keyboard and USB tablet through QEMU: one instance, drag, preview, Esc, grid
@@ -112,6 +121,12 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Panel-local shortcuts sometimes did nothing under KWin.** Ctrl+Left and
+  the other panel shortcuts hid the panel and then asked the service to act
+  on "the active window". Right after the panel hid, KWin sometimes reported
+  no active window, so nothing happened. The panel now sends its own target
+  window, as the palette already did. Found in a real Plasma 5.27 X11 login
+  (VM panel run, P13).
 - **Shortcut editor could not record a combination Plasma uses.** On Plasma
   Wayland, KWin acted on its own shortcuts while the editor listened, so
   pressing Ctrl+Alt+Delete opened the logout screen instead of being reported

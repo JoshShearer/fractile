@@ -3,7 +3,8 @@
 # (tests/kwin/Dockerfile), starts a private D-Bus session and a headless
 # kwin_wayland --virtual, and runs tests/kwin/e2e_kwin.py. Writes evidence
 # to tests/evidence/e2e-kwin-wayland.json.
-#   tests/kwin/e2e-kwin-in-container.sh
+#   tests/kwin/e2e-kwin-in-container.sh [SUITE.py OUTPUTS EVIDENCE.json]
+# e.g. tests/kwin/e2e-kwin-in-container.sh e2e_kwin_two.py 2 e2e-kwin-wayland-two-monitors.json
 #
 # kwin_wayland carries cap_sys_nice as a file capability, hence --cap-add.
 #
@@ -32,4 +33,5 @@ if [ -e /dev/dri/renderD128 ]; then
   fi
 fi
 echo "render device: $gpu"
-docker run "${args[@]}" -e FRACTILE_TEST_GPU=$gpu fractile-kwin-test bash /src/tests/kwin/container-root.sh
+docker run "${args[@]}" -e FRACTILE_TEST_GPU=$gpu -e FRACTILE_KWIN_SUITE="${1:-e2e_kwin.py}" -e FRACTILE_KWIN_OUTPUTS="${2:-1}" \
+  -e FRACTILE_KWIN_EVIDENCE="${3:-e2e-kwin-wayland.json}" fractile-kwin-test bash /src/tests/kwin/container-root.sh

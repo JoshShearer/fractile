@@ -592,7 +592,7 @@ def run_panel(session: str, deb: str) -> None:
         vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
         rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {PLASMA_VERSIONS if plasma else 'gnome-shell --version'}").stdout.strip().replace("\n", "; ")
         inst = vm.ssh("for i in 1 2 3; do sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 "
-                      "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb python3-evdev > /tmp/apt.log 2>&1 && break; sleep 30; "
+                      "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb python3-evdev x11-utils > /tmp/apt.log 2>&1 && break; sleep 30; "
                       "sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; dpkg-query -W fractile", timeout=1800)
         if not check("P01", f"the .deb installs ({rel})", inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, inst.stdout.strip()[-200:]):
             return
@@ -688,7 +688,13 @@ def run_panel(session: str, deb: str) -> None:
             time.sleep(0.8)
             mid_frame = frame()
             drag.active = active()
-            prev = [x for x in (vm.call("list_windows", {"all": True}).get("result") or []) if (x.get("title") or "").startswith("Fractile preview")]
+            if session.endswith("x11"):
+                # On X11 the preview is an override-redirect window, which no
+                # window list carries: ask the X server.
+                xp = vm.vmctl("x11-preview")
+                prev = [{"frame": xp["frame"]}] if xp.get("frame") else []
+            else:
+                prev = [x for x in (vm.call("list_windows", {"all": True}).get("result") or []) if (x.get("title") or "").startswith("Fractile preview")]
             s = vm.screenshot(shot) if shot else None
             vm.button(False)
             time.sleep(0.2)
