@@ -27,6 +27,7 @@ Usage: driver.py --session wayland|x11|plasma-x11 --deb /src/packaging/build/fra
 from __future__ import annotations
 
 import argparse
+import shlex
 import hashlib
 import json
 import socket
@@ -56,6 +57,7 @@ APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-edi
 HOLD = 0
 HOLD_AT = "login"
 POWER_CUT = False
+PANEL = False  # --panel: a USB tablet for absolute pointer input
 DB = "~/.local/share/fractile/fractile.db"
 CLI_ENV = "XDG_RUNTIME_DIR=/run/user/$(id -u)"
 results: list[dict] = []
@@ -162,6 +164,10 @@ def qemu_cmd(disk: Path, seed_img: Path | None, serial: Path) -> list[str]:
            "-qmp", f"unix:{QMP},server,nowait", "-serial", f"file:{serial}"]
     if seed_img:
         cmd += ["-drive", f"file={seed_img},if=virtio,format=raw"]
+    if PANEL:
+        # A tablet reports absolute positions, so the harness can put the
+        # pointer on an exact pixel (a mouse only moves relatively).
+        cmd += ["-device", "qemu-xhci", "-device", "usb-tablet"]
     return cmd
 
 
@@ -344,6 +350,35 @@ class VM:
             return ok
         except OSError:
             return False
+
+    # -- real input for the panel tests: QEMU's virtual keyboard and USB
+    # tablet, the way a user's devices reach the desktop. Fractile itself
+    # injects nothing.
+    def events(self, *evs: dict) -> bool:
+        return "return" in self.qmp("input-send-event", {"events": list(evs)})
+
+    def keydown(self, k: str, down: bool = True) -> bool:
+        return self.events({"type": "key", "data": {"down": down, "key": {"type": "qcode", "data": k}}})
+
+    def combo(self, combo: str) -> bool:
+        keys = combo.split("+")
+        ok = all(self.keydown(k) for k in keys)
+        time.sleep(0.05)
+        ok = all(self.keydown(k, False) for k in reversed(keys)) and ok
+        time.sleep(0.25)
+        return ok
+
+    def pointer_to(self, x: float, y: float, screen: tuple[int, int]) -> bool:
+        """Absolute position in the desktop's coordinates (one output)."""
+        w, h = screen
+        return self.events({"type": "abs", "data": {"axis": "x", "value": round(x * 32767 / max(1, w - 1))}},
+                           {"type": "abs", "data": {"axis": "y", "value": round(y * 32767 / max(1, h - 1))}})
+
+    def button(self, down: bool) -> bool:
+        return self.events({"type": "btn", "data": {"down": down, "button": "left"}})
+
+    def call(self, method: str, params: dict | None = None) -> dict:
+        return self.vmctl(f"call {method} {shlex.quote(json.dumps(params or {}))}")
 
     def stop(self) -> None:
         if self.p.poll() is None:
@@ -535,6 +570,271 @@ def run(session: str, deb: str) -> None:
         logs = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile logs --redacted --lines 400 2>&1 | grep -iE 'warn|error|restore' | tail -40").stdout
         (EVID / "vm").mkdir(parents=True, exist_ok=True)
         (EVID / "vm" / f"{session}-fractile-log.txt").write_text(logs)
+    finally:
+        vm.stop()
+
+
+def run_panel(session: str, deb: str) -> None:
+    """The panel in a real desktop login, driven with the VM's keyboard and
+    tablet (DV-01, DV-02, DV-04, DV-05, DV-07, DV-09, DV-10, DV-11, DV-15,
+    DV-21, DV-24, DV-27): the same interactions as tests/gui/gui_x11.py and
+    tests/gui/panel_gnome_wayland.py."""
+    base = base_for(session)
+    _xs, stype, shell = SESSIONS[session]
+    plasma = session.startswith("plasma")
+    ver = RELEASES[SESSION_RELEASE[session]]
+    vm = VM(base, f"panel-{session}")
+    try:
+        if not check("P00", "the VM boots and answers over ssh", vm.wait_ssh(600)):
+            return
+        gdm_and_session(vm, session)
+        vm.scp(deb, "/tmp/fractile.deb")
+        vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
+        rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {PLASMA_VERSIONS if plasma else 'gnome-shell --version'}").stdout.strip().replace("\n", "; ")
+        inst = vm.ssh("for i in 1 2 3; do sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 "
+                      "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb > /tmp/apt.log 2>&1 && break; sleep 30; "
+                      "sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; dpkg-query -W fractile", timeout=1800)
+        if not check("P01", f"the .deb installs ({rel})", inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, inst.stdout.strip()[-200:]):
+            return
+        vm.ssh("sudo systemctl reboot", timeout=20)
+        vm.wait_down()
+        vm.wait_ssh(600)
+        wait_session_shell(vm, stype)
+        vm.vmctl("launch io.fractile.Fractile.desktop")
+        wait_for(lambda: vm.ssh("test -S /run/user/$(id -u)/fractile/fractile.sock").returncode == 0, 60)
+        setup = vm.vmctl("setup")
+        # a log-out and log-in loads the GNOME extension (and is harmless on Plasma)
+        shell_before = vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()
+        vm.vmctl("logout")
+        wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()), 180, 3)
+        s2 = wait_session(vm, stype)
+        prep = vm.vmctl("panel-prep")
+        st = prep.get("status") or {}
+        if not check("P02", f"real {session} login: the service runs from the systemd unit and controls windows",
+                     bool(st.get("window_control")) and s2.get("unit_active") == "active",
+                     f"adapter {st.get('adapter')} session {st.get('session_type')}; setup {json.dumps(setup)[:200]}; prep {json.dumps(prep)[:300]}"):
+            vm.screenshot(f"panel-{session}-00-no-control")
+            return
+
+        # DV-01: one instance
+        pid0 = (vm.call("status").get("result") or {}).get("pid")
+        second = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) timeout 10 fractiled 2>&1; echo rc=$?")
+        pid1 = (vm.call("status").get("result") or {}).get("pid")
+        check("P03", "a second service started by hand says it is already running and leaves the running one alone (one instance)",
+              "already running" in second.stdout and "rc=124" not in second.stdout and pid0 and pid0 == pid1,
+              f"{second.stdout.strip()[-200:]}; service pid {pid0} -> {pid1}")
+
+        outs = (vm.call("list_outputs").get("result") or [])
+        out = outs[0]
+        screen = (out["rect"]["w"], out["rect"]["h"])
+        vm.vmctl("launch org.gnome.TextEditor.desktop")
+        ed = wait_for(lambda: next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.TextEditor.desktop"), None), 60, 2)
+        if not check("P04", "the target app (Text Editor) is up and placeable", bool(ed), f"outputs {[(o['stable_id'], o['rect']) for o in outs]}"):
+            return
+        wid = ed["id"]
+
+        def frame(w=wid):
+            return next((x["frame"] for x in (vm.call("list_windows", {"all": True}).get("result") or []) if x["id"] == w), None)
+
+        def rect(cols, rows, c0, r0, c1, r1):
+            return vm.call("compute_rect", {"grid": {"cols": cols, "rows": rows}, "selection": {"col0": c0, "row0": r0, "col1": c1, "row1": r1}}).get("result")
+
+        def near(a, b, tol=2):
+            return bool(a and b) and all(abs(a[k] - b[k]) <= tol for k in ("x", "y", "w", "h"))
+
+        def placed(want, t=6):
+            return wait_for(lambda: (lambda f: f if near(f, want) else None)(frame()), t, 0.5) or frame()
+
+        def active():
+            return vm.call("active_window").get("result")
+
+        def panel_open():
+            return bool(vm.vmctl("panel-geom").get("grids")) and any((w.get("title") or "").startswith("Fractile panel") and not w["state"].get("minimized")
+                                                                    for w in (vm.call("list_windows", {"all": True}).get("result") or []))
+
+        def open_panel(w=wid):
+            vm.ssh("rm -f /run/user/$(id -u)/fractile-panel-geometry.json")
+            vm.call("activate_window", {"window": w})
+            time.sleep(0.8)
+            vm.combo("ctrl+alt+g")
+            g = wait_for(lambda: (vm.vmctl("panel-geom").get("grids") or [None])[0], 15, 0.5)
+            if g:
+                time.sleep(1.0)  # let the compositor finish placing a new panel window
+                g = (vm.vmctl("panel-geom").get("grids") or [g])[0]
+            return g
+
+        def close_if_open():
+            if panel_open():
+                vm.combo("esc")
+                wait_for(lambda: not panel_open(), 5, 0.5)
+
+        def cell(g, col, row):
+            cw, ch = g["w"] / g["cols"], g["h"] / g["rows"]
+            return g["x"] + (col + 0.5) * cw, g["y"] + (row + 0.5) * ch
+
+        def drag(g, a, b, hold=None, shot=None):
+            ax, ay = cell(g, *a)
+            bx, by = cell(g, *b)
+            vm.pointer_to(ax, ay, screen)
+            time.sleep(0.3)
+            if hold:
+                vm.keydown(hold)
+                time.sleep(0.4)
+            vm.button(True)
+            time.sleep(0.2)
+            vm.pointer_to((ax + bx) / 2, (ay + by) / 2, screen)
+            time.sleep(0.2)
+            vm.pointer_to(bx, by, screen)
+            time.sleep(0.8)
+            mid_frame = frame()
+            drag.active = active()
+            prev = [x for x in (vm.call("list_windows", {"all": True}).get("result") or []) if (x.get("title") or "").startswith("Fractile preview")]
+            s = vm.screenshot(shot) if shot else None
+            vm.button(False)
+            time.sleep(0.2)
+            if hold:
+                vm.keydown(hold, False)
+            return mid_frame, prev, s
+
+        vm.call("snap", {"action": "center", "window": wid})
+        g = open_panel()
+        if not check("P05", "the panel shortcut opens the panel for the focused window", bool(g), json.dumps(vm.vmctl("panel-geom"))[:200]):
+            vm.screenshot(f"panel-{session}-05-no-panel")
+            return
+        vm.screenshot(f"panel-{session}-05-panel")
+
+        # DV-04 drag, DV-21 preview, DV-10 dismiss after applying
+        want = rect(g["cols"], g["rows"], 0, 0, 2, g["rows"] - 1)
+        mid, prev, s = drag(g, (0, 0), (2, g["rows"] - 1), shot=f"panel-{session}-06-drag-preview")
+        got = placed(want)
+        check("P06", "dragging across the grid places the window exactly", near(got, want), f"want {want} got {got}")
+        if plasma:
+            pv = prev[0]["frame"] if prev else None
+            pan = g.get("panel_id")
+            check("P07", "during the drag a preview window shows the exact target, the panel keeps keyboard focus, and the window has not moved yet",
+                  near(pv, want, 3) and not near(mid, want) and drag.active == pan, f"preview {pv} want {want}; active {drag.active} (panel {pan}); window then {mid}; {s}")
+        gone = wait_for(lambda: not panel_open(), 5, 0.5)
+        check("P08", "the panel closes after placing and focus returns to the window", bool(gone) and wait_for(lambda: active() == wid, 5, 0.5), f"active {active()}")
+
+        # DV-09 Esc
+        before = frame()
+        open_panel()
+        vm.combo("right")
+        vm.combo("esc")
+        gone = wait_for(lambda: not panel_open(), 5, 0.5)
+        time.sleep(0.5)
+        check("P09", "Esc closes the panel without moving the window and focus returns to it", bool(gone) and near(frame(), before, 0) and wait_for(lambda: active() == wid, 5, 0.5),
+              f"{before} -> {frame()}; active {active()}")
+
+        # DV-07, DV-24 keep
+        g1 = open_panel()
+        vm.combo("alt+equal")
+        time.sleep(0.4)
+        vm.combo("alt+shift+equal")
+        time.sleep(0.4)
+        vm.combo("ctrl+alt+g")
+        wait_for(lambda: not panel_open(), 5, 0.5)
+        g2 = open_panel()
+        check("P10", "Alt+= / Alt+Shift+= add a column / row, and the size is kept the next time the panel opens",
+              bool(g1 and g2) and (g2["cols"], g2["rows"]) == (g1["cols"] + 1, g1["rows"] + 1), f"{g1 and (g1['cols'], g1['rows'])} -> {g2 and (g2['cols'], g2['rows'])}")
+        vm.combo("alt+minus")
+        time.sleep(0.3)
+        vm.combo("alt+shift+minus")
+        time.sleep(0.3)
+        close_if_open()
+
+        # DV-11 Shift+drag keeps it open
+        g = open_panel()
+        if g:
+            want = rect(g["cols"], g["rows"], g["cols"] - 2, 0, g["cols"] - 1, 1)
+            drag(g, (g["cols"] - 2, 0), (g["cols"] - 1, 1), hold="shift")
+            got = placed(want)
+            still = panel_open()
+            check("P11", "Shift+drag places the window and keeps the panel open", near(got, want) and still, f"want {want} got {got} open {still}")
+        close_if_open()
+
+        # DV-05 hold Alt
+        vm.call("set_config", {"config": dict(vm.call("get_config")["result"]["config"], appearance=dict(vm.call("get_config")["result"]["config"]["appearance"], default_grid={"cols": 10, "rows": 10}))})
+        time.sleep(1)
+        g = open_panel()
+        if g and (g["cols"], g["rows"]) == (10, 10):
+            drag(dict(g, cols=20, rows=20), (1, 1), (12, 14), hold="alt", shot=f"panel-{session}-12-subdivided")
+            want = rect(20, 20, 1, 1, 12, 14)
+            got = placed(want)
+            check("P12", "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly", near(got, want), f"want {want} got {got}")
+        else:
+            check("P12", "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly", False, f"grid {g and (g['cols'], g['rows'])}")
+        close_if_open()
+        cfg = vm.call("get_config")["result"]["config"]
+        cfg["appearance"]["default_grid"] = {"cols": 6, "rows": 6}
+        vm.call("set_config", {"config": cfg})
+        time.sleep(1)
+
+        # DV-15 local shortcut only while open
+        vm.call("snap", {"action": "center", "window": wid})
+        open_panel()
+        vm.combo("ctrl+left")
+        want = rect(2, 1, 0, 0, 0, 0)
+        got = placed(want)
+        closed = wait_for(lambda: not panel_open(), 5, 0.5)
+        vm.call("snap", {"action": "center", "window": wid})
+        centered = frame()
+        vm.call("activate_window", {"window": wid})
+        time.sleep(0.8)
+        vm.combo("ctrl+left")
+        time.sleep(1.5)
+        check("P13", "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
+              near(got, want) and bool(closed) and near(frame(), centered, 0), f"in panel {got}; after close {frame()} (centered {centered})")
+
+        # DV-24 reset on open
+        cfg = vm.call("get_config")["result"]["config"]
+        cfg["appearance"]["reset_grid_on_open"] = True
+        vm.call("set_config", {"config": cfg})
+        time.sleep(1)
+        g1 = open_panel()
+        vm.combo("alt+equal")
+        time.sleep(0.5)
+        close_if_open()
+        g2 = open_panel()
+        check("P14", "with reset on open, a grid changed with Alt+= is back to the default 6x6 next time",
+              bool(g1 and g2) and (g1["cols"], g2["cols"], g2["rows"]) == (6, 6, 6), f"{g1 and (g1['cols'], g1['rows'])} -> {g2 and (g2['cols'], g2['rows'])}")
+        close_if_open()
+        cfg["appearance"]["reset_grid_on_open"] = False
+        vm.call("set_config", {"config": cfg})
+
+        # DV-27: the target closes while the panel is open
+        vm.vmctl("launch org.gnome.Calculator.desktop")
+        calc = wait_for(lambda: next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.Calculator.desktop"), None), 60, 2)
+        if calc:
+            before_ed = frame()
+            g = open_panel(calc["id"])
+            vm.ssh("pkill -u tester -f gnome-calculator")
+            gone = wait_for(lambda: not any(w["id"] == calc["id"] for w in (vm.call("list_windows").get("result") or [])), 15, 0.5)
+            time.sleep(1)
+            shot = vm.screenshot(f"panel-{session}-15-target-closed")
+            if g:
+                drag(g, (0, 0), (2, 2))
+                time.sleep(1)
+            still = panel_open()
+            check("P15", "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves",
+                  bool(g) and bool(gone) and still and near(frame(), before_ed, 0), f"panel {bool(g)} gone {bool(gone)} open {still}; editor {before_ed} -> {frame()}; {shot}")
+            close_if_open()
+        else:
+            check("P15", "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves", False, "Calculator did not open")
+
+        # DV-02: launching the app again (app menu) shows the panel for the focused window
+        vm.call("activate_window", {"window": wid})
+        time.sleep(0.8)
+        vm.ssh("rm -f /run/user/$(id -u)/fractile-panel-geometry.json")
+        vm.vmctl("launch io.fractile.Fractile.desktop")
+        g = wait_for(lambda: (vm.vmctl("panel-geom").get("grids") or [None])[0], 15, 0.5)
+        tgt = (vm.call("panel_state").get("result") or {}).get("target") or {}
+        check("P16", "starting Fractile again from the app menu opens the panel for the focused window", bool(g) and tgt.get("id") == wid, f"panel {bool(g)} target {tgt.get('id')} (editor {wid})")
+        close_if_open()
+
+        log = vm.ssh("grep -c Traceback ~/.local/state/fractile/ui.log 2>/dev/null; journalctl --user -q --no-pager | grep -c 'Traceback' ").stdout.split()
+        check("P17", "no Python errors in the UI's output", all(x == "0" for x in log), f"{log}")
+        hold("end")
     finally:
         vm.stop()
 
@@ -769,11 +1069,13 @@ def main() -> int:
     ap.add_argument("--soak-minutes", type=float, default=0, help="run the T27 soak in the VM instead of the login tests")
     ap.add_argument("--provision-only", action="store_true")
     ap.add_argument("--power-cut", action="store_true", help="RS-18/T15: power cuts during snapshot writes instead of the reboot/log-out tests")
+    ap.add_argument("--panel", action="store_true", help="the panel driven with the VM's keyboard and tablet instead of the reboot/log-out tests")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
     ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail"])
     a = ap.parse_args()
-    global HOLD, HOLD_AT, POWER_CUT
+    global HOLD, HOLD_AT, POWER_CUT, PANEL
     POWER_CUT = a.power_cut
+    PANEL = a.panel
     HOLD = min(a.hold, 2400)
     HOLD_AT = a.hold_at
     if a.soak_minutes:
@@ -784,13 +1086,13 @@ def main() -> int:
         base_for(a.session)
         return 0
     try:
-        run(a.session, a.deb)
+        (run_panel if PANEL else run)(a.session, a.deb)
     except Exception as ex:  # noqa: BLE001  record, then still write evidence
         import traceback
         traceback.print_exc()
         check("VXX", "run crashed", False, repr(ex))
     ver = RELEASES[SESSION_RELEASE[a.session]] if a.session else "24.04"
-    suite = f"vm-ubuntu{ver}-{a.session}" + ("-power-cut" if POWER_CUT else "")
+    suite = f"vm-ubuntu{ver}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "")
     ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
           "environment": f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}

@@ -13,6 +13,11 @@ desktops only. See PLATFORM_MATRIX.md.
   45, 47 and 48 Wayland. Keys and pointer come from Mutter's RemoteDesktop
   virtual devices (test harness only). The two-monitor X11 suite also checks
   that a repeated placement shortcut cycles the monitors (G25).
+- **Panel tests in a real Plasma Wayland login** (`FRACTILE_VM_PANEL=1
+  tests/vm/vm-e2e.sh plasma-wayland`): the panel driven with the VM's virtual
+  keyboard and USB tablet through QEMU: one instance, drag, preview, Esc, grid
+  keys, Shift+drag, Alt subdivision, local shortcut, reset, target closing,
+  relaunch from the app menu. 18/18 on Plasma 6.6 (Ubuntu 26.04).
 - **Glass panel.** The placement panel is a translucent, rounded slab with a
   rim light. The cells are frosted panes, and the selection is drawn as one lit
   pane spanning its cells. It fades in over 120 ms on X11. On compositors that
@@ -106,6 +111,12 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **No placement preview on Plasma Wayland.** The UI asked the KWin script to
+  draw the preview; KWin scripts cannot draw, so there was none, and only the
+  panel's grid showed the selection. The UI now draws the preview as its own
+  input-transparent window there, the KWin script puts it on the exact target
+  rectangle, and keyboard focus goes back to the panel. Found and checked in a
+  real Plasma 6.6 Wayland login (VM panel run, P07).
 - **Command palette sometimes did nothing under KWin.** Its snap and move
   commands acted on "the active window" after the palette had closed, and
   KWin sometimes reports no active window for a moment then, so the command

@@ -14,6 +14,11 @@ the systemd user manager's environment. Prints one JSON object per command.
   vmctl.py state                   windows, outputs, restore status
   vmctl.py logout                  log out of the desktop the way the menu does
   vmctl.py launch ID.desktop       start an app the way the app menu does
+  vmctl.py call METHOD [JSON]      one IPC call to the service; prints its result
+  vmctl.py panel-prep              panel tests: the UI reports its grid geometry
+                                   (FRACTILE_UI_TEST_GEOMETRY), panel shortcut
+                                   Ctrl+Alt+G, service restarted with that
+  vmctl.py panel-geom              where the open panel's grid is on screen
 """
 from __future__ import annotations
 
@@ -268,9 +273,63 @@ def cmd_logout() -> dict:
     return {"rc": p.returncode, "stderr": p.stderr.strip()}
 
 
+GEOM = f"{RUNTIME}/fractile-panel-geometry.json"
+
+
+def cmd_call() -> dict:
+    from fractile_ui.ipc import Client, RpcError
+    c = Client("vm-test")
+    try:
+        return {"result": c.call(sys.argv[2], json.loads(sys.argv[3]) if len(sys.argv) > 3 else {})}
+    except RpcError as ex:
+        return {"error": str(ex)}
+    finally:
+        c.close()
+
+
+def cmd_panel_prep() -> dict:
+    out = {}
+    out["set_env"] = run("systemctl", "--user", "set-environment", f"FRACTILE_UI_TEST_GEOMETRY={GEOM}").returncode
+    out["restart"] = run("systemctl", "--user", "restart", "fractile.service", timeout=60).returncode
+    # a UI started before carries the old environment
+    run("pkill", "-u", str(UID), "-f", "fractile-ui")
+    up = wait_for(lambda: run("fractile", "status").returncode == 0, 30.0)
+    out["service_up"] = bool(up)
+    out["shortcut"] = run("fractile", "config", "set", "general.panel_shortcut", '"Ctrl+Alt+G"').returncode
+    out["first_run"] = run("fractile", "config", "set", "general.first_run_complete", "true").returncode
+    # the compositor integration reconnects to the restarted service
+    wait_for(lambda: (try_cli("status") or {}).get("window_control"), 30.0)
+    st = try_cli("status") or {}
+    out["status"] = {k: st.get(k) for k in ("adapter", "session_type", "window_control", "global_shortcuts", "hotkey_errors", "ui_attached")}
+    return out
+
+
+def panel_windows():
+    return [w for w in (try_cli("list-windows", "--all") or []) if isinstance(w, dict) and (w.get("title") or "").startswith("Fractile panel")
+            and not (w.get("state") or {}).get("minimized")]
+
+
+def cmd_panel_geom() -> dict:
+    """The grid of each open panel in screen coordinates: the panel window's
+    frame (from the compositor) plus the grid's offset inside it (from the UI;
+    a Wayland client does not know its own screen position)."""
+    try:
+        g = json.load(open(GEOM))
+    except (OSError, ValueError):
+        return {"grids": [], "why": "no geometry file"}
+    wins = panel_windows()
+    grids = []
+    for d in g:
+        w = next((w for w in wins if w.get("output_id") == d.get("output")), wins[0] if len(wins) == 1 else None)
+        if w:
+            grids.append(dict(d, x=w["frame"]["x"] + d["ox"], y=w["frame"]["y"] + d["oy"], panel=w["frame"], panel_id=w["id"]))
+    return {"grids": grids, "mtime": os.path.getmtime(GEOM)}
+
+
 def main() -> int:
     cmd = sys.argv[1]
-    fn = {"session": cmd_session, "setup": cmd_setup, "open-apps": cmd_open_apps, "state": cmd_state, "logout": cmd_logout, "launch": cmd_launch}[cmd]
+    fn = {"session": cmd_session, "setup": cmd_setup, "open-apps": cmd_open_apps, "state": cmd_state, "logout": cmd_logout, "launch": cmd_launch,
+          "call": cmd_call, "panel-prep": cmd_panel_prep, "panel-geom": cmd_panel_geom}[cmd]
     print(json.dumps(fn()))
     return 0
 

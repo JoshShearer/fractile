@@ -328,11 +328,12 @@ class PanelController:
         self.model = GridModel(6, 6)
         self.cell_px = 40
         self.panels: list[PanelWindow] = []
-        self.overlay = CompositorOverlay(app.bridge) if app.wayland else PreviewOverlay()
+        self.overlay = CompositorOverlay(app.bridge, self._refocus_panel) if app.wayland else PreviewOverlay()
         self.payload: dict = {}
         self.cfg: dict = {}
         self.visible = False
         self._preview_cache: dict = {}
+        self._preview_output = None
         self._last_grid_cfg = None
         # Alt: held = finer grid while held; tapped (pressed and released
         # with nothing else) = finer grid until tapped again or the panel
@@ -403,6 +404,14 @@ class PanelController:
         except OSError:
             pass
 
+    def _refocus_panel(self) -> None:
+        """Keyboard focus back to the panel after a preview window was mapped
+        (KWin Wayland, where the UI draws the preview itself)."""
+        p = next((p for p in self.panels if p.isVisible() and p.output.get("stable_id") == self._preview_output), None) \
+            or next((p for p in self.panels if p.isVisible()), None)
+        if p is not None and self.visible:
+            self.app.bridge.call_async("focus_own_window", {"title": p.windowTitle()})
+
     def hide(self, notify: bool = True):
         self.overlay.hide()
         for p in self.panels:
@@ -472,6 +481,7 @@ class PanelController:
                 return
             self._preview_cache[key] = r
         scr = screen_for_output(output)
+        self._preview_output = output["stable_id"]  # the panel being dragged on
         self.overlay.show_target(r, scr, f"{r['w']} × {r['h']}")
         self.app.register_own_windows()
         for p in self.panels:

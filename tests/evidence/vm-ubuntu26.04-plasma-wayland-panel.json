@@ -1,0 +1,116 @@
+{
+  "suite": "vm-ubuntu26.04-plasma-wayland-panel",
+  "when": "2026-11-14T19:39:14+0000",
+  "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "results": [
+    {
+      "id": "P00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P01",
+      "name": "the .deb installs (Ubuntu 26.04.1 LTS; kwin-wayland 4:6.6.6-0ubuntu0.1; kwin-x11 ; plasma-workspace 4:6.6.6-0ubuntu0.1;)",
+      "ok": true,
+      "detail": "fractile\t0.9.0-1"
+    },
+    {
+      "id": "P02",
+      "name": "real plasma-wayland login: the service runs from the systemd unit and controls windows",
+      "ok": true,
+      "detail": "adapter kwin session wayland; setup {\"extension\": 0, \"extension_info\": [\"kwriteconfig6 0\", \"reconfigure 0 \", \"script loaded True\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.con; prep {\"set_env\": 0, \"restart\": 0, \"service_up\": true, \"shortcut\": 0, \"first_run\": 0, \"status\": {\"adapter\": \"kwin\", \"session_type\": \"wayland\", \"window_control\": true, \"global_shortcuts\": true, \"hotkey_errors\": {}, \"ui_attached\": true}}"
+    },
+    {
+      "id": "P03",
+      "name": "a second service started by hand says it is already running and leaves the running one alone (one instance)",
+      "ok": true,
+      "detail": "fractiled: already running\nrc=0; service pid 5850 -> 5850"
+    },
+    {
+      "id": "P04",
+      "name": "the target app (Text Editor) is up and placeable",
+      "ok": true,
+      "detail": "outputs [('conn-Virtual-1-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0})]"
+    },
+    {
+      "id": "P05",
+      "name": "the panel shortcut opens the panel for the focused window",
+      "ok": true,
+      "detail": "{\"grids\": [{\"output\": \"conn-Virtual-1-1600x1200\", \"x\": 679, \"y\": 448, \"w\": 241, \"h\": 241, \"ox\": 126, \"oy\": 62, \"cols\": 6, \"rows\": 6, \"active\": true, \"panel\": {\"h\": 381, \"w\": 493, \"x\": 553, \"y\": 386}, "
+    },
+    {
+      "id": "P06",
+      "name": "dragging across the grid places the window exactly",
+      "ok": true,
+      "detail": "want {'h': 1154, 'w': 800, 'x': 0, 'y': 0} got {'h': 1154, 'w': 800, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "P07",
+      "name": "during the drag a preview window shows the exact target, the panel keeps keyboard focus, and the window has not moved yet",
+      "ok": true,
+      "detail": "preview {'h': 1154, 'w': 800, 'x': 0, 'y': 0} want {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:4d1f644c-9588-4afe-b6f5-9bb6158414f7 (panel kwin:4d1f644c-9588-4afe-b6f5-9bb6158414f7); window then {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-06-drag-preview.png"
+    },
+    {
+      "id": "P08",
+      "name": "the panel closes after placing and focus returns to the window",
+      "ok": true,
+      "detail": "active kwin:63d31004-49f1-4724-8f11-164a13b393da"
+    },
+    {
+      "id": "P09",
+      "name": "Esc closes the panel without moving the window and focus returns to it",
+      "ok": true,
+      "detail": "{'h': 1154, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:63d31004-49f1-4724-8f11-164a13b393da"
+    },
+    {
+      "id": "P10",
+      "name": "Alt+= / Alt+Shift+= add a column / row, and the size is kept the next time the panel opens",
+      "ok": true,
+      "detail": "(6, 6) -> (7, 7)"
+    },
+    {
+      "id": "P11",
+      "name": "Shift+drag places the window and keeps the panel open",
+      "ok": true,
+      "detail": "want {'h': 384, 'w': 534, 'x': 1066, 'y': 0} got {'h': 384, 'w': 534, 'x': 1066, 'y': 0} open True"
+    },
+    {
+      "id": "P12",
+      "name": "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly",
+      "ok": true,
+      "detail": "want {'h': 808, 'w': 960, 'x': 80, 'y': 57} got {'h': 808, 'w': 960, 'x': 80, 'y': 57}"
+    },
+    {
+      "id": "P13",
+      "name": "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
+      "ok": true,
+      "detail": "in panel {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; after close {'h': 577, 'w': 800, 'x': 400, 'y': 288} (centered {'h': 577, 'w': 800, 'x': 400, 'y': 288})"
+    },
+    {
+      "id": "P14",
+      "name": "with reset on open, a grid changed with Alt+= is back to the default 6x6 next time",
+      "ok": true,
+      "detail": "(6, 6) -> (6, 6)"
+    },
+    {
+      "id": "P15",
+      "name": "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves",
+      "ok": true,
+      "detail": "panel True gone True open True; editor {'h': 577, 'w': 800, 'x': 400, 'y': 288} -> {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-15-target-closed.png"
+    },
+    {
+      "id": "P16",
+      "name": "starting Fractile again from the app menu opens the panel for the focused window",
+      "ok": true,
+      "detail": "panel True target kwin:63d31004-49f1-4724-8f11-164a13b393da (editor kwin:63d31004-49f1-4724-8f11-164a13b393da)"
+    },
+    {
+      "id": "P17",
+      "name": "no Python errors in the UI's output",
+      "ok": true,
+      "detail": "['0']"
+    }
+  ],
+  "log": []
+}

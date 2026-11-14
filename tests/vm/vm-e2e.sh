@@ -28,6 +28,8 @@ docker run --rm -v fractile-vm-cache:/cache --user 0 "$tag" chown "$(id -u)" /ca
 [[ -n ${FRACTILE_VM_HOLD:-} ]] && args+=(--hold "$FRACTILE_VM_HOLD" --hold-at "${FRACTILE_VM_HOLD_AT:-login}")
 # RS-18/T15: FRACTILE_VM_POWER_CUT=1 runs the power-cut scenario instead of reboot/log-out.
 [[ -n ${FRACTILE_VM_POWER_CUT:-} ]] && args+=(--power-cut)
+# FRACTILE_VM_PANEL=1 drives the panel with the VM keyboard and tablet instead.
+[[ -n ${FRACTILE_VM_PANEL:-} ]] && args+=(--panel)
 [[ $what == provision ]] && args=(--session "${2:-wayland}" --deb /dev/null --provision-only)
 if [[ $what == soak ]]; then
   # T27 in the VM: detached, so the run survives the terminal; follow it with
