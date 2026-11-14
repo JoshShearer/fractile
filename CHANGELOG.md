@@ -28,8 +28,8 @@ desktops only. See PLATFORM_MATRIX.md.
   explanations.
 - **Adapters.** X11 (EWMH, ICCCM, RandR with EDID ids). GNOME Shell extension
   for Wayland (45-48 declared; see PLATFORM_MATRIX.md for the versions run). KWin script for Plasma Wayland (6.x,
-  6.8.2 tested). Hyprland 0.57 or later through Hyprland's own IPC (nothing to
-  enable; 0.57.2 tested, nested only). Sway 1.8 or later through Sway's IPC
+  6.8.2 tested). Hyprland with a Lua configuration (0.56 or later) through Hyprland's own
+  IPC (nothing to enable; 0.57.2 tested nested, 0.56.2 on Omarchy by hand). Sway 1.8 or later through Sway's IPC
   (1.12 tested, nested only). COSMIC and other Wayland compositors (river,
   Wayfire, ...) are reported as unsupported, with reasons.
 - **UI.** A PyQt6 panel, settings (General, Appearance, Shortcuts, Session,
@@ -222,6 +222,13 @@ desktops only. See PLATFORM_MATRIX.md.
   never answered ("KWin integration did not answer 'move_resize'"). Timers
   are now held until they fire (200 of 200), and an error while a placement
   settles is reported instead of leaving the call open.
+- The packaged UI started with `#!/usr/bin/env python3`, so a version
+  manager's Python first on the PATH (Omarchy's mise shims) ran it, without
+  PyQt6, and the UI did not start. The .deb and the Arch package now run it
+  on `/usr/bin/python3` (`FRACTILE_PYTHON` changes that at build time).
+- Hyprland 0.56.2 already reads a Lua configuration and takes the Lua
+  dispatch form; the docs said 0.57 or later. The adapter checks for the
+  Lua form, not a version, and works on 0.56.2 (Omarchy).
 - Test harnesses: the nested X11 desktop leaked D-Bus-activated host services
   and FUSE mounts, and `xdotool --sync` could hang forever. Both are fixed.
 
@@ -239,9 +246,10 @@ desktops only. See PLATFORM_MATRIX.md.
   every window is closed first; the layout last seen is saved instead. If the display is
   already gone, the layout last seen (up to about 10 s old) is saved.
 - COSMIC: no window control (platform limitation).
-- Hyprland: tested nested inside a headless KWin only, not in a real Hyprland
-  login (uwsm, display manager) or on Omarchy; versions before 0.57 are not
-  supported. Without uwsm the systemd unit does not start; start
+- Hyprland: the automated suite runs nested inside a headless KWin only. A
+  real Omarchy login (Hyprland 0.56.2, uwsm, scale 1.5) was checked by hand;
+  autostart and the log-out snapshot there are not tested. A Hyprland without
+  the Lua configuration is not supported. Without uwsm the systemd unit does not start; start
   `fractiled --autostart` from the Hyprland configuration.
 - Sway: tested nested inside a headless KWin only (Sway 1.12), not in a real
   Sway login. `bindcode` bindings in the Sway configuration are not checked

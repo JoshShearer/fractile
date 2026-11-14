@@ -28,7 +28,13 @@ done
 P="$dest$prefix"
 install -Dm755 "$bins/fractiled" "$P/bin/fractiled"
 install -Dm755 "$bins/fractile" "$P/bin/fractile"
-install -Dm755 ui/fractile-ui "$P/bin/fractile-ui"
+# The packaged UI runs on the distribution's Python, where the PyQt6 package
+# is installed. `#!/usr/bin/env python3` would take the first python3 on the
+# session's PATH, and version managers put theirs first (Omarchy's mise
+# shims: a Python without PyQt6, so the UI did not start).
+python=${FRACTILE_PYTHON:-/usr/bin/python3}
+sed "1s|^#!.*python3.*\$|#!$python|" ui/fractile-ui > "$dest.fractile-ui.tmp"
+install -Dm755 "$dest.fractile-ui.tmp" "$P/bin/fractile-ui"; rm -f "$dest.fractile-ui.tmp"
 for f in ui/fractile_ui/*.py; do install -Dm644 "$f" "$P/lib/fractile/fractile_ui/$(basename "$f")"; done
 install -Dm644 ui/fractile_ui/data/io.fractile.Fractile.svg "$P/lib/fractile/fractile_ui/data/io.fractile.Fractile.svg"
 # The unit hard-codes /usr/bin; rewrite for other prefixes.

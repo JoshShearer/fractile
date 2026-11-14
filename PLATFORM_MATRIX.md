@@ -73,4 +73,4 @@ monitors have not been run. Simulated relogins and simulated crash-resume pass o
 |---|---|---|
 | GNOME Shell extension `fractile@fractile.io` 0.9.0 | shell-version 45, 46, 47, 48 | 45.10, 46.0, 47.10, 48.8 |
 | KWin script `fractile` 0.9.0 | X-Plasma-API-Minimum-Version 6.0 | KWin 6.8.2 only |
-| Hyprland adapter (built in, Hyprland's IPC) | Hyprland 0.57 or later (Lua dispatch) | Hyprland 0.57.2 only |
+| Hyprland adapter (built in, Hyprland's IPC) | Hyprland with the Lua configuration and dispatch (0.56 or later) | Hyprland 0.57.2 (nested, automated); 0.56.2 on Omarchy (real login, by hand) |

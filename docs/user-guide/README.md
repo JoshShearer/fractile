@@ -6,7 +6,7 @@ your window layout and can put it back after you log in again.
 
 Fractile 0.9.0. Where your desktop is supported is in
 [PLATFORM_MATRIX.md](../../PLATFORM_MATRIX.md). In short: GNOME (X11 and Wayland),
-KDE Plasma on Wayland, Hyprland 0.57 or later and Sway 1.8 or later work. COSMIC does not, because it has no API for
+KDE Plasma on Wayland, Hyprland 0.56 or later (with its Lua configuration) and Sway 1.8 or later work. COSMIC does not, because it has no API for
 moving other programs' windows (see [compatibility/cosmic.md](../compatibility/cosmic.md)).
 
 ## Install

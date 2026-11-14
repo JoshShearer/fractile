@@ -11,7 +11,7 @@ are, and put them back later, including after you log in again. It only
 launches apps you approved.
 
 - **Works on:** GNOME on X11 and Wayland (Wayland needs the bundled extension),
-  KDE Plasma on Wayland (needs the bundled KWin script), Hyprland 0.57 or later
+  KDE Plasma on Wayland (needs the bundled KWin script), Hyprland with a Lua configuration (0.56 or later)
   and Sway 1.8 or later (through their own IPC; placed windows become
   floating), and X11 window managers.
 - **Does not work on:** COSMIC. It offers no API for moving other programs'

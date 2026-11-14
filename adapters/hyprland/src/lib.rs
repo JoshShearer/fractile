@@ -4,7 +4,7 @@
 //! of `EVENT>>DATA`). Both live in `$XDG_RUNTIME_DIR/hypr/<instance>/`, a
 //! directory only this user can open.
 //!
-//! Hyprland 0.57 and later read a Lua configuration and evaluate every
+//! Hyprland with a Lua configuration (0.56.2 and 0.57.2 seen) reads it and evaluate every
 //! `dispatch` argument as a Lua expression (`return hl.dispatch(<expr>)`).
 //! The classic `dispatch movewindowpixel ...` and `keyword ...` forms are
 //! refused there. This adapter speaks the Lua form only; older Hyprland
@@ -596,7 +596,7 @@ impl HyprlandAdapter {
         inner.version = v["tag"].as_str().map(|t| t.trim_start_matches('v').to_string()).filter(|t| !t.is_empty()).unwrap_or_else(|| s(&v["version"]));
         if let Err(e) = inner.dispatch("(function() end)") {
             return Err(format!(
-                "Hyprland {} does not take Lua dispatch expressions over IPC ({e}). Fractile's Hyprland adapter needs Hyprland 0.57 or later.",
+                "Hyprland {} does not take Lua dispatch expressions over IPC ({e}). Fractile's Hyprland adapter needs a Hyprland that reads a Lua configuration (0.56.2 and 0.57.2 tested).",
                 inner.version
             ));
         }

@@ -2,19 +2,20 @@
 
 | Session | Adapter | How |
 |---|---|---|
-| Hyprland 0.57 or later (Wayland) | `hyprland` | The Fractile service talks to Hyprland's own IPC: the request socket `$XDG_RUNTIME_DIR/hypr/<instance>/.socket.sock` (JSON queries, Lua dispatch expressions) and the event socket `.socket2.sock`. Nothing has to be installed or enabled in Hyprland. |
-| Hyprland before 0.57 | none | Not supported. Fractile's adapter speaks the Lua dispatch form only, and `fractile status` says so with the version it found. |
+| Hyprland with a Lua configuration (Wayland; 0.56.2 and 0.57.2 tested) | `hyprland` | The Fractile service talks to Hyprland's own IPC: the request socket `$XDG_RUNTIME_DIR/hypr/<instance>/.socket.sock` (JSON queries, Lua dispatch expressions) and the event socket `.socket2.sock`. Nothing has to be installed or enabled in Hyprland. |
+| Hyprland that takes only the classic `hyprctl dispatch` form | none | Not supported. Fractile's adapter speaks the Lua dispatch form only; at start it sends one empty Lua dispatch, and when Hyprland refuses it `fractile status` says so with the version it found. |
 
-Hyprland 0.57 reads a Lua configuration (`~/.config/hypr/hyprland.lua`) and
+Hyprland 0.56 and 0.57 (as packaged by Arch) read a Lua configuration (`~/.config/hypr/hyprland.lua`) and
 evaluates every `hyprctl dispatch` argument as a Lua expression. The classic
 forms (`dispatch movewindowpixel ...`, `keyword bind ...`) are refused there
-("unknown request" or a Lua syntax error), which is why older Hyprland
-versions are not covered by this adapter.
+("unknown request" or a Lua syntax error), which is why a Hyprland without
+the Lua configuration is not covered by this adapter.
 
 ## Tested
 
 | Environment | Result | Evidence |
 |---|---|---|
+| Omarchy 4.5 (Arch), Hyprland 0.56.2 started by uwsm from SDDM: a real login on a laptop, 1920x1200 at scale 1.5, the user's own Omarchy configuration (261 binds); Arch package from `makepkg` installed with `pacman -U`, service started by hand | works (manual): detection, the scaled monitor as 1280x800 with the bar left out of the work area, all 12 windows placeable, the panel shortcut moved to Ctrl+Alt+G because Omarchy binds Super+Alt+G (conflict reported, Omarchy's bind untouched), the UI, and grid placement from the panel (done and judged by the user) | this page; no automated suite on that machine |
 | Hyprland 0.57.2 (Arch package) nested inside `kwin_wayland --virtual`, in an `archlinux:latest` container with the host's NVIDIA render node; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 25/25 | `tests/evidence/e2e-hyprland.json` (`tests/hyprland/e2e-hyprland-in-container.sh`) |
 
 The suite covers: detection and connection, and an unreachable instance
@@ -41,12 +42,15 @@ configuration. `wtype` uploads its own keymap with keysyms at arbitrary
 keycodes, so Hyprland must match binds by keysym for the harness key presses
 to reach them. A physical keyboard needs no such setting.
 
-**Not tested:** a real login (with uwsm, a display manager or from a TTY),
-Omarchy or any other preconfigured Hyprland setup, physical monitors, a
-monitor scale other than 1 (the conversion from Hyprland's physical mode to
-logical size is covered by a unit test only), XWayland applications, window
+The Omarchy run found one bug: the UI did not start, because Omarchy puts
+mise's shims first on the session's PATH and the UI's `#!/usr/bin/env
+python3` took mise's Python, which has no PyQt6. The packaged UI now runs on
+`/usr/bin/python3`.
+
+**Not tested:** the automated suite on a real login, autostart through uwsm
+and the log-out snapshot on a real log-out, multiple physical monitors, XWayland applications, window
 groups, special (scratchpad) workspaces, session restore across a real log-out
-and log-in, and Hyprland versions other than 0.57.2.
+and log-in, and Hyprland versions other than 0.56.2 and 0.57.2.
 
 ## Setting it up
 
