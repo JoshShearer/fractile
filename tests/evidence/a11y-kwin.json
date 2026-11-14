@@ -1,8 +1,14 @@
 {
-  "suite": "a11y",
-  "when": "2026-11-14T09:32:56-0600",
-  "environment": "kwin-x11 test image (Xvfb, kwin_x11 5.27), real PyQt6 UI and service",
+  "suite": "a11y-x11",
+  "when": "2026-11-14T16:31:38+0000",
+  "environment": "Xvfb kwin_x11 (X11), PyQt6 UI, AT-SPI (at-spi2-core)",
   "results": [
+    {
+      "id": "A00",
+      "name": "target window is up",
+      "ok": true,
+      "detail": ""
+    },
     {
       "id": "A1",
       "name": "every control a keyboard user can reach has a name in the AT-SPI tree (what Orca announces)",

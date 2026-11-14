@@ -1,0 +1,140 @@
+{
+  "suite": "gui-x11",
+  "when": "2026-11-14T16:24:27+0000",
+  "environment": "Xvfb GNOME Shell 45.10 (X11), PyQt6 UI",
+  "screenshots": "tests/evidence/gui/",
+  "results": [
+    {
+      "id": "G00",
+      "name": "test windows are up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G01",
+      "name": "hotkey starts the UI and shows the panel above all windows",
+      "ok": true,
+      "detail": "0.6s incl. UI start; stack top 0x1400007"
+    },
+    {
+      "id": "G02",
+      "name": "first-run wizard waits while the panel is open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G03",
+      "name": "dragging across the grid places the window exactly",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 800, 'x': 0, 'y': 32} got {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "G14",
+      "name": "during the drag a non-interactive preview shows the exact target and the window has not moved yet",
+      "ok": true,
+      "detail": "preview {'x': 0, 'y': 32, 'w': 800, 'h': 1168} want {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "G04",
+      "name": "panel closes after placing and focus returns to the window",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G05",
+      "name": "first-run wizard appears after the panel closes and saves on Finish",
+      "ok": true,
+      "detail": "first_run_complete=True shortcut=Ctrl+Alt+G"
+    },
+    {
+      "id": "G06",
+      "name": "arrow keys, Shift+arrows and Enter place the window",
+      "ok": true,
+      "detail": "want {'h': 584, 'w': 800, 'x': 533, 'y': 32} got {'h': 584, 'w': 800, 'x': 533, 'y': 32}"
+    },
+    {
+      "id": "G07",
+      "name": "Esc closes the panel without moving the window",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G08",
+      "name": "Alt+= / Alt+Shift+= change columns / rows and the size is kept",
+      "ok": true,
+      "detail": "(6, 6) -> (7, 7)"
+    },
+    {
+      "id": "G09",
+      "name": "Shift+drag places the window and keeps the panel open",
+      "ok": true,
+      "detail": "want {'h': 389, 'w': 534, 'x': 1066, 'y': 32} got {'h': 389, 'w': 534, 'x': 1066, 'y': 32} panel_open=True"
+    },
+    {
+      "id": "G10",
+      "name": "command palette 'left half' snaps the previously focused window",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 800, 'x': 0, 'y': 32} got {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "G11",
+      "name": "recovery dialog shows the plan and restores the snapshot",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 800, 'x': 0, 'y': 32} got {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "G12",
+      "name": "Fractile UI windows are flagged as own and never offered as targets",
+      "ok": true,
+      "detail": "1 own windows, flagged 2"
+    },
+    {
+      "id": "G15",
+      "name": "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly",
+      "ok": true,
+      "detail": "want {'h': 818, 'w': 960, 'x': 80, 'y': 90} got {'h': 818, 'w': 960, 'x': 80, 'y': 90}"
+    },
+    {
+      "id": "G18",
+      "name": "tapping Alt keeps the 20x20 subdivision for a plain drag, and the half-cell selection lands exactly",
+      "ok": true,
+      "detail": "want {'h': 584, 'w': 1120, 'x': 240, 'y': 148} got {'h': 584, 'w': 1120, 'x': 240, 'y': 148}"
+    },
+    {
+      "id": "G16",
+      "name": "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
+      "ok": true,
+      "detail": "in panel {'h': 1168, 'w': 800, 'x': 0, 'y': 32}; after close {'h': 584, 'w': 800, 'x': 400, 'y': 324} (centered {'h': 584, 'w': 800, 'x': 400, 'y': 324})"
+    },
+    {
+      "id": "G19",
+      "name": "with reset on open, a grid changed with Alt+= is back to the default 6x6 next time",
+      "ok": true,
+      "detail": "(6, 6) -> (6, 6)"
+    },
+    {
+      "id": "G21",
+      "name": "closing and reopening the panel straight away keeps the UI running and the panel open",
+      "ok": true,
+      "detail": "ui pids [3260] -> [3260]"
+    },
+    {
+      "id": "G20",
+      "name": "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves",
+      "ok": true,
+      "detail": "panel=True gone=True open_after_drag=True editor {'h': 584, 'w': 800, 'x': 400, 'y': 324} -> {'h': 584, 'w': 800, 'x': 400, 'y': 324}"
+    },
+    {
+      "id": "G17",
+      "name": "relaunching from the app menu shows the panel for the focused window; no second UI stays running",
+      "ok": true,
+      "detail": "exit 0; ui pids [3260] -> [3260]; got {'h': 194, 'w': 266, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "G13",
+      "name": "UI logged no Python errors during the run",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

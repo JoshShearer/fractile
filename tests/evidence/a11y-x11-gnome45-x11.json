@@ -1,0 +1,37 @@
+{
+  "suite": "a11y-x11",
+  "when": "2026-11-14T16:33:13+0000",
+  "environment": "Xvfb GNOME Shell 45.10 (X11), PyQt6 UI, AT-SPI (at-spi2-core)",
+  "results": [
+    {
+      "id": "A00",
+      "name": "target window is up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A1",
+      "name": "every control a keyboard user can reach has a name in the AT-SPI tree (what Orca announces)",
+      "ok": true,
+      "detail": "262 controls; unnamed: []; windows not found: []"
+    },
+    {
+      "id": "A2",
+      "name": "high-contrast theme chosen in settings: text and selection reach 7:1, and the panel is drawn opaque",
+      "ok": true,
+      "detail": "contrast {'window text': 21.0, 'field text': 21.0, 'button text': 21.0, 'selection': 19.6}; panel high contrast True, opaque True"
+    },
+    {
+      "id": "A3",
+      "name": "font scale 150% chosen in settings: the font grows and no label or button in any window is cut short",
+      "ok": true,
+      "detail": "font 10.0 -> 15.0 pt; cut: []"
+    },
+    {
+      "id": "A4",
+      "name": "right-to-left locale: windows mirror (panel controls, settings tabs) while the grid keeps screen order",
+      "ok": true,
+      "detail": "app RTL True; grid LTR True; column 0 on the left True; close button at x=16 of 493; cell at the left edge (0, 0); first settings tab right of the second True"
+    }
+  ]
+}

@@ -59,7 +59,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| RS-01 | Six restore policies; restore independent of autostart | VERIFIED (X11, Plasma X11 container) for all six: manual and last_clean (X13, X22, X27, X28), off (RS1), last_known after a crash (RS2), last_clean after a crash asks (RS3), ask (RS4), named with and without confirmation (RS5, RS6). RS1-RS6 have not run under GNOME yet | X13, X22, X27, X28, RS1-RS6 |
+| RS-01 | Six restore policies; restore independent of autostart | VERIFIED (X11, Plasma X11 container) for all six: manual and last_clean (X13, X22, X27, X28), off (RS1), last_known after a crash (RS2), last_clean after a crash asks (RS3), ask (RS4), named with and without confirmation (RS5, RS6). RS1-RS6 also pass under GNOME Shell 45 X11 (E12) | X13, X22, X27, X28, RS1-RS6 |
 | RS-02 | Snapshot contents per SRS 2.1/11 | VERIFIED | snapshot schema tests; X13, M07 |
 | RS-03 | Wait for readiness, no fixed sleep | VERIFIED (X11) | X27, X28 (readiness wait observed in log) |
 | RS-04 | Existing windows found before launching | VERIFIED | X12, X19, T11 below |
@@ -98,7 +98,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | UX-03 | Command palette | VERIFIED (X11) | G10 |
 | UX-04 | Export/import with validation | VERIFIED | SEC3, SEC7 |
 | UX-05 | Local CLI and authenticated API | VERIFIED | all E2E suites use them; SEC1, SEC2 |
-| UX-06 | Accessibility labels, high contrast, font scaling, RTL | VERIFIED (X11, Plasma X11 container): keyboard-only use (G06); every reachable control in every window has a name in the AT-SPI tree, read from a second process as Orca would (A1, 262 controls); the high-contrast theme reaches 7:1 and draws the panel opaque (A2); 150% font scale cuts nothing short (A3); an RTL locale mirrors the windows while the grid keeps screen order (A4). Not tested with Orca speaking, and not under GNOME yet | G06, A1-A4 |
+| UX-06 | Accessibility labels, high contrast, font scaling, RTL | VERIFIED (X11, Plasma X11 container): keyboard-only use (G06); every reachable control in every window has a name in the AT-SPI tree, read from a second process as Orca would (A1, 262 controls); the high-contrast theme reaches 7:1 and draws the panel opaque (A2); 150% font scale cuts nothing short (A3); an RTL locale mirrors the windows while the grid keeps screen order (A4). Also passes under GNOME Shell 45 X11 (E12). Not tested with Orca speaking | G06, A1-A4 |
 
 ## Compositor capability (SRS 3)
 

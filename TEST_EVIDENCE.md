@@ -26,6 +26,7 @@ cannot show.
 | E9 | Ubuntu 24.04.5 desktop in QEMU/KVM (Docker), 4 vCPU, 6 GiB, virtio-vga 1600x1200 | GNOME Shell 46.0 (Wayland and Xorg sessions) and Plasma 5.27 X11 (kde-plasma-desktop), real GDM logins | VM E2E (`tests/vm/`) |
 | E10 | archlinux:latest container on the host kernel, host GPU render node | Hyprland 0.57.2 nested in `kwin_wayland --virtual` (KWin is only the parent display); native Wayland GTK4/Qt clients; keys with wtype | Hyprland E2E |
 | E11 | archlinux:latest container on the host kernel | Sway 1.12 nested in `kwin_wayland --virtual` (wlroots Wayland backend, pixman renderer); native Wayland GTK4/Qt clients; keys with wtype | Sway E2E |
+| E12 | fedora:39 container | GNOME Shell 45.10 `--x11` (real mutter WM) on Xvfb 1600x1200, private D-Bus session, AT-SPI | X11 suites under GNOME without a host display |
 
 ## Results
 
@@ -33,11 +34,12 @@ cannot show.
 |---|---|---|---|---|
 | Rust unit, property and restore-simulation tests | `cargo test --workspace` | host | all pass | (console) |
 | X11 E2E | `python3 tests/integration/e2e_x11.py` | E1 | 44/44 | `tests/evidence/e2e-x11.json` |
-| X11 E2E under Plasma X11 | `bash tests/kwin-x11/e2e-kwin-x11-in-container.sh` | E7 | 50/50, including RS1-RS6 (restore policies off, last_known, last_clean after a crash, ask, named). RS1-RS6 are new and have not run under GNOME (E1) yet | `tests/evidence/e2e-x11-kwin.json` |
+| X11 E2E under Plasma X11 | `bash tests/kwin-x11/e2e-kwin-x11-in-container.sh` | E7 | 50/50, including RS1-RS6 (restore policies off, last_known, last_clean after a crash, ask, named). RS1-RS6 also pass under GNOME 45 (E12) | `tests/evidence/e2e-x11-kwin.json` |
 | Real apps (T14: browsers, editors, terminals) | `python3 tests/integration/e2e_x11_apps.py` | E1 | 13/13, Chrome incognito recorded as a known limitation | `tests/evidence/e2e-x11-apps.json` |
 | GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/` |
-| GUI (real PyQt6 UI) under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 21/21, G15 skipped (kwin_x11 takes Alt+click; G18 covers tap-then-drag). G19-G21 are new and have not run under GNOME yet | `tests/evidence/gui-x11-kwin.json` |
-| Accessibility (UX-06) | `bash tests/gui/a11y-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27, at-spi2-core) | 4/4: A1 names over AT-SPI, A2 high contrast, A3 150% font, A4 right to left (ar_EG locale) | `tests/evidence/a11y-kwin.json` |
+| GUI (real PyQt6 UI) under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 21/21, G15 skipped (kwin_x11 takes Alt+click; G18 covers tap-then-drag). G18-G21 also pass under GNOME 45 (E12) | `tests/evidence/gui-x11-kwin.json` |
+| Accessibility (UX-06) | `bash tests/gui/a11y-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27, at-spi2-core) | 5/5: A1 names over AT-SPI, A2 high contrast, A3 150% font, A4 right to left (ar_EG locale) | `tests/evidence/a11y-kwin.json` |
+| X11 suites under GNOME Shell 45 | `bash tests/gnome/x11-gnome-in-container.sh fedora:39 [suite.py ...]` (default: E2E, GUI, Settings; also `tests/gui/a11y_x11.py`) | E12 | X11 E2E 50/50, GUI 22/22 (G15 runs: mutter leaves Alt+click to the app), Settings 22/22, accessibility 5/5 | `tests/evidence/e2e-x11-gnome45-x11.json`, `gui-x11-gnome45-x11.json`, `settings-x11-gnome45-x11.json`, `a11y-x11-gnome45-x11.json` |
 | GUI on two monitors (DV-13) | `bash tests/gui/gui-two-monitors-in-container.sh` | kwin-x11 test image, Xvfb split into two RandR monitors (1600x1200 + 1280x1024) | 5/5 | `tests/evidence/gui-two-monitors-kwin.json` |
 | Settings and shortcut editor under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh settings_x11.py settings-x11-kwin.json` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 22/22, including S18-S21 (Duplicate, Export, Remove, Import) which have not run under GNOME yet | `tests/evidence/settings-x11-kwin.json` |
 | Settings and shortcut editor (X11) | `python3 tests/gui/settings_x11.py` | E1 | 18/18 | `tests/evidence/settings-x11.json` |
