@@ -38,7 +38,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | DV-10 | Dismiss after applying (configurable) | VERIFIED (G04) | VERIFIED (W14) | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-11 | Shift inverts keep-open | VERIFIED (G09) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-12 | Panel on each monitor | NOT TESTED (single monitor) | VERIFIED (M05) | NOT TESTED | BLOCKED BY PLATFORM |
-| DV-13 | Move to another monitor through its panel | NOT TESTED | PARTIAL: placement onto the other monitor's grid (M02, via the service); drag on the second panel not run | NOT TESTED | BLOCKED BY PLATFORM |
+| DV-13 | Move to another monitor through its panel | VERIFIED: a panel on each monitor, and a drag on the second monitor's panel places the window there exactly (G22, G23; kwin_x11 5.27, two RandR monitors on Xvfb, in a container); also checked by hand on a Pop!_OS 24.04 desktop with two physical monitors under GNOME 46 Xorg; the automated check has not run under GNOME | PARTIAL: placement onto the other monitor's grid (M02, via the service); drag on the second panel not run | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-14 | Unlimited named shortcuts, edit/delete, import/export | PARTIAL: stored and run (X09, G16); adding one in Settings and pressing it VERIFIED (S09-S11); edit/duplicate/remove/import/export exist in Settings > Shortcuts but are not driven by a test | PARTIAL (W09) | PARTIAL (K09) | BLOCKED BY PLATFORM |
 | DV-15 | Local shortcuts only while the panel is open | VERIFIED (G16) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-16 | Global shortcuts; reject and explain conflicts | VERIFIED (X09, X10, X11) | VERIFIED (W09) | VERIFIED (K09) | BLOCKED BY PLATFORM |

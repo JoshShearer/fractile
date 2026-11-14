@@ -58,13 +58,26 @@ for s in "${scr[@]}"; do args+=(-screen "$s"); done
 # multiple -screen with +xinerama gives a multi-monitor RandR layout
 if (( ${#scr[@]} > 1 )); then args+=(+xinerama); fi
 if [[ ${FRACTILE_TEST_XSERVER:-xephyr} == xvfb ]]; then
-  # Xvfb: one screen (multi-monitor runs use Xephyr)
-  Xvfb ":$num" -screen 0 "${scr[0]}x24" -ac -noreset +extension RANDR >"$state/xephyr.log" 2>&1 &
+  # Xvfb has one screen; for WxH+WxH it gets one wide screen that is split
+  # into RandR 1.5 monitors side by side below (Qt and the adapter read those).
+  tw=0; th=0
+  for s_ in "${scr[@]}"; do w_=${s_%x*}; h_=${s_#*x}; tw=$((tw + w_)); (( h_ > th )) && th=$h_; done
+  Xvfb ":$num" -screen 0 "${tw}x${th}x24" -ac -noreset +extension RANDR >"$state/xephyr.log" 2>&1 &
 else
   Xephyr ":$num" "${args[@]}" -ac -br -noreset -resizeable >"$state/xephyr.log" 2>&1 &
 fi
 echo $! >"$state/xephyr.pid"
 for _ in $(seq 50); do DISPLAY=":$num" xprop -root >/dev/null 2>&1 && break; sleep 0.1; done
+if [[ ${FRACTILE_TEST_XSERVER:-xephyr} == xvfb ]] && (( ${#scr[@]} > 1 )); then
+  x_=0; i_=0; out_=$(DISPLAY=":$num" xrandr --listmonitors | awk 'NR==2 {print $NF}')
+  DISPLAY=":$num" xrandr --delmonitor "$out_" >/dev/null 2>&1 || true
+  for s_ in "${scr[@]}"; do
+    w_=${s_%x*}; h_=${s_#*x}
+    # physical size in mm at about 96 dpi
+    DISPLAY=":$num" xrandr --setmonitor "TEST-$i_" "$w_/$((w_ * 254 / 960))x$h_/$((h_ * 254 / 960))+$x_+0" "$([[ $i_ == 0 ]] && echo "$out_" || echo none)"
+    x_=$((x_ + w_)); i_=$((i_ + 1))
+  done
+fi
 export XDG_CONFIG_HOME="$state/config" XDG_DATA_HOME="$state/data" XDG_CACHE_HOME="$state/cache"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
 # Private runtime dir: gnome-shell writes a crash-guard file there which, in
