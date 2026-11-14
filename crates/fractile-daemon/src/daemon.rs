@@ -24,6 +24,8 @@ pub struct Subscriber {
     pub id: u64,
     pub kind: String,
     pub pid: i32,
+    /// A UI started only for the tray (`fractile-ui --background`).
+    pub background: bool,
     pub writer: Arc<Mutex<UnixStream>>,
 }
 
@@ -187,6 +189,13 @@ impl Daemon {
 
     pub fn ui_attached(&self) -> bool {
         self.subscribers.lock().unwrap().iter().any(|s| s.kind == "ui")
+    }
+
+    /// The attached UIs (process id, started for the tray only). More than one can be attached for a
+    /// moment after a service restart (a UI the service started for the tray
+    /// and one reconnecting); the idle background one then leaves.
+    pub fn ui_list(&self) -> Vec<Value> {
+        self.subscribers.lock().unwrap().iter().filter(|s| s.kind == "ui").map(|s| json!({"pid": s.pid, "background": s.background})).collect()
     }
 
     fn sync_own(&self) {

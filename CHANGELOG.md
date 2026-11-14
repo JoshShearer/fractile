@@ -229,6 +229,12 @@ desktops only. See PLATFORM_MATRIX.md.
 - Hyprland 0.56.2 already reads a Lua configuration and takes the Lua
   dispatch form; the docs said 0.57 or later. The adapter checks for the
   Lua form, not a version, and works on 0.56.2 (Omarchy).
+- After a service restart two UIs could stay attached: the service started
+  one for the tray while the UI opened from the menu was still reconnecting,
+  and both answered the panel shortcut (two panels on every monitor; seen on
+  Pop!_OS with GNOME on Xorg). A UI started only for the tray now leaves when
+  another UI is attached, and of two tray-only UIs the newer one leaves
+  (`tests/gui/ui-restart-in-container.sh`).
 - Test harnesses: the nested X11 desktop leaked D-Bus-activated host services
   and FUSE mounts, and `xdotool --sync` could hang forever. Both are fixed.
 

@@ -102,9 +102,9 @@ class Client:
             raise RpcError(e.get("code", "error"), e.get("message", "error"))
         return msg.get("result")
 
-    def start_events(self, kind: str = "client") -> None:
+    def start_events(self, kind: str = "client", background: bool = False) -> None:
         """Subscribe and switch to a background reader thread."""
-        self.call("subscribe", {"kind": kind})
+        self.call("subscribe", {"kind": kind, "background": background})
         self.sock.settimeout(None)
         self._reader = threading.Thread(target=self._read_loop, name="fractile-ipc", daemon=True)
         self._reader.start()

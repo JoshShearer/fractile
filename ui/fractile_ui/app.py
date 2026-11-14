@@ -53,6 +53,7 @@ class FractileApp:
 
     # ---- service ----
     def start(self):
+        self.bridge.background = bool(getattr(self.args, "background", False))
         self.bridge.keep_connected("ui")
 
     def config(self) -> dict:
@@ -72,6 +73,10 @@ class FractileApp:
         self.reload_config()
         self.register_own_windows()
         first_run = not self.config().get("general", {}).get("first_run_complete", False)
+        # Attached after another UI: a tray-only UI leaves (the newer one,
+        # when both are tray-only).
+        if self._yield_to_other_ui([u.get("pid") for u in self.status.get("uis") or [] if u.get("pid") != os.getpid()]):
+            return
         if getattr(self.args, "background", False):
             # Started at login only for the tray icon: no windows. First-run
             # setup waits until the user has used the panel once (it shows
@@ -141,6 +146,10 @@ class FractileApp:
         elif ev in ("snapshots_changed", "layouts_changed"):
             if self.dashboard_win:
                 self.dashboard_win.reload()
+        elif ev == "ui_joined":
+            # A UI with windows joined; a tray-only newcomer leaves by itself.
+            if data.get("pid") != os.getpid() and not data.get("background"):
+                self._yield_to_other_ui([data.get("pid")])
         elif ev == "daemon_exit":
             self.panel.hide(notify=False)
         elif ev == "outputs_changed":
@@ -273,6 +282,20 @@ class FractileApp:
         print("fractile-ui: no tray icon to show; exiting (the service starts the UI again when needed)", file=sys.stderr)
         self.bridge.stop()
         self.qapp.quit()
+
+    def _yield_to_other_ui(self, others) -> bool:
+        """Another UI is attached (seen after a service restart: the service
+        started one for the tray while this one reconnected, and both drew the
+        panel). A UI started with --background that shows no window leaves,
+        so one UI answers requests."""
+        if not others or not getattr(self.args, "background", False):
+            return False
+        if any(w.isVisible() for w in QApplication.topLevelWidgets()):
+            return False
+        print(f"fractile-ui: another Fractile UI is attached (pid {others[0]}); exiting", file=sys.stderr)
+        self.bridge.stop()
+        self.qapp.quit()
+        return True
 
     def save_now(self):
         def ok(r):

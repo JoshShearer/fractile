@@ -42,6 +42,8 @@ class Bridge(QObject):
         self.client: Client | None = None
         self.calls: Client | None = None
         self._stop = False
+        # Started only for the tray icon (fractile-ui --background).
+        self.background = False
         self._lock = threading.Lock()
         self._results: list[_Result] = []
 
@@ -54,7 +56,7 @@ class Bridge(QObject):
             calls = Client(self.name)
         except RpcError:
             return False
-        ev.start_events(kind)
+        ev.start_events(kind, self.background)
         self.client, self.calls = ev, calls
         self.connected.emit(calls.server_info or {})
         return True

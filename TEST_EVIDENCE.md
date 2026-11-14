@@ -37,6 +37,7 @@ cannot show.
 | Real apps (T14: browsers, editors, terminals) | `python3 tests/integration/e2e_x11_apps.py` | E1 | 13/13, Chrome incognito recorded as a known limitation | `tests/evidence/e2e-x11-apps.json` |
 | GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/` |
 | Settings and shortcut editor (X11) | `python3 tests/gui/settings_x11.py` | E1 | 18/18 | `tests/evidence/settings-x11.json` |
+| One UI after a service restart | `bash tests/gui/ui-restart-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11) | passed (the unfixed build left 2 UIs) | output of the script |
 | Recovery dialog keys | `python3 tests/gui/recovery_keys.py` | host (offscreen Qt) | 3/3 | `tests/evidence/recovery-keys.json` |
 | GNOME Wayland E2E | `python3 tests/integration/e2e_gnome_wayland.py` | E2 | 25/25 | `tests/evidence/e2e-gnome-wayland.json` |
 | GNOME Wayland multi-monitor | `python3 tests/integration/e2e_gnome_wayland_multimon.py` | E3 | 8/8 | `tests/evidence/e2e-gnome-wayland-multimon.json` |

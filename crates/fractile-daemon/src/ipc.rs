@@ -217,6 +217,7 @@ pub fn status(d: &Daemon) -> Value {
         "restore_policy": cfg.session.policy,
         "restore": restore,
         "ui_attached": d.ui_attached(),
+        "uis": d.ui_list(),
         "locked": d.is_locked(),
         "config_error": d.cfg_error.lock().unwrap().clone(),
         "hotkey_errors": d.hotkey_errors.lock().unwrap().clone(),
@@ -371,11 +372,15 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
             let kind: String = s(p, "kind").unwrap_or("client").chars().take(16).collect();
             if c.sub_id.is_none() {
                 let id = d.next_sub.fetch_add(1, Ordering::SeqCst);
-                d.subscribers.lock().unwrap().push(Subscriber { id, kind: kind.clone(), pid: c.pid, writer: c.writer.clone() });
+                d.subscribers.lock().unwrap().push(Subscriber { id, kind: kind.clone(), pid: c.pid, background: kind == "ui" && p.get("background").and_then(|b| b.as_bool()).unwrap_or(false), writer: c.writer.clone() });
                 c.sub_id = Some(id);
                 c.client = kind.clone();
             }
             if kind == "ui" {
+                // UIs already attached learn of this one: an idle UI started
+                // only for the tray then exits, so one UI answers requests.
+                let background = p.get("background").and_then(|b| b.as_bool()).unwrap_or(false);
+                d.broadcast("ui_joined", json!({"pid": c.pid, "background": background}));
                 // A freshly attached UI shows nothing until the pending
                 // request (if any) is delivered, so the panel flag must
                 // reflect that or the next toggle would "hide" a panel
