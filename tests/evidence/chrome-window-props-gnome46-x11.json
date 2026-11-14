@@ -1,0 +1,55 @@
+{
+  "suite": "chrome-window-props",
+  "when": "2026-11-14T22:41:42+0000",
+  "environment": "Google Chrome 157.0.8103.78 on Xvfb (no window manager), throwaway profile, X11",
+  "properties": [
+    "WM_CLASS",
+    "WM_CLIENT_MACHINE",
+    "WM_ICON_NAME",
+    "WM_NAME",
+    "WM_NORMAL_HINTS",
+    "WM_PROTOCOLS",
+    "WM_WINDOW_ROLE",
+    "XdndAware",
+    "_MOTIF_WM_HINTS",
+    "_NET_WM_BYPASS_COMPOSITOR",
+    "_NET_WM_ICON",
+    "_NET_WM_ICON_NAME",
+    "_NET_WM_NAME",
+    "_NET_WM_PID",
+    "_NET_WM_SYNC_REQUEST_COUNTER",
+    "_NET_WM_USER_TIME",
+    "_NET_WM_WINDOW_TYPE"
+  ],
+  "differences": {
+    "WM_ICON_NAME": {
+      "normal": "\"Normal - Google Chrome\"",
+      "incognito": "\"Secret - Google Chrome\""
+    },
+    "WM_NAME": {
+      "normal": "\"Normal - Google Chrome\"",
+      "incognito": "\"Secret - Google Chrome\""
+    },
+    "WM_NORMAL_HINTS": {
+      "normal": "\t\tprogram specified location: 10, 10\t\tprogram specified minimum size: 500 by 143\t\twindow gravity: Static",
+      "incognito": "\t\tprogram specified location: 20, 20\t\tprogram specified minimum size: 500 by 87\t\twindow gravity: Static"
+    },
+    "_NET_WM_ICON_NAME": {
+      "normal": "\"Normal - Google Chrome\"",
+      "incognito": "\"Secret - Google Chrome\""
+    },
+    "_NET_WM_NAME": {
+      "normal": "\"Normal - Google Chrome\"",
+      "incognito": "\"Secret - Google Chrome\""
+    },
+    "_NET_WM_SYNC_REQUEST_COUNTER": {
+      "normal": "2097155",
+      "incognito": "2097169"
+    },
+    "_NET_WM_USER_TIME": {
+      "normal": "1640892048",
+      "incognito": "1640897924"
+    }
+  },
+  "conclusion": "only the title, the requested position, the minimum-size hint (toolbar-dependent) and per-window counters differ; no property marks the incognito window"
+}
