@@ -7,6 +7,12 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Added
 
+- **Glass panel.** The placement panel is a translucent, rounded slab with a
+  rim light. The cells are frosted panes, and the selection is drawn as one lit
+  pane spanning its cells. It fades in over 120 ms on X11. On compositors that
+  blur translucent windows (Hyprland by default) the slab is frosted. On
+  GNOME/Mutter and KWin it is tinted but not blurred. The high-contrast theme
+  stays opaque.
 - **Grid placement.** A 6x6 panel with drag and keyboard selection. Alt
   subdivision (up to 20x20), Alt+=/- and Alt+Shift+=/- resize the grid, and
   Shift inverts keep-open. A live preview is shown, with per-monitor panels,
@@ -81,6 +87,14 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **"Follow system" ignored a dark desktop on Pop!_OS.** GNOME was set to
+  prefer dark, but Qt 6.4 with qt5ct/qt6ct handed the UI a light palette, so the
+  panel and grid were light. The UI now reads the desktop's light/dark setting
+  from the XDG desktop portal (`org.freedesktop.appearance color-scheme`) and
+  uses its own dark or light palette when Qt disagrees. It also follows the
+  switch live. Two related fixes: switching back to "Follow system" now
+  restores the system palette, and the text size no longer grows on every
+  configuration reload.
 - A layout entry matching on app id alone (no desktop file, no WM_CLASS)
   never matched its window, because the score needed was above what an app id
   alone can reach. Such an entry now matches exactly that app id (X32).

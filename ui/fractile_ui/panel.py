@@ -9,15 +9,15 @@ from __future__ import annotations
 import json
 import os
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QGuiApplication, QIcon, QKeyEvent
+from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QGuiApplication, QIcon, QKeyEvent, QLinearGradient, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout
 
 from . import keys
 from .grid_model import GridModel, Sel
 from .gridwidget import GridWidget
 from .overlay import CompositorOverlay, PreviewOverlay
-from .theme import mute
+from .theme import is_dark, mute
 
 
 def output_center(o: dict) -> tuple[int, int]:
@@ -70,6 +70,17 @@ def to_logical(rect: dict, screen) -> QRect:
     return QRect(g.x() + round((rect["x"] - ox) / dpr), g.y() + round((rect["y"] - oy) / dpr), round(rect["w"] / dpr), round(rect["h"] / dpr))
 
 
+PANEL_QSS = """
+QToolButton, QPushButton#fav {
+    border: none; border-radius: 7px; padding: 3px 7px; background: transparent;
+}
+QToolButton:hover, QPushButton#fav:hover { background: rgba(127, 127, 140, 0.20); }
+QToolButton:pressed, QPushButton#fav:pressed { background: rgba(127, 127, 140, 0.34); }
+QPushButton#fav { border: 1px solid rgba(127, 127, 140, 0.30); border-radius: 9px; padding: 2px 9px; }
+QToolButton#close { border-radius: 11px; padding: 2px 6px; }
+"""
+
+
 class PanelWindow(QFrame):
     closed = pyqtSignal()
 
@@ -79,19 +90,25 @@ class PanelWindow(QFrame):
         self.output = output
         self.setObjectName("FractilePanel")
         self.setWindowTitle(f"Fractile panel {output['stable_id']}")
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet("#FractilePanel { border-radius: 12px; border: 1px solid palette(mid); background: palette(window); }")
+        # Glass: the window is ARGB and paintEvent draws a translucent slab.
+        # A compositor that blurs translucent windows (Hyprland by default)
+        # frosts what is behind it; elsewhere it is plain see-through tint.
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setStyleSheet(PANEL_QSS)
         v = QVBoxLayout(self)
-        v.setContentsMargins(14, 12, 14, 12)
-        v.setSpacing(8)
+        v.setContentsMargins(16, 14, 16, 12)
+        v.setSpacing(10)
         # header: target app
         h = QHBoxLayout()
         self.icon = QLabel()
         self.icon.setFixedSize(32, 32)
         self.app = QLabel()
         f = self.app.font()
-        f.setBold(True)
+        f.setWeight(f.Weight.DemiBold)
+        if f.pointSizeF() > 0:
+            f.setPointSizeF(f.pointSizeF() * 1.08)
         self.app.setFont(f)
         self.title = QLabel()
         mute(self.title)
@@ -108,6 +125,7 @@ class PanelWindow(QFrame):
         close.setText("✕")
         close.setToolTip("Close (Esc)")
         close.setAutoRaise(True)
+        close.setObjectName("close")
         close.clicked.connect(ctl.cancel)
         h.addWidget(close, 0, Qt.AlignmentFlag.AlignTop)
         v.addLayout(h)
@@ -150,6 +168,68 @@ class PanelWindow(QFrame):
         mute(self.help, small=True)
         v.addWidget(self.help)
 
+    # ---- look ----
+    def high_contrast(self) -> bool:
+        return (self.ctl.cfg or {}).get("appearance", {}).get("theme") == "high_contrast"
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        radius = 14.0
+        path = QPainterPath()
+        path.addRoundedRect(r, radius, radius)
+        if self.high_contrast():
+            p.fillPath(path, QColor(0, 0, 0))
+            pen = QPen(QColor(255, 255, 255))
+            pen.setWidthF(2)
+            p.setPen(pen)
+            p.drawPath(path)
+            return
+        dark = is_dark(self)
+        # Slab: a tint that is a little denser at the bottom, so text in
+        # the footer stays readable over busy windows without blur.
+        g = QLinearGradient(0, 0, 0, r.height())
+        if dark:
+            g.setColorAt(0, QColor(0x1C, 0x1F, 0x27, 226))
+            g.setColorAt(1, QColor(0x15, 0x17, 0x1D, 238))
+        else:
+            g.setColorAt(0, QColor(0xFA, 0xFB, 0xFD, 222))
+            g.setColorAt(1, QColor(0xF3, 0xF5, 0xF9, 236))
+        p.fillPath(path, g)
+        # Sheen across the top third, like light on a pane of glass.
+        sheen = QLinearGradient(0, 0, 0, r.height() * 0.35)
+        sheen.setColorAt(0, QColor(255, 255, 255, 26 if dark else 70))
+        sheen.setColorAt(1, QColor(255, 255, 255, 0))
+        p.fillPath(path, sheen)
+        # Outer hairline, then a rim light just inside it.
+        pen = QPen(QColor(0, 0, 0, 90 if dark else 46))
+        pen.setWidthF(1)
+        p.setPen(pen)
+        p.drawPath(path)
+        rim = QLinearGradient(0, 0, 0, r.height())
+        rim.setColorAt(0, QColor(255, 255, 255, 56 if dark else 230))
+        rim.setColorAt(0.5, QColor(255, 255, 255, 14 if dark else 120))
+        rim.setColorAt(1, QColor(255, 255, 255, 10 if dark else 90))
+        pen = QPen(rim, 1)
+        p.setPen(pen)
+        inner = QPainterPath()
+        inner.addRoundedRect(r.adjusted(1, 1, -1, -1), radius - 1, radius - 1)
+        p.drawPath(inner)
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        # One short fade on open. Wayland ignores window opacity, which is fine.
+        if self.ctl.app.wayland:
+            return
+        self.setWindowOpacity(0.0)
+        a = QPropertyAnimation(self, b"windowOpacity", self)
+        a.setDuration(120)
+        a.setStartValue(0.0)
+        a.setEndValue(1.0)
+        a.setEasingCurve(QEasingCurve.Type.OutCubic)
+        a.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+
     # ---- content ----
     def refresh(self, payload: dict, cfg: dict):
         t = payload.get("target")
@@ -181,6 +261,7 @@ class PanelWindow(QFrame):
             b.setToolTip(s["name"])
             b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             b.setFlat(True)
+            b.setObjectName("fav")
             b.clicked.connect(lambda _=False, sid=s["id"]: self.ctl.run_shortcut(sid, self.output))
             self.favs.addWidget(b)
         self.update_size_label()

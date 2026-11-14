@@ -18,7 +18,7 @@ from . import APP_ID, __version__
 from .bridge import Bridge
 from .ipc import Client, RpcError
 from .panel import PanelController
-from .theme import apply_theme
+from .theme import SchemeWatcher, apply_theme
 
 
 def app_icon() -> QIcon:
@@ -35,6 +35,8 @@ class FractileApp:
     def __init__(self, qapp: QApplication, args):
         self.qapp = qapp
         self.args = args
+        # Follow the desktop's light/dark switch live when the theme is "system".
+        self.scheme_watcher = SchemeWatcher(self.on_desktop_scheme)
         self.bridge = Bridge("ui")
         self.wayland = QGuiApplication.platformName().startswith("wayland")
         self.panel = PanelController(self)
@@ -61,6 +63,11 @@ class FractileApp:
             r = self.bridge.try_call("get_config")
             self._cfg = (r or {}).get("config") or {}
         return self._cfg
+
+    def on_desktop_scheme(self, scheme):
+        a = self.config().get("appearance", {})
+        if a.get("theme", "system") == "system":
+            apply_theme(self.qapp, "system", a.get("font_scale", 1.0), scheme)
 
     def reload_config(self):
         self._cfg = None
