@@ -1,6 +1,6 @@
 {
   "suite": "orca-x11",
-  "when": "2026-11-14T17:13:04+0000",
+  "when": "2026-11-14T17:52:13+0000",
   "environment": "Xvfb GNOME Shell 46.0 (X11), PyQt6 UI, Orca 46.1 (speech logged, no audio)",
   "results": [
     {

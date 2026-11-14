@@ -85,7 +85,10 @@ fn handle(d: Arc<Daemon>, s: UnixStream, pid: i32) {
         };
         let resp = match res {
             Ok(v) => Response { id: req.id, result: Some(v), error: None },
-            Err(e) => Response { id: req.id, result: None, error: Some(e) },
+            Err(e) => {
+                crate::debug!(d.log, "request {} from {} failed: {} {}", req.method, conn.client, e.code, e.message);
+                Response { id: req.id, result: None, error: Some(e) }
+            }
         };
         if send(&conn, resp).is_err() {
             break;

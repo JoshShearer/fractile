@@ -1,0 +1,12 @@
+{
+  "suite": "palette-loop-x11",
+  "when": "2026-11-14T17:49:52+0000",
+  "results": [
+    {
+      "id": "G10L",
+      "name": "command palette 'left half' snaps the focused window in 60 of 60 runs",
+      "ok": true,
+      "detail": "0 failed"
+    }
+  ]
+}

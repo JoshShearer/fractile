@@ -100,6 +100,13 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Command palette sometimes did nothing under KWin.** Its snap and move
+  commands acted on "the active window" after the palette had closed, and
+  KWin sometimes reports no active window for a moment then, so the command
+  failed (about 1 in 35 under kwin_x11) and the window stayed put. The palette
+  now sends the window that had focus when it opened. Repeated 220 times
+  since without a failure (tests/gui/palette_loop_x11.py). The service also
+  logs failed requests at the debug log level.
 - **Panel shortcut lost just after the service started.** When the tray-only
   UI left at once (tray icon turned off, another UI took over, or a crash),
   the service would not start another UI for 10 s. A panel shortcut pressed
@@ -340,9 +347,6 @@ desktops only. See PLATFORM_MATRIX.md.
   change without the new name, and Orca drops it. The grid's name and usage
   are still read when it gets focus. With Qt 6.10 (Fedora 42) every change is
   read (Orca suite O1b).
-- The GUI check G10 (the command palette snaps the window that had focus)
-  failed once in three runs under kwin_x11, with the window left unmoved; it
-  passed in the other two and under GNOME. Not yet explained.
 - Real logins, log-out and reboot are validated on Ubuntu 24.04 GNOME
   (Wayland and Xorg sessions), Plasma 5.27 X11 and Ubuntu 26.04 Plasma 6.6.6
   Wayland, in a VM. Sway and Hyprland have no real login test. Mixed DPI and monitor

@@ -33,10 +33,19 @@ class CommandPalette(QFrame):
     def build(self):
         b = self.app.bridge
         items = []
+        # The window the commands act on is the one that had focus when the
+        # palette opened. Asking for the active window after the palette has
+        # closed races the window manager: KWin reports no active window for
+        # a moment, and the command then fails.
+        self.target = self._focused_window()
+
+        def on_target(params: dict) -> dict:
+            return dict(params, window=self.target) if self.target else params
+
         for a in SNAP_ACTIONS:
-            items.append((f"Snap: {a.replace('-', ' ')}", lambda a=a: b.call_async("snap", {"action": a})))
-        items += [("Move window to next monitor", lambda: b.call_async("move_to_output", {"step": 1})),
-                  ("Move window to previous monitor", lambda: b.call_async("move_to_output", {"step": -1})),
+            items.append((f"Snap: {a.replace('-', ' ')}", lambda a=a: b.call_async("snap", on_target({"action": a}))))
+        items += [("Move window to next monitor", lambda: b.call_async("move_to_output", on_target({"step": 1}))),
+                  ("Move window to previous monitor", lambda: b.call_async("move_to_output", on_target({"step": -1}))),
                   ("Undo last placement", lambda: b.call_async("undo", {})),
                   ("Show panel", lambda: b.call_async("show_panel", {})),
                   ("Save workspace now", self.app.save_now),
@@ -49,6 +58,17 @@ class CommandPalette(QFrame):
         for l in b.try_call("layout_list") or []:
             items.append((f"Layout: apply {l['name']}", lambda n=l["name"]: self.app.show_recovery({"layout": n, "reason": "palette"})))
         self.items = items
+
+    def _focused_window(self) -> str | None:
+        """The focused window if it is one Fractile can place (not one of
+        Fractile's own); otherwise None, and the service picks the window
+        that had focus last."""
+        b = self.app.bridge
+        active = b.try_call("active_window")
+        if not isinstance(active, str):
+            return None
+        placeable = {w.get("id") for w in (b.try_call("list_windows") or [])}
+        return active if active in placeable else None
 
     def popup(self):
         self.build()

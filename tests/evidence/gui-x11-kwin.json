@@ -1,6 +1,6 @@
 {
   "suite": "gui-x11",
-  "when": "2026-11-14T17:27:59+0000",
+  "when": "2026-11-14T17:50:35+0000",
   "environment": "Xvfb kwin_x11 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
