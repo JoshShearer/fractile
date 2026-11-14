@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "ui"))
 
 from PyQt6.QtCore import QTimer  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QCheckBox, QPushButton  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QCheckBox, QMessageBox, QPushButton  # noqa: E402
 
 from fractile_ui.app import FractileApp  # noqa: E402
 from fractile_ui.settings import ShortcutDialog  # noqa: E402
@@ -261,7 +261,100 @@ def run(app: FractileApp, shot_dir: str) -> None:
     page = w.PAGES[w.tabs.currentIndex()]
     check("S13", "the shortcut list shows the panel shortcut with its real keys; Edit… on it opens General",
           pkeys == "Ctrl+Alt+G" and pstat == "active" and page == "general", f"keys={pkeys} status={pstat} page after Edit={page}")
+    manage_shortcuts(app, w)
     w.close()
+
+
+def answer_message_box(seen: list) -> None:
+    """Read and close the next modal message box (Import reports with one)."""
+    def close():
+        m = QApplication.activeModalWidget()
+        if isinstance(m, QMessageBox):
+            seen.append(m.text())
+            m.accept()
+        else:
+            QTimer.singleShot(100, close)
+    QTimer.singleShot(100, close)
+
+
+def manage_shortcuts(app, w) -> None:
+    """DV-14: Duplicate, Export, Remove and Import on the Shortcuts page.
+    The desktop's file chooser is replaced by a fixed path (it is the
+    platform's dialog, not Fractile's code); everything else is the real
+    Settings window and the live service."""
+    import tempfile
+    from PyQt6.QtWidgets import QFileDialog
+    tmp = Path(tempfile.mkdtemp(prefix="fractile-sc-"))
+    w.open_page("shortcuts")
+    pump(0.3)
+    page = w.tabs.currentWidget()
+
+    def row_of(name):
+        return next((r for r in range(w.sc_table.rowCount()) if w.sc_table.item(r, 0).text() == name), None)
+
+    def service_names():
+        return [x["name"] for x in (app.bridge.try_call("get_config") or {}).get("config", {}).get("shortcuts", [])]
+
+    r = row_of("Probe left half")
+    if r is not None:
+        w.sc_table.selectRow(r)
+        button(page, "Duplicate").click()
+        pump(0.3)
+    copy_ = next((x for x in w.cfg["shortcuts"] if x["name"] == "Probe left half (copy)"), None)
+    orig = next((x for x in w.cfg["shortcuts"] if x["name"] == "Probe left half"), None)
+    check("S18", "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
+          bool(copy_ and orig) and copy_["action"] == orig["action"] and copy_.get("accelerator") is None and copy_["id"] != orig["id"],
+          f"copy={copy_}")
+
+    out = tmp / "exported.json"
+    QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (str(out), "JSON (*.json)"))
+    button(page, "Export…").click()
+    pump(0.3)
+    try:
+        data = json.loads(out.read_text())
+    except (OSError, ValueError):
+        data = {}
+    names = [x.get("name") for x in data.get("shortcuts", [])]
+    check("S19", "Export writes every shortcut (including pending ones) to the chosen file",
+          data.get("fractile_shortcuts") == 1 and "Probe left half" in names and "Probe left half (copy)" in names and len(names) == len(w.cfg["shortcuts"]),
+          f"{len(names)} exported, names {names[:4]}...")
+
+    r = row_of("Probe left half (copy)")
+    if r is not None:
+        w.sc_table.selectRow(r)
+        button(page, "Remove").click()
+        pump(0.3)
+    w.apply_b.click()
+    pump(1.5)
+    svc = service_names()
+    check("S20", "Remove takes the copy out; after Apply the service has the original and not the copy",
+          "Probe left half" in svc and "Probe left half (copy)" not in svc and row_of("Probe left half (copy)") is None, f"service shortcuts {svc}")
+
+    # Importing the file back adds nothing new except the copy (removed since),
+    # and a shortcut whose keys are taken comes in without keys.
+    n0 = len(w.cfg["shortcuts"])
+    seen: list = []
+    QFileDialog.getOpenFileName = staticmethod(lambda *a, **k: (str(out), "JSON (*.json)"))
+    answer_message_box(seen)
+    button(page, "Import…").click()
+    pump(0.5)
+    back = [x for x in w.cfg["shortcuts"] if x["name"] == "Probe left half"]
+    re_copy = [x for x in w.cfg["shortcuts"] if x["name"] == "Probe left half (copy)"]
+    clash = tmp / "clash.json"
+    clash.write_text(json.dumps({"fractile_shortcuts": 1, "shortcuts": [
+        {"id": "from-elsewhere", "name": "Someone's left half", "scope": "global", "accelerator": "Ctrl+Alt+Shift+F9",
+         "action": orig["action"] if orig else {}}]}))
+    QFileDialog.getOpenFileName = staticmethod(lambda *a, **k: (str(clash), "JSON (*.json)"))
+    answer_message_box(seen)
+    button(page, "Import…").click()
+    pump(0.5)
+    other = next((x for x in w.cfg["shortcuts"] if x["name"] == "Someone's left half"), None)
+    check("S21", "Import of an exported file skips what is already there; a shortcut whose keys are taken comes in without keys, and the message says so",
+          len(back) == 1 and len(re_copy) == 1 and len(w.cfg["shortcuts"]) == n0 + 2 and other is not None and other.get("accelerator") is None
+          and len(seen) == 2 and "already here" in seen[0] and "without keys" in seen[1],
+          f"messages {seen}; added {len(w.cfg['shortcuts']) - n0}")
+    w.revert_b.click()
+    pump(0.3)
 
 
 def main() -> int:

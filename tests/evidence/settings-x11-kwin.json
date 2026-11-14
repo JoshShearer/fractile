@@ -1,0 +1,140 @@
+{
+  "suite": "settings-x11",
+  "when": "2026-11-14T15:01:41+0000",
+  "environment": "Xvfb kwin_x11 (X11), PyQt6 UI",
+  "screenshots": "tests/evidence/gui/",
+  "results": [
+    {
+      "id": "S00",
+      "name": "test window is up and another client holds Ctrl+Alt+Shift+K",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S01",
+      "name": "Settings opens from the service request with all eight pages",
+      "ok": true,
+      "detail": "['General', 'Appearance', 'Shortcuts', 'Session Restore', 'Rules', 'Monitors', 'Diagnostics', 'About']"
+    },
+    {
+      "id": "S02",
+      "name": "every page renders (screenshots in tests/evidence/gui/)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S08",
+      "name": "a General change is only pending until Apply, then the service has it",
+      "ok": true,
+      "detail": "before=True pending_dirty=True service_before=True service_after=False"
+    },
+    {
+      "id": "S03",
+      "name": "a global shortcut without a modifier is refused and the editor keeps listening",
+      "ok": true,
+      "detail": "\u26a0 Global shortcuts need at least one modifier (Ctrl, Alt, Shift or Super). Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "S14",
+      "name": "while the editor listens, global shortcuts are paused so the desktop passes their keys to it",
+      "ok": true,
+      "detail": "hotkeys_paused=True"
+    },
+    {
+      "id": "S04",
+      "name": "a combination Fractile already uses is reported by name (the panel shortcut)",
+      "ok": true,
+      "detail": "\u26a0 already used by Fractile shortcut 'Show/hide panel'"
+    },
+    {
+      "id": "S05",
+      "name": "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",
+      "ok": true,
+      "detail": "\u26a0 conflict: another application already uses this key combination"
+    },
+    {
+      "id": "S06",
+      "name": "a free combination is reported as available",
+      "ok": true,
+      "detail": "\u2713 Available. Note: some desktop shortcuts cannot be detected until they are pressed."
+    },
+    {
+      "id": "S07",
+      "name": "a panel shortcut on a navigation key is refused (reserved by the panel)",
+      "ok": true,
+      "detail": "\u26a0 The panel uses this key for keyboard navigation. Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "S09",
+      "name": "the new shortcut appears in the table, pending until Apply",
+      "ok": true,
+      "detail": "dialog=True modal=None add_button=True rows=14"
+    },
+    {
+      "id": "S15",
+      "name": "the pause ends when the editor closes",
+      "ok": true,
+      "detail": "hotkeys_paused=False"
+    },
+    {
+      "id": "S10",
+      "name": "after Apply the service saved and registered it; the table says active",
+      "ok": true,
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-5edaa224', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+    },
+    {
+      "id": "S13",
+      "name": "the shortcut list shows the panel shortcut with its real keys; Edit\u2026 on it opens General",
+      "ok": true,
+      "detail": "keys=Ctrl+Alt+G status=active page after Edit=general"
+    },
+    {
+      "id": "S18",
+      "name": "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
+      "ok": true,
+      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-40bbf6c9', 'name': 'Probe left half (copy)', 'scope': 'global'}"
+    },
+    {
+      "id": "S19",
+      "name": "Export writes every shortcut (including pending ones) to the chosen file",
+      "ok": true,
+      "detail": "14 exported, names ['Left half', 'Right half', 'Top half', 'Bottom half']..."
+    },
+    {
+      "id": "S20",
+      "name": "Remove takes the copy out; after Apply the service has the original and not the copy",
+      "ok": true,
+      "detail": "service shortcuts ['Left half', 'Right half', 'Top half', 'Bottom half', 'Maximize (fill work area)', 'Center', 'Show/hide panel', 'Undo last placement', 'Move window to next monitor', 'Save current workspace', 'Restore latest snapshot', 'Command palette', 'Probe left half']"
+    },
+    {
+      "id": "S21",
+      "name": "Import of an exported file skips what is already there; a shortcut whose keys are taken comes in without keys, and the message says so",
+      "ok": true,
+      "detail": "messages ['Imported 1 shortcut. 13 were already here and left as is. Press Apply to check and save them.', 'Imported 1 shortcut. 1 came in without keys because those keys are already used; set new ones with Edit\u2026. Press Apply to check and save them.']; added 2"
+    },
+    {
+      "id": "S12",
+      "name": "the UI logged no Python errors",
+      "ok": true,
+      "detail": "t editor listening; keyboard grab taken; window active=True\nfractile-ui: shortcut editor listening; keyboard grab taken; window active=True\nfractile-ui: shortcut editor listening; keyboard grab taken; window active=True\nfractile-ui: shortcut editor listening; keyboard grab taken; window active=True\n"
+    },
+    {
+      "id": "S11",
+      "name": "pressing the shortcut created in Settings places the window (left half)",
+      "ok": true,
+      "detail": "want {'x': 0, 'y': 0, 'w': 800, 'h': 1200} got {'h': 1200, 'w': 800, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "S16",
+      "name": "an editor that disconnects while listening does not leave shortcuts paused",
+      "ok": true,
+      "detail": "during=True after_close=False"
+    },
+    {
+      "id": "S17",
+      "name": "a pause that is never ended times out and shortcuts come back",
+      "ok": true,
+      "detail": "after_timeout=False"
+    }
+  ]
+}

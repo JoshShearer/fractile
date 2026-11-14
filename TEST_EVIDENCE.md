@@ -38,6 +38,7 @@ cannot show.
 | GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/` |
 | GUI (real PyQt6 UI) under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 21/21, G15 skipped (kwin_x11 takes Alt+click; G18 covers tap-then-drag). G19-G21 are new and have not run under GNOME yet | `tests/evidence/gui-x11-kwin.json` |
 | GUI on two monitors (DV-13) | `bash tests/gui/gui-two-monitors-in-container.sh` | kwin-x11 test image, Xvfb split into two RandR monitors (1600x1200 + 1280x1024) | 5/5 | `tests/evidence/gui-two-monitors-kwin.json` |
+| Settings and shortcut editor under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh settings_x11.py settings-x11-kwin.json` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 22/22, including S18-S21 (Duplicate, Export, Remove, Import) which have not run under GNOME yet | `tests/evidence/settings-x11-kwin.json` |
 | Settings and shortcut editor (X11) | `python3 tests/gui/settings_x11.py` | E1 | 18/18 | `tests/evidence/settings-x11.json` |
 | One UI after a service restart | `bash tests/gui/ui-restart-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11) | passed (the unfixed build left 2 UIs) | output of the script |
 | UI restarts onto new code after an upgrade (idle, and at the panel shortcut) | `bash tests/gui/ui-upgrade-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11) | passed (the unfixed build kept the old code) | output of the script |

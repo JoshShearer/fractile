@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, Q
                              QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
 
 from . import __version__
+from . import keys
 from .theme import mute
 from .widgets import GridPicker, ShortcutEdit
 
@@ -640,20 +641,55 @@ class SettingsWindow(QWidget):
         except Exception as e:  # noqa: BLE001
             QMessageBox.warning(self, "Import", f"Not a Fractile shortcuts file: {e}")
             return
-        existing = {s["id"] for s in self.cfg["shortcuts"]}
-        n = 0
+        n, n_same, n_nokeys = self.merge_shortcuts(items)
+        self._load_tables()
+        self._update_dirty()
+        parts = [f"Imported {n} shortcut{'s' if n != 1 else ''}."]
+        if n_same:
+            parts.append(f"{n_same} {'were' if n_same != 1 else 'was'} already here and left as is.")
+        if n_nokeys:
+            parts.append(f"{n_nokeys} came in without keys because those keys are already used; set new ones with Edit….")
+        parts.append("Press Apply to check and save them." if n else "")
+        QMessageBox.information(self, "Import", " ".join(p for p in parts if p))
+
+    @staticmethod
+    def _same_shortcut(a: dict, b: dict) -> bool:
+        """Same shortcut whatever its id (and whatever defaults the service
+        filled in): name, scope, action and keys."""
+        ka, kb = a.get("accelerator"), b.get("accelerator")
+        same_keys = (not ka and not kb) or (bool(ka) and bool(kb) and keys.same(ka, kb))
+        return a.get("name") == b.get("name") and a.get("scope", "global") == b.get("scope", "global") and a.get("action") == b.get("action") and same_keys
+
+    def merge_shortcuts(self, items: list) -> tuple[int, int, int]:
+        """Add imported shortcuts to the pending list. Returns (added,
+        already present, added without keys). A file exported here and
+        imported back adds nothing; keys already in use are not taken twice."""
+        mine = self.cfg["shortcuts"]
+        by_id = {s["id"]: s for s in mine}
+        added = same = nokeys = 0
         for s in items:
             if not isinstance(s, dict) or "action" not in s or "name" not in s:
                 continue
             s = dict(s)
-            if s.get("id") in existing:
-                s["id"] = "s-" + uuid.uuid4().hex[:8]
             s.setdefault("scope", "global")
-            self.cfg["shortcuts"].append(s)
-            n += 1
-        self._load_tables()
-        self._update_dirty()
-        QMessageBox.information(self, "Import", f"Imported {n} shortcuts. Press Apply to check and save them.")
+            old = by_id.get(s.get("id"))
+            if any(self._same_shortcut(o, s) for o in mine):
+                same += 1
+                continue
+            if old is not None or not s.get("id"):
+                s["id"] = "s-" + uuid.uuid4().hex[:8]
+            acc = s.get("accelerator")
+            panel_key = (self.cfg.get("general") or {}).get("panel_shortcut")
+            taken = any(o.get("scope", "global") == s["scope"] and o.get("accelerator") and keys.same(o["accelerator"], acc) for o in mine) if acc else False
+            if acc and s["scope"] == "global" and panel_key and keys.same(panel_key, acc):
+                taken = True
+            if taken:
+                s["accelerator"] = None
+                nokeys += 1
+            mine.append(s)
+            by_id[s["id"]] = s
+            added += 1
+        return added, same, nokeys
 
     def _session(self) -> QWidget:
         outer = QWidget()

@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT / "tests" / "gui"))
 import pause_checks  # noqa: E402
 sys.path.insert(0, str(ROOT / "tests" / "gui"))
 from e2e_x11 import check, rect_eq, results  # noqa: E402
-from gui_x11 import SHOTS, GuiEnv  # noqa: E402
+from gui_x11 import SHOTS, GuiEnv, environment  # noqa: E402
 
 # Holds a passive grab on Ctrl+Alt+Shift+K on the root window until killed.
 # (Not an F-key: Ctrl+Alt+F<n> is the X server's VT switch.)
@@ -104,8 +104,7 @@ def main() -> int:
         e.cleanup()
         if not a.keep:
             subprocess.run(["bash", str(nested), "stop", str(a.display)])
-    gs = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout.strip()
-    ev = {"suite": "settings-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": f"Xephyr nested {gs} (X11), PyQt6 UI",
+    ev = {"suite": "settings-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": environment(),
           "screenshots": "tests/evidence/gui/", "results": results}
     Path(a.evidence).write_text(json.dumps(ev, indent=2) + "\n")
     failed = [r for r in results if not r["ok"]]

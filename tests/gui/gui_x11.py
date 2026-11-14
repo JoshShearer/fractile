@@ -120,6 +120,17 @@ class GuiEnv(Env):
         super().cleanup()
 
 
+def environment() -> str:
+    """Where the suite ran, for the evidence file (GNOME Shell or kwin_x11)."""
+    wm = ["kwin_x11", "--version"] if KWIN else ["gnome-shell", "--version"]
+    try:
+        wmv = subprocess.run(wm, capture_output=True, text=True).stdout.strip() or wm[0]
+    except OSError:
+        wmv = wm[0]
+    server = "Xvfb" if os.environ.get("FRACTILE_TEST_XSERVER") == "xvfb" else "Xephyr nested"
+    return f"{server} {wmv} (X11), PyQt6 UI"
+
+
 def expected(e: GuiEnv, cols: int, rows: int, c0: int, r0: int, c1: int, r1: int) -> dict:
     c = e.client()
     try:
@@ -481,13 +492,7 @@ def main() -> int:
         e.cleanup()
         if not a.keep:
             subprocess.run(["bash", str(nested), "stop", str(a.display)])
-    wm = ["kwin_x11", "--version"] if KWIN else ["gnome-shell", "--version"]
-    try:
-        wmv = subprocess.run(wm, capture_output=True, text=True).stdout.strip()
-    except OSError:
-        wmv = wm[0]
-    server = "Xvfb" if os.environ.get("FRACTILE_TEST_XSERVER") == "xvfb" else "Xephyr nested"
-    ev = {"suite": "gui-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": f"{server} {wmv} (X11), PyQt6 UI", "screenshots": "tests/evidence/gui/", "results": results}
+    ev = {"suite": "gui-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": environment(), "screenshots": "tests/evidence/gui/", "results": results}
     Path(a.evidence).write_text(json.dumps(ev, indent=2) + "\n")
     failed = [r for r in results if not r["ok"]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed; evidence: {a.evidence}")

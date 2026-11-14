@@ -87,6 +87,12 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Importing an exported shortcuts file duplicated everything.** Each
+  shortcut came back as a second copy with the same keys, which then clashed.
+  Import now skips shortcuts that are already there (same name, scope, action
+  and keys, whatever the id). A shortcut whose keys are already used (in the
+  list or by the panel shortcut) comes in without keys, and the message says
+  how many of each.
 - **Closing and reopening the panel quickly crashed the UI (X11).** The
   position re-check added for GNOME Xorg ran up to 1.2 s after the panel
   opened. If the panel was reopened within that time, the old window had been
