@@ -25,6 +25,7 @@ class CommandPalette(QFrame):
         v.addWidget(self.q)
         self.list = a11y.name(QListWidget(), "Commands")
         self.list.itemActivated.connect(lambda _i: self.run_current())
+        self.list.installEventFilter(self)
         v.addWidget(self.list)
         self.resize(520, 380)
         self.items: list[tuple[str, callable]] = []
@@ -86,13 +87,32 @@ class CommandPalette(QFrame):
         fn()
 
     def eventFilter(self, obj, ev):
-        if ev.type() == ev.Type.KeyPress:
-            if ev.key() == Qt.Key.Key_Escape:
-                self.hide()
+        if ev.type() != ev.Type.KeyPress:
+            return super().eventFilter(obj, ev)
+        key = ev.key()
+        if key == Qt.Key.Key_Escape:
+            self.hide()
+            return True
+        if obj is self.q and key in (Qt.Key.Key_Down, Qt.Key.Key_Up) and self.list.count():
+            # Into the list, so the focus is on the command (a screen reader
+            # reads each one as it is reached; selection alone is not announced).
+            r = self.list.currentRow() + (1 if key == Qt.Key.Key_Down else -1)
+            self.list.setCurrentRow(max(0, min(self.list.count() - 1, r)))
+            self.list.setFocus()
+            return True
+        if obj is self.list:
+            if key == Qt.Key.Key_Up and self.list.currentRow() <= 0:
+                self.q.setFocus()
                 return True
-            if ev.key() in (Qt.Key.Key_Down, Qt.Key.Key_Up):
-                r = self.list.currentRow() + (1 if ev.key() == Qt.Key.Key_Down else -1)
-                self.list.setCurrentRow(max(0, min(self.list.count() - 1, r)))
+            # Typing in the list goes on filtering in the search field.
+            if key == Qt.Key.Key_Backspace:
+                self.q.setFocus()
+                self.q.backspace()
+                return True
+            t = ev.text()
+            if t and t.isprintable() and not ev.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier):
+                self.q.setFocus()
+                self.q.insert(t)
                 return True
         return super().eventFilter(obj, ev)
 

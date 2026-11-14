@@ -100,6 +100,24 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Panel shortcut lost just after the service started.** When the tray-only
+  UI left at once (tray icon turned off, another UI took over, or a crash),
+  the service would not start another UI for 10 s. A panel shortcut pressed
+  in that time was held back and never shown. Now the next request starts a
+  UI as soon as the last one has gone. Found by the Orca suite; the
+  regression test is tests/gui/early-panel-in-container.sh.
+- **Screen readers (found with Orca 46.1).**
+  - The placement grid now announces its selection, for example "Placement
+    grid: columns 1 to 2, rows 1 to 6, of 6 by 6". Before, it said nothing as
+    the arrow keys moved.
+  - The shortcut recorder says what it sets and the keys it holds, for
+    example "Show/hide panel shortcut: Ctrl+Alt+G". Before, it said only
+    "Shortcut".
+  - Up and Down in the command palette move focus into the command list, so
+    each command is read out. Typing there goes back to the search field.
+  - The tab widgets' inner page stacks are named; Orca read them out as
+    "layered pane".
+
 - **Importing an exported shortcuts file duplicated everything.** Each
   shortcut came back as a second copy with the same keys, which then clashed.
   Import now skips shortcuts that are already there (same name, scope, action
@@ -317,6 +335,14 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Known issues and limits
 
+- With Qt 6.4 (Ubuntu 24.04 and Pop!_OS 24.04), Orca does not read the
+  placement grid's selection as it changes. That Qt sends the AT-SPI name
+  change without the new name, and Orca drops it. The grid's name and usage
+  are still read when it gets focus. With Qt 6.10 (Fedora 42) every change is
+  read (Orca suite O1b).
+- The GUI check G10 (the command palette snaps the window that had focus)
+  failed once in three runs under kwin_x11, with the window left unmoved; it
+  passed in the other two and under GNOME. Not yet explained.
 - Real logins, log-out and reboot are validated on Ubuntu 24.04 GNOME
   (Wayland and Xorg sessions), Plasma 5.27 X11 and Ubuntu 26.04 Plasma 6.6.6
   Wayland, in a VM. Sway and Hyprland have no real login test. Mixed DPI and monitor

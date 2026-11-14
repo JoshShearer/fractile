@@ -1,6 +1,6 @@
 {
   "suite": "a11y-x11",
-  "when": "2026-11-14T16:31:38+0000",
+  "when": "2026-11-14T17:23:09+0000",
   "environment": "Xvfb kwin_x11 (X11), PyQt6 UI, AT-SPI (at-spi2-core)",
   "results": [
     {

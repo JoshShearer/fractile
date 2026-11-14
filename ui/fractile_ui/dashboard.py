@@ -78,7 +78,7 @@ class DashboardWindow(QWidget):
         v = QVBoxLayout(self)
         split = QSplitter()
         v.addWidget(split, 1)
-        left = a11y.name(QTabWidget(), "Snapshots and layouts")
+        left = a11y.name_tabs(QTabWidget(), "Snapshots and layouts")
         self.snaps = a11y.name(QListWidget(), "Snapshots")
         self.snaps.currentItemChanged.connect(lambda *_: self.show_snapshot())
         self.layouts = a11y.name(QListWidget(), "Layouts")

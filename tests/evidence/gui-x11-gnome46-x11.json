@@ -1,6 +1,6 @@
 {
   "suite": "gui-x11",
-  "when": "2026-11-14T16:47:53+0000",
+  "when": "2026-11-14T17:18:51+0000",
   "environment": "Xvfb GNOME Shell 46.0 (X11), PyQt6 UI",
   "screenshots": "tests/evidence/gui/",
   "results": [
@@ -116,7 +116,7 @@
       "id": "G21",
       "name": "closing and reopening the panel straight away keeps the UI running and the panel open",
       "ok": true,
-      "detail": "ui pids [2827] -> [2827]"
+      "detail": "ui pids [2811] -> [2811]"
     },
     {
       "id": "G20",
@@ -128,7 +128,7 @@
       "id": "G17",
       "name": "relaunching from the app menu shows the panel for the focused window; no second UI stays running",
       "ok": true,
-      "detail": "exit 0; ui pids [2827] -> [2827]; got {'h': 194, 'w': 266, 'x': 0, 'y': 32}"
+      "detail": "exit 0; ui pids [2811] -> [2811]; got {'h': 194, 'w': 266, 'x': 0, 'y': 32}"
     },
     {
       "id": "G13",

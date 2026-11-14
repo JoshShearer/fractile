@@ -111,6 +111,12 @@ fn handle(d: Arc<Daemon>, s: UnixStream, pid: i32) {
             // preview behind.
             let _ = d.adapter().hide_overlay();
             d.panel.lock().unwrap().visible = false;
+            // The last UI left (a tray-only UI with no tray, one that
+            // yielded to another, a crash): the next request must start a
+            // UI, not wait out the guard against starting two at once.
+            if !d.ui_attached() {
+                d.panel.lock().unwrap().ui_spawned_at = None;
+            }
         }
     }
 }

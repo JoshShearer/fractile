@@ -89,6 +89,7 @@ class FirstRunWizard(QWizard):
                 free = c
                 break
         self.sc = ShortcutEdit(self.app, "global", free, "panel")
+        self.sc.set_accessible_label("Panel shortcut")
         v.addWidget(self.sc)
         t = QLabel((f"Current shortcut: {free}." if free == current else f"Suggested: {free}, which is free on this desktop.") if free else "None of the usual combinations is free. Click the button and press one you like, or leave it empty and use the tray icon or app menu.")
         t.setWordWrap(True)

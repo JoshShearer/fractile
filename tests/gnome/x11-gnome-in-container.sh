@@ -15,9 +15,9 @@ toolchain=$(ls -d "${RUSTUP_HOME:-$HOME/.rustup}"/toolchains/stable-x86_64-unkno
 mkdir -p "$root/tests/evidence"
 # The image is for the Wayland suites; the X11 server and tools come at run time
 # (dbus-x11: GTK4 test windows get their application id only on a session bus).
-setup="dnf -q -y install xorg-x11-server-Xvfb xdotool xprop xrandr xwininfo dbus-x11 python3-xlib glibc-langpack-ar >/tmp/dnf.log 2>&1 || { tail -20 /tmp/dnf.log; exit 1; }
+setup="dnf -q -y install xorg-x11-server-Xvfb xdotool xprop xrandr xwininfo dbus-x11 python3-xlib glibc-langpack-ar orca >/tmp/dnf.log 2>&1 || { tail -20 /tmp/dnf.log; exit 1; }
 rm -rf /run/systemd/seats && mkdir -p /run/dbus && dbus-daemon --system --fork"
-docker run --rm -v "$root:/src:ro" -v "$toolchain:/toolchain:ro" -v "fractile-gnome-cache-${base//:/-}:/cache" \
+docker run --rm ${FRACTILE_ORCA_LOG:+-e FRACTILE_ORCA_LOG=/evidence/$(basename "$FRACTILE_ORCA_LOG")} -v "$root:/src:ro" -v "$toolchain:/toolchain:ro" -v "fractile-gnome-cache-${base//:/-}:/cache" \
   -v "$root/tests/evidence:/evidence" "$tag" bash -c "$setup && chown tester /cache /evidence && exec su tester -s /bin/bash -c '
 set -uo pipefail
 export PATH=/toolchain/bin:\$PATH CARGO_HOME=/cache/cargo CARGO_TARGET_DIR=/cache/target

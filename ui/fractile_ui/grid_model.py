@@ -32,6 +32,18 @@ class Sel:
         return (self.col1 - self.col0 + 1) * (self.row1 - self.row0 + 1)
 
 
+def spoken(sel: Sel | None, cols: int, rows: int) -> str:
+    """What a screen reader says for the grid (UX-06): the selection in
+    1-based columns and rows, or how to use the grid when nothing is chosen."""
+    if sel is None:
+        return (f"Placement grid, {cols} by {rows}. Arrow keys choose a cell, Shift and arrow keys "
+                f"grow the selection, Enter places the window")
+
+    def span(a: int, b: int, what: str) -> str:
+        return f"{what} {a + 1}" if a == b else f"{what}s {a + 1} to {b + 1}"
+    return f"Placement grid: {span(sel.col0, sel.col1, 'column')}, {span(sel.row0, sel.row1, 'row')}, of {cols} by {rows}"
+
+
 @dataclass
 class GridModel:
     cols: int = 6

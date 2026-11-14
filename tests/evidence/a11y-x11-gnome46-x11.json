@@ -1,6 +1,6 @@
 {
   "suite": "a11y-x11",
-  "when": "2026-11-14T16:42:36+0000",
+  "when": "2026-11-14T17:20:35+0000",
   "environment": "Xvfb GNOME Shell 46.0 (X11), PyQt6 UI, AT-SPI (at-spi2-core)",
   "results": [
     {

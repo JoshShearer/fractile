@@ -5,7 +5,7 @@ from PyQt6.QtCore import QPoint, QPointF, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
-from .grid_model import GridModel, Sel
+from .grid_model import GridModel, Sel, spoken
 from .theme import accent, is_dark
 
 
@@ -26,7 +26,7 @@ class GridWidget(QWidget):
         # The grid is a map of the monitor: column 0 is its left edge in
         # every language, so it never mirrors in a right-to-left layout.
         self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
-        self.setAccessibleName("Placement grid")
+        self.setAccessibleName(spoken(None, self.m.eff_cols, self.m.eff_rows))
         self.setAccessibleDescription("Drag across cells, or use arrow keys and Shift+arrow keys, then Enter to place the window.")
 
     def sizeHint(self) -> QSize:
@@ -88,7 +88,16 @@ class GridWidget(QWidget):
         w = self.window()
         return bool(getattr(w, "high_contrast", lambda: False)())
 
+    def _announce(self) -> None:
+        # The grid's accessible name carries the selection, so a screen
+        # reader reads each change (a name change on the focused object
+        # is spoken; a custom widget's description is not).
+        text = spoken(self.m.selection, self.m.eff_cols, self.m.eff_rows)
+        if text != self.accessibleName():
+            self.setAccessibleName(text)
+
     def paintEvent(self, _):
+        self._announce()
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         cols, rows = self.m.eff_cols, self.m.eff_rows

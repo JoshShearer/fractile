@@ -14,7 +14,7 @@ suites=("$@"); [ ${#suites[@]} -gt 0 ] || suites=(tests/integration/e2e_x11.py t
 # the shell that logind runs (it does not here), so move it aside. Then run
 # as a user with the host's uid, so the evidence files stay the host user's.
 uid=$(id -u); gid=$(id -g)
-docker run --rm -e UID_="$uid" -e GID_="$gid" -v "$root:/src:ro" -v "$root/tests/evidence:/evidence" \
+docker run --rm -e UID_="$uid" -e GID_="$gid" ${FRACTILE_ORCA_LOG:+-e FRACTILE_ORCA_LOG=/evidence/$(basename "$FRACTILE_ORCA_LOG")} -v "$root:/src:ro" -v "$root/tests/evidence:/evidence" \
   fractile-gnome46-x11-test bash -c '
 mv /run/systemd/seats /tmp/seats.unused 2>/dev/null || true
 mkdir -p /run/dbus && dbus-daemon --system --fork

@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from fractile_ui.grid_model import GridModel, Sel  # noqa: E402
+from fractile_ui.grid_model import GridModel, Sel, spoken  # noqa: E402
 
 
 class GridModelTest(unittest.TestCase):
@@ -47,6 +47,11 @@ class GridModelTest(unittest.TestCase):
         self.assertEqual(s, Sel(1, 0, 2, 1))
         s = g.key_move(10, 10, True)
         self.assertEqual(s, Sel(1, 0, 5, 5))
+
+    def test_spoken_selection_is_one_based(self):
+        self.assertEqual(spoken(Sel(0, 0, 2, 5), 6, 6), "Placement grid: columns 1 to 3, rows 1 to 6, of 6 by 6")
+        self.assertEqual(spoken(Sel(4, 2, 4, 2), 12, 12), "Placement grid: column 5, row 3, of 12 by 12")
+        self.assertTrue(spoken(None, 6, 6).startswith("Placement grid, 6 by 6. Arrow keys"))
 
 
 if __name__ == "__main__":

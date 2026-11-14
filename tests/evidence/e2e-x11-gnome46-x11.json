@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-14T16:46:54+0000",
+  "when": "2026-11-14T17:17:53+0000",
   "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 285"
+      "detail": "pid 286"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "57 ms incl. polling"
+      "detail": "59 ms incl. polling"
     },
     {
       "id": "X10",
@@ -217,13 +217,13 @@
       "id": "RS3",
       "name": "policy last_clean: after a crash nothing is restored without asking; the recovery prompt is shown for the last autosave",
       "ok": true,
-      "detail": "autosaved True (a5b48fd6-39fe-495e-9105-1fb82ec34ff5); asked [{'reason': 'unclean_shutdown', 'snapshot_id': 'a5b48fd6-39fe-495e-9105-1fb82ec34ff5', 'unclean': True}]; editor left alone True"
+      "detail": "autosaved True (7971891c-5513-41b9-9623-15ab3ce741e5); asked [{'reason': 'unclean_shutdown', 'snapshot_id': '7971891c-5513-41b9-9623-15ab3ce741e5', 'unclean': True}]; editor left alone True"
     },
     {
       "id": "RS4",
       "name": "policy ask: each login offers the last session (the logout snapshot) and restores nothing until the user answers",
       "ok": true,
-      "detail": "asked [{'reason': 'ask_each_login', 'snapshot_id': 'ca5312d3-738b-4749-ae38-830a6c8d0171', 'unclean': False}]; latest logout snapshot ca5312d3-738b-4749-ae38-830a6c8d0171; editor left alone True"
+      "detail": "asked [{'reason': 'ask_each_login', 'snapshot_id': '90bf8967-989f-4646-9c74-36a611299fd1', 'unclean': False}]; latest logout snapshot 90bf8967-989f-4646-9c74-36a611299fd1; editor left alone True"
     },
     {
       "id": "RS5",
@@ -259,7 +259,7 @@
       "id": "X30",
       "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
       "ok": true,
-      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 800, 'x': 0, 'y': 32} want {'h': 1168, 'w': 800, 'x': 0, 'y': 32}; Doc 2 at {'h': 1168, 'w': 800, 'x': 800, 'y': 32} want {'h': 1168, 'w': 800, 'x': 800, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2192, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 800, \"x\": 800, \"y\": 616}, \"record_"
+      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 800, 'x': 0, 'y': 32} want {'h': 1168, 'w': 800, 'x': 0, 'y': 32}; Doc 2 at {'h': 1168, 'w': 800, 'x': 800, 'y': 32} want {'h': 1168, 'w': 800, 'x': 800, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2172, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 800, \"x\": 800, \"y\": 616}, \"record_"
     },
     {
       "id": "X31",
@@ -283,7 +283,7 @@
       "id": "X34",
       "name": "ordered, delayed launching (LR-05): the dependent app starts only after the first has a window, at least its 2 s delay later; both placed",
       "ok": true,
-      "detail": "first window 0.4458901882171631 s, second 3.0676963329315186 s (gap 2.62 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
+      "detail": "first window 0.3747553825378418 s, second 2.9223837852478027 s (gap 2.55 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
     },
     {
       "id": "X35",
@@ -295,7 +295,7 @@
       "id": "X36",
       "name": "profile auto-switch (LR-07): when the docked monitor setup appears, its profile becomes active and its layout is applied",
       "ok": true,
-      "detail": "active profile 'docked'; window {'h': 1168, 'w': 400, 'x': 1200, 'y': 32}; [\"2026-11-14T16:46:53.047 Info monitor topology matched profile 'docked'\"]"
+      "detail": "active profile 'docked'; window {'h': 1168, 'w': 400, 'x': 1200, 'y': 32}; [\"2026-11-14T17:17:51.712 Info monitor topology matched profile 'docked'\"]"
     },
     {
       "id": "X24",

@@ -1,0 +1,43 @@
+{
+  "suite": "orca-x11",
+  "when": "2026-11-14T17:12:06+0000",
+  "environment": "Xvfb GNOME Shell 48.8 (X11), PyQt6 UI, Orca Orca version 48.9, AT-SPI2 version: 2.56.8 (speech logged, no audio)",
+  "results": [
+    {
+      "id": "O00",
+      "name": "Orca is running and logging",
+      "ok": true,
+      "detail": "orca exit None; log 2613 bytes"
+    },
+    {
+      "id": "O00b",
+      "name": "target window is up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "O1",
+      "name": "opening the panel announces the placement grid and how to use it",
+      "ok": true,
+      "detail": "said: ['Fractile panel conn-screen-1600x1200 6 \u00d7 6 Drag to place  \u00b7  Alt: finer grid (hold, or tap to keep)  \u00b7  Shift: keep open  \u00b7  Esc: close', 'Placement grid, 6 by 6. Arrow keys choose a cell, Shift and arrow keys grow the selection, Enter places the window.', 'Drag across cells, or use arrow keys and Shift+arrow keys, then Enter to place the window.']"
+    },
+    {
+      "id": "O1b",
+      "name": "moving the selection with the keyboard reads the chosen columns and rows",
+      "ok": true,
+      "detail": "said: ['Placement grid: column 1, row 1, of 6 by 6.', 'left shift', 'left shift', 'Placement grid: columns 1 to 2, rows 1 to 2, of 6 by 6.']"
+    },
+    {
+      "id": "O2",
+      "name": "Tab through Settings: every control that takes focus is announced by name (no bare role), and the shortcut recorder says what it sets and its keys",
+      "ok": true,
+      "detail": "12 controls focused; unnamed []; bare roles spoken []; recorder ['Show/hide panel shortcut: not assigned']; focused: ['page tab list: General', 'check box: Start Fractile when I log in', 'check box: Show icon in the system tray (when the desktop provides one)', 'check box: Show/hide panel shortcut: not assigned', 'button: Clear', 'check box: Show a panel on every monitor', 'check box: Close the panel after placing a window (hold Shift to do the opposite)', 'check box: Repeating a shortcut moves the window to the next monitor', 'spin button: Repeat window', 'check box: Warn when an automatic tiling manager is active (Fractile never changes its settings)', 'check box: Show the key hints at the bottom of the panel', 'button: Restore defaults for this page']"
+    },
+    {
+      "id": "O3",
+      "name": "the command palette announces its search field, and moving down reads a command",
+      "ok": true,
+      "detail": "open: ['Command text.']; down: ['Snap: right half.']"
+    }
+  ]
+}

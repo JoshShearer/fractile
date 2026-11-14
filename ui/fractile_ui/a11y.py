@@ -8,7 +8,8 @@ box or a custom widget. Those get a name here.
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (QAbstractButton, QAbstractItemView, QAbstractSlider, QAbstractSpinBox, QComboBox,
-                             QFormLayout, QLabel, QLineEdit, QPlainTextEdit, QTabWidget, QTextEdit, QWidget)
+                             QFormLayout, QLabel, QLineEdit, QPlainTextEdit, QStackedWidget, QTabWidget, QTextEdit,
+                             QWidget)
 
 CONTROLS = (QAbstractButton, QLineEdit, QComboBox, QAbstractSpinBox, QAbstractSlider, QAbstractItemView,
             QPlainTextEdit, QTextEdit)
@@ -38,6 +39,9 @@ def name_form_fields(root: QWidget) -> None:
             field = fi.widget() if fi else None
             if not text or field is None:
                 continue
+            if hasattr(field, "set_accessible_label"):
+                field.set_accessible_label(text)  # e.g. the shortcut recorder
+                continue
             if isinstance(field, CONTROLS):
                 if not field.accessibleName():
                     field.setAccessibleName(text)
@@ -54,8 +58,11 @@ def name_form_fields(root: QWidget) -> None:
                     w.setAccessibleName(f"{text} {i + 1}")
 
 
-def name_tab_widgets(root: QWidget, what: str) -> None:
-    """A tab widget is a container a screen reader can land on; name it."""
-    for t in root.findChildren(QTabWidget):
-        if not t.accessibleName():
-            t.setAccessibleName(f"{what} sections")
+def name_tabs(tabs: QTabWidget, text: str) -> QTabWidget:
+    """Name a tab widget and the page stack inside it: Orca announces the
+    stack ("layered pane") when focus enters a page."""
+    tabs.setAccessibleName(text)
+    for st in tabs.findChildren(QStackedWidget):
+        if st.parent() is tabs and not st.accessibleName():
+            st.setAccessibleName(text)
+    return tabs

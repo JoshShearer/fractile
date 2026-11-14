@@ -98,7 +98,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | UX-03 | Command palette | VERIFIED (X11) | G10 |
 | UX-04 | Export/import with validation | VERIFIED | SEC3, SEC7 |
 | UX-05 | Local CLI and authenticated API | VERIFIED | all E2E suites use them; SEC1, SEC2 |
-| UX-06 | Accessibility labels, high contrast, font scaling, RTL | VERIFIED (X11, Plasma X11 container): keyboard-only use (G06); every reachable control in every window has a name in the AT-SPI tree, read from a second process as Orca would (A1, 262 controls); the high-contrast theme reaches 7:1 and draws the panel opaque (A2); 150% font scale cuts nothing short (A3); an RTL locale mirrors the windows while the grid keeps screen order (A4). Also passes under GNOME Shell 45 and 46 X11 (E12, E13). Not tested with Orca speaking | G06, A1-A4 |
+| UX-06 | Accessibility labels, high contrast, font scaling, RTL | VERIFIED (X11, Plasma X11 container): keyboard-only use (G06); every reachable control in every window has a name in the AT-SPI tree, read from a second process as Orca would (A1, 262 controls); the high-contrast theme reaches 7:1 and draws the panel opaque (A2); 150% font scale cuts nothing short (A3); an RTL locale mirrors the windows while the grid keeps screen order (A4). Also passes under GNOME Shell 45 and 46 X11 (E12, E13). With Orca (speech logged, no audio), the panel, the grid, every Settings control reached by Tab and the command palette are announced by name (O1-O3, GNOME 46 and 48). Limit: with Qt 6.4 (Ubuntu/Pop 24.04) Orca does not read the grid's selection as it changes, because of a Qt AT-SPI bug; with Qt 6.10 it does (O1b) | G06, A1-A4, O1-O3 |
 
 ## Compositor capability (SRS 3)
 

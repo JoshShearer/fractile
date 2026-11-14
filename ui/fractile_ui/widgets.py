@@ -30,7 +30,10 @@ class ShortcutEdit(QWidget):
         self.btn.setCheckable(True)
         self.btn.setMinimumWidth(180)
         self.btn.clicked.connect(self.toggle)
-        self.btn.setAccessibleName("Shortcut")
+        # Named for what it sets and what it holds ("Show/hide panel
+        # shortcut: Ctrl+Alt+G"); the form it sits in supplies the label.
+        self.label = "Shortcut"
+        self.btn.setAccessibleDescription("Press to record a new key combination")
         clear = QToolButton()
         clear.setText("Clear")
         clear.clicked.connect(lambda: self.set_value(None))
@@ -47,10 +50,15 @@ class ShortcutEdit(QWidget):
         lay.addWidget(self.info)
         self._render()
 
+    def set_accessible_label(self, text: str) -> None:
+        self.label = text
+        self._render() if not self.capturing else None
+
     def toggle(self):
         self.capturing = self.btn.isChecked()
         if self.capturing:
             self.btn.setText("Press keys…  (Esc to cancel)")
+            self.btn.setAccessibleName(f"{self.label}: listening, press the keys, or Escape to cancel")
             self._pause(True)
             # Keys reach this editor through the grab, or, if the grab is
             # refused, through ordinary focus; take both.
@@ -134,6 +142,7 @@ class ShortcutEdit(QWidget):
 
     def _render(self):
         self.btn.setText(self.value or "Not assigned")
+        self.btn.setAccessibleName(f"{self.label}: {self.value or 'not assigned'}")
         self.info.setText("")
         if not self.value:
             return
