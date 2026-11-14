@@ -119,10 +119,10 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 |---|---|---|---|
 | PK-01 | `.deb` for Ubuntu/Pop!_OS | VERIFIED (clean Ubuntu 24.04 container) | `package-deb-ubuntu24.04.log` |
 | PK-02 | Arch PKGBUILD | VERIFIED (clean `archlinux:latest`, makepkg as user) | `package-arch.log` |
-| PK-03 | systemd user unit (graphical-session.target) | PARTIAL: `systemd-analyze --user verify` passes, enable verified; not run under a real user manager | |
+| PK-03 | systemd user unit (graphical-session.target) | VERIFIED: `systemd-analyze --user verify` passes; under a real user manager the enabled unit starts the service at a real GDM login (Ubuntu 24.04 VM, V02, V03); also enabled and running on a Pop!_OS 24.04 desktop (checked by hand) | |
 | PK-04 | XDG autostart fallback | VERIFIED (Arch container; TryExec unit test) | |
 | PK-05 | Clean uninstall; config preservation policy | VERIFIED | T28 below |
-| PK-06 | Upgrade/migration | PARTIAL: config/schema version checks (`refuses_newer_schema`); no package-to-package upgrade run | |
+| PK-06 | Upgrade/migration | PARTIAL: config/schema version checks (`refuses_newer_schema`). A running UI and service restart onto replaced files (`tests/gui/ui-upgrade-in-container.sh`, `tests/gui/service-upgrade-in-container.sh`; the service never while the panel is open or a restore runs). Reinstalling the package over a running install done by hand on Pop!_OS (apt) and Omarchy (pacman). No upgrade between two released versions has been run (there is only 0.9.0) | |
 
 ## Test matrix (SRS 10)
 

@@ -87,6 +87,15 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **An upgrade left the old service running.** A package replaces
+  `/usr/bin/fractiled`, but the running service kept executing the old binary
+  until the next login, and a package cannot reliably restart a per-user
+  service. The service now notices that its binary was replaced and restarts
+  itself in place (same pid, so systemd keeps tracking it) once it is idle:
+  never while the panel is open or a restore is running. It is not treated as
+  a logout: there is no logout snapshot, and the login session carries on. Set
+  `FRACTILE_NO_SELF_RESTART=1` to turn this off. Regression test:
+  `tests/gui/service-upgrade-in-container.sh`.
 - **An upgrade left the old UI running.** After reinstalling on Pop!_OS and
   Omarchy, the UI started before the upgrade kept drawing the old panel until
   it was killed, because a service restart does not end the UI. The UI now

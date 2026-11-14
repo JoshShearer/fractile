@@ -13,6 +13,7 @@ mod ipc;
 mod logind;
 mod gnome_session;
 mod session;
+mod upgrade;
 
 use daemon::Daemon;
 use fractile_core::adapter::CompositorAdapter;
@@ -268,6 +269,8 @@ fn main() {
         let d = d.clone();
         std::thread::Builder::new().name("login".into()).spawn(move || session::login_flow(d)).unwrap();
     }
+    // Restart onto a new binary after a package upgrade (see upgrade.rs).
+    upgrade::start(d.clone());
 
     // Signals: TERM/INT = orderly end of session, HUP = reload config.
     // (Registered before the socket opens; see above.)
