@@ -21,6 +21,33 @@ from .panel import PanelController
 from .theme import SchemeWatcher, apply_theme
 
 
+def code_fingerprint() -> tuple:
+    """Identity of the UI's own files (inode, mtime, size). A package upgrade
+    replaces them; a running UI keeps the old code in memory until it
+    restarts, so it compares this with what it started from."""
+    pkg = os.path.dirname(os.path.abspath(__file__))
+    files = [os.path.realpath(sys.argv[0])]
+    for d, _dirs, names in os.walk(pkg):
+        if "__pycache__" in d:
+            continue
+        files += [os.path.join(d, n) for n in names if n.endswith(".py")]
+    out = []
+    for f in sorted(files):
+        try:
+            st = os.stat(f)
+            out.append((f, st.st_ino, st.st_mtime_ns, st.st_size))
+        except OSError:
+            out.append((f, None))
+    return tuple(out)
+
+
+def restart_args(argv: list[str], panel: bool) -> list[str]:
+    """Arguments for a restart onto new code: never repeat a one-shot request
+    (it was already handled); ask for the panel when that is why we restart."""
+    keep = ["--background"] if "--background" in argv[1:] and not panel else []
+    return [sys.executable, argv[0], *keep, *(["--panel"] if panel else [])]
+
+
 def app_icon() -> QIcon:
     ic = QIcon.fromTheme(APP_ID)
     if ic.isNull():
@@ -37,6 +64,13 @@ class FractileApp:
         self.args = args
         # Follow the desktop's light/dark switch live when the theme is "system".
         self.scheme_watcher = SchemeWatcher(self.on_desktop_scheme)
+        # Restart onto new code after a package upgrade (see code_fingerprint).
+        self.code_at_start = code_fingerprint()
+        self._code_seen = self.code_at_start
+        self.code_timer = QTimer()
+        self.code_timer.setInterval(20000)
+        self.code_timer.timeout.connect(self._check_code_idle)
+        self.code_timer.start()
         self.bridge = Bridge("ui")
         self.wayland = QGuiApplication.platformName().startswith("wayland")
         self.panel = PanelController(self)
@@ -112,8 +146,52 @@ class FractileApp:
         if self.tray:
             self.tray.setToolTip("Fractile: service not running")
 
+    # ---- restart after an upgrade ----
+    def _code_changed_and_settled(self, wait_s: float = 0.0) -> bool:
+        """True when the files differ from what this process started with and
+        have stopped changing (an upgrade in progress is left alone)."""
+        now = code_fingerprint()
+        if now == self.code_at_start:
+            self._code_seen = now
+            return False
+        if wait_s:
+            import time
+            time.sleep(wait_s)
+            settled = code_fingerprint() == now
+        else:
+            settled = now == self._code_seen
+        self._code_seen = now
+        return settled
+
+    def _check_code_idle(self):
+        if self.panel.visible or any(w.isVisible() for w in QApplication.topLevelWidgets()):
+            return
+        if self._code_changed_and_settled():
+            self.restart_onto_new_code(panel=False)
+
+    def restart_onto_new_code(self, panel: bool):
+        argv = restart_args(sys.argv, panel)
+        print(f"fractile-ui: the installed UI changed; restarting ({' '.join(argv[2:]) or 'no request'})", file=sys.stderr)
+        sys.stderr.flush()
+        self.bridge.stop()
+        if self.tray:
+            self.tray.hide()
+        try:
+            os.execv(argv[0], argv)
+        except OSError as e:
+            print(f"fractile-ui: restart failed ({e}); keeping the running UI", file=sys.stderr)
+            self.code_at_start = code_fingerprint()
+            self.bridge._stop = False
+            self.bridge.keep_connected("ui")
+
     def on_event(self, ev: str, data):
         data = data or {}
+        if ev == "show_panel" and not self.panel.visible and self._code_changed_and_settled(0.4):
+            # Open the new panel, not the old one: the restarted UI asks the
+            # service for the panel again (the target is still the window
+            # that has focus, since nothing of ours has shown).
+            self.restart_onto_new_code(panel=True)
+            return
         if ev == "show_panel":
             self.panel.show(data)
         elif ev == "hide_panel":

@@ -87,6 +87,14 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **An upgrade left the old UI running.** After reinstalling on Pop!_OS and
+  Omarchy, the UI started before the upgrade kept drawing the old panel until
+  it was killed, because a service restart does not end the UI. The UI now
+  notices when its installed files change and restarts onto the new code. When
+  idle it restarts within about 40 s, but never while one of its windows is
+  open. If the panel shortcut comes first, it restarts and opens the new panel.
+  It waits until the files stop changing, so an upgrade still in progress is
+  left alone. Regression test: `tests/gui/ui-upgrade-in-container.sh`.
 - **"Follow system" ignored a dark desktop on Pop!_OS.** GNOME was set to
   prefer dark, but Qt 6.4 with qt5ct/qt6ct handed the UI a light palette, so the
   panel and grid were light. The UI now reads the desktop's light/dark setting
