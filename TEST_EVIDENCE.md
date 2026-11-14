@@ -180,7 +180,9 @@ run left its headless shell running.
 - The tray outside GNOME with the AppIndicator extension.
 - COSMIC: BLOCKED BY PLATFORM (docs/compatibility/cosmic.md).
 - Pop!_OS host package install: done by hand on the developer's desktop
-  (`apt install`, GNOME 46 on Xorg); no automated suite ran there.
+  (`apt install`, GNOME 46 on Xorg); no automated suite ran there. Recording
+  a shortcut in Settings works there with the current build (checked by hand,
+  2026-11-14).
 - The 24-hour soak ran on Xvfb with GNOME Shell (X11) in the Ubuntu VM, not
   on a GNOME Wayland or KDE session. Earlier attempts on the developer's
   desktop were stopped (SIGTTIN after 2 minutes; then a run without a memory
