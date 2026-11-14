@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -488,6 +489,9 @@ def run_all(e: Env) -> None:
     check("X28", "logging out during the login restore: the next login restores that layout again",
           skipped and again, f"exit snapshot of the unrestored desktop skipped: {skipped}; editor back {again} at {e.frame(g)} want {want_g}")
 
+    # RS-01: the remaining restore policies at login
+    restore_policies(e, g)
+
     # T20: unicode names and titles, title changes, transient dialogs
     t20(e)
 
@@ -502,6 +506,163 @@ def run_all(e: Env) -> None:
     caps = json.loads(out.stdout)["capabilities"]
     levels = {v["level"] for v in caps["operations"].values()}
     check("X24", "unknown Wayland desktop reports unsupported (no fake support)", caps["adapter"] == "none" and levels == {"unsupported"}, f"adapter={caps['adapter']} levels={levels}")
+
+
+FAKE_UI = """#!/usr/bin/env python3
+# Stands in for fractile-ui in the restore-policy checks: attaches as the UI
+# and writes down every request the service sends it.
+import json, sys, time
+sys.path.insert(0, {ui!r})
+from fractile_ui.ipc import Client
+log = open({log!r}, "a")
+c = Client("fake-ui", __import__("pathlib").Path({sock!r}))
+c.on_event = lambda ev, data: (log.write(json.dumps({{"event": ev, "data": data}}) + "\\n"), log.flush())
+c.start_events("ui", background="--background" in sys.argv)
+while not c.closed:
+    time.sleep(0.2)
+"""
+
+
+def restore_policies(e: Env, g: str) -> None:
+    """RS-01: off, last_known, last_clean after a crash, ask and named, each
+    across a simulated logout and login (new XDG_SESSION_ID). The UI is a
+    stand-in that records what the service asks it to show."""
+    events = e.base / "ui-events.jsonl"
+    fake = e.base / "fake-ui"
+    fake.write_text(FAKE_UI.format(ui=str(ROOT / "ui"), log=str(events), sock=str(Path(e.env["FRACTILE_RUNTIME_DIR"]) / "fractile.sock")))
+    fake.chmod(0o755)
+    gx = str(int(g.split(":")[1], 16))
+    n = [0]
+
+    def setcfg(session: dict) -> None:
+        c = e.client()
+        c.call("set_config", {"patch": {"session": session}})
+        c.close()
+
+    def asked() -> list[dict]:
+        if not events.exists():
+            return []
+        out = []
+        for line in events.read_text().splitlines():
+            m = json.loads(line)
+            if m["event"] == "show_recovery":
+                out.append(m["data"])
+        return out
+
+    def relogin(sig=signal.SIGTERM) -> None:
+        e.stop_daemon(sig)
+        e.xdo("windowmove", gx, "100", "600")  # the next session opens it elsewhere
+        if events.exists():
+            events.unlink()
+        n[0] += 1
+        e.env["XDG_SESSION_ID"] = f"e2e-rs01-{n[0]}-{os.getpid()}"
+        e.start_daemon()
+
+    def autosaves() -> int:
+        return len(re.findall(r" autosave \S+ \(\d+ windows\)", (e.base / "daemon.out").read_text()))
+
+    def last_autosave() -> str | None:
+        ids = re.findall(r" autosave (\S+) \(\d+ windows\)", (e.base / "daemon.out").read_text())
+        return ids[-1] if ids else None
+
+    def autosaved(before: int) -> bool:
+        # the first autosave comes one interval (1 min) after the service starts
+        return bool(e.wait_for(lambda: autosaves() > before, 110.0, 1.0))
+
+    def restore_done(timeout=60.0) -> bool:
+        return bool(e.wait_for(lambda: e.cli_json("restore-status").get("running") is None, timeout, 0.5))
+
+    def log_tail(*words) -> str:
+        lines = [ln for ln in (e.base / "daemon.out").read_text().splitlines() if any(w in ln for w in words)]
+        return " | ".join(ln[-160:] for ln in lines[-6:])
+
+    def placed(want, timeout=15.0) -> bool:
+        return bool(e.wait_for(lambda: rect_eq(e.frame(g), want, 2), timeout, 0.3))
+
+    def left_alone(want) -> bool:
+        time.sleep(8)  # longer than a login restore takes here
+        return not rect_eq(e.frame(g), want, 2)
+
+    # every UI request from here on goes to the stand-in
+    e.env["FRACTILE_UI"] = str(fake)
+    e.stop_daemon()
+    e.start_daemon()  # same session: no login restore
+
+    # off: no snapshot at logout, nothing restored, nothing asked
+    setcfg({"policy": "off"})
+    e.cli_json("snap", "top-left-quarter", "--window", g)
+    want = e.frame(g)
+    before = len(e.cli_json("list-snapshots", "--limit", "500"))
+    relogin()
+    alone = left_alone(want)
+    after = len(e.cli_json("list-snapshots", "--limit", "500"))
+    check("RS1", "policy off: no snapshot at logout, nothing restored or offered at the next login",
+          alone and after == before and not asked(), f"snapshots {before} -> {after}; editor left alone {alone}; asked {asked()}")
+
+    # last_known after a crash (power-loss policy restore): the last autosave comes back
+    setcfg({"policy": "last_known", "power_loss_policy": "restore", "autosave_interval_min": 1, "confirm_before_restore": False})
+    e.cli_json("snap", "bottom-left-quarter", "--window", g)
+    want = e.frame(g)
+    saved = autosaved(autosaves())
+    relogin(signal.SIGKILL)
+    back = placed(want, 20.0)
+    done = restore_done()
+    log = (e.base / "daemon.out").read_text()
+    check("RS2", "policy last_known: after a crash (no logout snapshot) the last autosave is restored at the next login",
+          saved and back and "decision=restore unclean=true" in log, f"autosaved {saved}; editor back {back} at {e.frame(g)} want {want}; restore finished {done}")
+
+    # last_clean after a crash: not restored silently; the user is asked
+    setcfg({"policy": "last_clean"})
+    e.cli_json("snap", "bottom-right-quarter", "--window", g)
+    want = e.frame(g)
+    saved = autosaved(autosaves())
+    auto_id = last_autosave()
+    relogin(signal.SIGKILL)
+    got = e.wait_for(asked, 15.0, 0.3)
+    alone = left_alone(want)
+    a = (got or [{}])[0]
+    check("RS3", "policy last_clean: after a crash nothing is restored without asking; the recovery prompt is shown for the last autosave",
+          saved and alone and a.get("reason") == "unclean_shutdown" and a.get("unclean") is True and a.get("snapshot_id") == auto_id,
+          f"autosaved {saved} ({auto_id}); asked {got}; editor left alone {alone}" + ("" if saved else "; log: " + log_tail("autosave", "restore", "run ")))
+
+    # ask: a clean logout, then the login asks with the logout snapshot and restores nothing
+    setcfg({"policy": "ask"})
+    e.cli_json("snap", "top-right-quarter", "--window", g)
+    want = e.frame(g)
+    relogin()
+    got = e.wait_for(asked, 15.0, 0.3)
+    alone = left_alone(want)
+    snaps = e.cli_json("list-snapshots", "--limit", "5")
+    a = (got or [{}])[0]
+    logout_id = next((s["id"] for s in snaps if s.get("mode") == "logout"), None)
+    check("RS4", "policy ask: each login offers the last session (the logout snapshot) and restores nothing until the user answers",
+          alone and a.get("reason") == "ask_each_login" and a.get("snapshot_id") == logout_id and logout_id is not None,
+          f"asked {got}; latest logout snapshot {logout_id}; editor left alone {alone}")
+
+    # named, no confirmation: the chosen layout is applied at login
+    e.cli_json("snap", "left-half", "--window", g)
+    want = e.frame(g)
+    lay = e.run("layout", "save", "rs-login")
+    setcfg({"policy": "named", "named_layout": "rs-login", "confirm_before_restore": False})
+    relogin()
+    back = placed(want, 20.0)
+    check("RS5", "policy named: the chosen layout is applied at login", lay.returncode == 0 and back,
+          f"layout save exit {lay.returncode} {lay.stderr.strip()}; editor at {e.frame(g)} want {want}")
+
+    # named with confirmation: asked first, nothing moved
+    setcfg({"confirm_before_restore": True})
+    relogin()
+    got = e.wait_for(asked, 15.0, 0.3)
+    alone = left_alone(want)
+    a = (got or [{}])[0]
+    check("RS6", "policy named with 'confirm before restoring': the layout is offered at login, not applied",
+          alone and a.get("reason") == "named_layout" and a.get("layout") == "rs-login", f"asked {got}; editor left alone {alone}")
+
+    # back to how the rest of the suite expects it
+    setcfg({"policy": "last_clean", "confirm_before_restore": False})
+    e.stop_daemon()
+    e.env["FRACTILE_UI"] = "/bin/true"
+    e.start_daemon()  # same session: no login restore
 
 
 def layouts_lr(e: Env, g: str) -> None:

@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-13T04:44:54+0000",
+  "when": "2026-11-14T15:19:47+0000",
   "environment": "xvfb with kwin_x11 4:5.27.11-0ubuntu3 (Plasma X11 window manager, no plasmashell)",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 160"
+      "detail": "pid 158"
     },
     {
       "id": "SEC1",
@@ -73,7 +73,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "53 ms incl. polling"
+      "detail": "52 ms incl. polling"
     },
     {
       "id": "X10",
@@ -97,7 +97,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1762 ms"
+      "detail": "1769 ms"
     },
     {
       "id": "X14",
@@ -202,6 +202,42 @@
       "detail": "exit snapshot of the unrestored desktop skipped: True; editor back True at {'h': 600, 'w': 800, 'x': 800, 'y': 0} want {'h': 600, 'w': 800, 'x': 800, 'y': 0}"
     },
     {
+      "id": "RS1",
+      "name": "policy off: no snapshot at logout, nothing restored or offered at the next login",
+      "ok": true,
+      "detail": "snapshots 18 -> 18; editor left alone True; asked []"
+    },
+    {
+      "id": "RS2",
+      "name": "policy last_known: after a crash (no logout snapshot) the last autosave is restored at the next login",
+      "ok": true,
+      "detail": "autosaved True; editor back True at {'h': 600, 'w': 800, 'x': 0, 'y': 600} want {'h': 600, 'w': 800, 'x': 0, 'y': 600}; restore finished True"
+    },
+    {
+      "id": "RS3",
+      "name": "policy last_clean: after a crash nothing is restored without asking; the recovery prompt is shown for the last autosave",
+      "ok": true,
+      "detail": "autosaved True (a59dde0d-bb2e-44cd-a8a6-0b8385f554dc); asked [{'reason': 'unclean_shutdown', 'snapshot_id': 'a59dde0d-bb2e-44cd-a8a6-0b8385f554dc', 'unclean': True}]; editor left alone True"
+    },
+    {
+      "id": "RS4",
+      "name": "policy ask: each login offers the last session (the logout snapshot) and restores nothing until the user answers",
+      "ok": true,
+      "detail": "asked [{'reason': 'ask_each_login', 'snapshot_id': '6b644ab4-f57a-43f0-96ac-4f7679838778', 'unclean': False}]; latest logout snapshot 6b644ab4-f57a-43f0-96ac-4f7679838778; editor left alone True"
+    },
+    {
+      "id": "RS5",
+      "name": "policy named: the chosen layout is applied at login",
+      "ok": true,
+      "detail": "layout save exit 0 ; editor at {'h': 1200, 'w': 800, 'x': 0, 'y': 0} want {'h': 1200, 'w': 800, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "RS6",
+      "name": "policy named with 'confirm before restoring': the layout is offered at login, not applied",
+      "ok": true,
+      "detail": "asked [{'layout': 'rs-login', 'reason': 'named_layout'}]; editor left alone True"
+    },
+    {
       "id": "X29a",
       "name": "a window with a unicode title is listed with its exact title",
       "ok": true,
@@ -223,7 +259,7 @@
       "id": "X30",
       "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
       "ok": true,
-      "detail": "retitled True; Doc 1 at {'h': 1200, 'w': 800, 'x': 0, 'y': 0} want {'h': 1200, 'w': 800, 'x': 0, 'y': 0}; Doc 2 at {'h': 1200, 'w': 800, 'x': 800, 'y': 0} want {'h': 1200, 'w': 800, 'x': 800, 'y': 0}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2168, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 600, \"w\": 800, \"x\": 800, \"y\": 600}, \"record_"
+      "detail": "retitled True; Doc 1 at {'h': 1200, 'w': 800, 'x': 0, 'y': 0} want {'h': 1200, 'w': 800, 'x': 0, 'y': 0}; Doc 2 at {'h': 1200, 'w': 800, 'x': 800, 'y': 0} want {'h': 1200, 'w': 800, 'x': 800, 'y': 0}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2228, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 600, \"w\": 800, \"x\": 800, \"y\": 600}, \"record_"
     },
     {
       "id": "X31",
@@ -247,7 +283,7 @@
       "id": "X34",
       "name": "ordered, delayed launching (LR-05): the dependent app starts only after the first has a window, at least its 2 s delay later; both placed",
       "ok": true,
-      "detail": "first window 0.46325135231018066 s, second 2.9870893955230713 s (gap 2.52 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
+      "detail": "first window 0.4439961910247803 s, second 3.033895254135132 s (gap 2.59 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
     },
     {
       "id": "X35",
@@ -259,7 +295,7 @@
       "id": "X36",
       "name": "profile auto-switch (LR-07): when the docked monitor setup appears, its profile becomes active and its layout is applied",
       "ok": true,
-      "detail": "active profile 'docked'; window {'h': 1200, 'w': 400, 'x': 1200, 'y': 0}; [\"2026-11-13T04:44:52.729 Info monitor topology matched profile 'docked'\"]"
+      "detail": "active profile 'docked'; window {'h': 1200, 'w': 400, 'x': 1200, 'y': 0}; [\"2026-11-14T15:19:46.545 Info monitor topology matched profile 'docked'\"]"
     },
     {
       "id": "X24",

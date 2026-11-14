@@ -59,7 +59,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| RS-01 | Six restore policies; restore independent of autostart | VERIFIED (X11) for manual and last_clean; others PARTIAL (unit-tested decision logic, no E2E) | X13, X22, X27, X28 |
+| RS-01 | Six restore policies; restore independent of autostart | VERIFIED (X11, Plasma X11 container) for all six: manual and last_clean (X13, X22, X27, X28), off (RS1), last_known after a crash (RS2), last_clean after a crash asks (RS3), ask (RS4), named with and without confirmation (RS5, RS6). RS1-RS6 have not run under GNOME yet | X13, X22, X27, X28, RS1-RS6 |
 | RS-02 | Snapshot contents per SRS 2.1/11 | VERIFIED | snapshot schema tests; X13, M07 |
 | RS-03 | Wait for readiness, no fixed sleep | VERIFIED (X11) | X27, X28 (readiness wait observed in log) |
 | RS-04 | Existing windows found before launching | VERIFIED | X12, X19, T11 below |

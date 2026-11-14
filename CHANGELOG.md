@@ -84,6 +84,11 @@ desktops only. See PLATFORM_MATRIX.md.
   being silently replaced; minimize is the scratchpad; the service exits with
   a saved layout when Sway exits. No preview overlay. See
   docs/compatibility/sway.md.
+- **Restore-policy E2E checks (RS1-RS6).** Each policy is checked across a
+  simulated logout and login: off saves and restores nothing, last_known
+  restores the last autosave after a crash, last_clean asks after a crash,
+  ask offers the logout snapshot, and named applies its layout or offers it
+  first. A stand-in UI records what the service asks the UI to show.
 
 ### Fixed during validation
 

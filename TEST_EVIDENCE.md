@@ -33,7 +33,7 @@ cannot show.
 |---|---|---|---|---|
 | Rust unit, property and restore-simulation tests | `cargo test --workspace` | host | all pass | (console) |
 | X11 E2E | `python3 tests/integration/e2e_x11.py` | E1 | 44/44 | `tests/evidence/e2e-x11.json` |
-| X11 E2E under Plasma X11 | `bash tests/kwin-x11/e2e-kwin-x11-in-container.sh` | E7 | 44/44 | `tests/evidence/e2e-x11-kwin.json` |
+| X11 E2E under Plasma X11 | `bash tests/kwin-x11/e2e-kwin-x11-in-container.sh` | E7 | 50/50, including RS1-RS6 (restore policies off, last_known, last_clean after a crash, ask, named). RS1-RS6 are new and have not run under GNOME (E1) yet | `tests/evidence/e2e-x11-kwin.json` |
 | Real apps (T14: browsers, editors, terminals) | `python3 tests/integration/e2e_x11_apps.py` | E1 | 13/13, Chrome incognito recorded as a known limitation | `tests/evidence/e2e-x11-apps.json` |
 | GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/` |
 | GUI (real PyQt6 UI) under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 21/21, G15 skipped (kwin_x11 takes Alt+click; G18 covers tap-then-drag). G19-G21 are new and have not run under GNOME yet | `tests/evidence/gui-x11-kwin.json` |
