@@ -65,7 +65,7 @@ monitors have not been run. Simulated relogins and simulated crash-resume pass o
 |---|---|---|---|---|---|---|
 | `fractile_0.9.0-1_amd64.deb` | Pop!_OS 24.04 host | VERIFIED (Ubuntu 24.04.5 container) | VERIFIED | VERIFIED | VERIFIED | `tests/evidence/package-deb-ubuntu24.04.log` |
 | `fractile-0.9.0-1-x86_64.pkg.tar.zst` | archlinux:latest container (makepkg) | VERIFIED | VERIFIED | VERIFIED | VERIFIED | `tests/evidence/package-arch.log` |
-| Pop!_OS 24.04 host install | n/a | NOT TESTED (no root on the test host) | | | | |
+| Pop!_OS 24.04 host install | VERIFIED by hand (`apt install` of the .deb on the developer's Pop!_OS 24.04 desktop, GNOME 46 on Xorg, two physical monitors 2560x1440 + 3440x1440; service, UI, a panel shortcut and placement on both monitors, judged by the user) | NOT TESTED (that desktop runs the Xorg session) | | | | |
 
 ## Integration versions
 

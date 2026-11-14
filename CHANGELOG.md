@@ -251,7 +251,8 @@ desktops only. See PLATFORM_MATRIX.md.
   (Wayland and Xorg sessions), Plasma 5.27 X11 and Ubuntu 26.04 Plasma 6.6.6
   Wayland, in a VM. Sway and Hyprland have no real login test. Mixed DPI and monitor
   disconnect/reconnect are validated on headless GNOME (virtual monitors
-  changed through DisplayConfig), not with physical monitors. The tray is
+  changed through DisplayConfig); physical monitors were used by hand only
+  (Pop!_OS GNOME Xorg with two monitors, Omarchy at scale 1.5). The tray is
   validated on GNOME with the AppIndicator extension only.
 - On Plasma and other desktops without gnome-session, the logout snapshot is
   taken when systemd stops the service. Apps in KDE's own session management

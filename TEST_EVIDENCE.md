@@ -159,13 +159,14 @@ run left its headless shell running.
 ## What is not covered
 
 - A power-loss interruption on real hardware (the VM power cut is
-  covered), and physical monitors (mixed DPI and disconnect/reconnect ran
-  on virtual monitors through DisplayConfig).
+  covered). Physical monitors were used by hand only: two monitors at scale
+  1 on Pop!_OS GNOME Xorg, and a laptop panel at scale 1.5 on Omarchy
+  (Hyprland); mixed DPI and disconnect/reconnect ran on virtual monitors
+  through DisplayConfig.
 - The tray outside GNOME with the AppIndicator extension.
 - COSMIC: BLOCKED BY PLATFORM (docs/compatibility/cosmic.md).
-- Pop!_OS host package install (no root on the test host): dependency
-  resolution was simulated (`tests/evidence/package-deb-popos24.04-simulate.log`);
-  the real install ran on Ubuntu 24.04 (container and VM).
+- Pop!_OS host package install: done by hand on the developer's desktop
+  (`apt install`, GNOME 46 on Xorg); no automated suite ran there.
 - The 24-hour soak ran on Xvfb with GNOME Shell (X11) in the Ubuntu VM, not
   on a GNOME Wayland or KDE session. Earlier attempts on the developer's
   desktop were stopped (SIGTTIN after 2 minutes; then a run without a memory

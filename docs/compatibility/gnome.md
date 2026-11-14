@@ -35,6 +35,12 @@ At log-out, gnome-session stops GNOME Shell before systemd stops the
 Fractile service, so Fractile registers with gnome-session and saves the
 logout snapshot when the session ends, before the shell goes.
 
+Used by hand on a real Pop!_OS 24.04 desktop (GNOME 46 on Xorg, x11
+adapter, two physical monitors at scale 1): install, the panel on each
+monitor, placement on both. That found a GNOME Xorg behaviour: a frameless
+window asking for a position on the second monitor is first mapped at
+120,120 on the primary; the UI moves its panels back after the map.
+
 **Not tested:** fractional scaling; a physical monitor hot-plug (the display
 changes above are made through DisplayConfig on virtual monitors); a
 non-Ubuntu real login.
