@@ -5,6 +5,7 @@ from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtGui import QCursor, QGuiApplication
 from PyQt6.QtWidgets import QFrame, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout
 
+from . import a11y
 from .settings import SNAP_ACTIONS
 
 
@@ -16,13 +17,13 @@ class CommandPalette(QFrame):
         self.setObjectName("FractilePalette")
         self.setStyleSheet("#FractilePalette { border-radius: 12px; border: 1px solid palette(mid); background: palette(window); }")
         v = QVBoxLayout(self)
-        self.q = QLineEdit()
+        self.q = a11y.name(QLineEdit(), "Command", "Type to filter the commands below; Enter runs the selected one")
         self.q.setPlaceholderText("Type a command: left half, layout, save, restore…")
         self.q.textChanged.connect(self.filter)
         self.q.returnPressed.connect(self.run_current)
         self.q.installEventFilter(self)
         v.addWidget(self.q)
-        self.list = QListWidget()
+        self.list = a11y.name(QListWidget(), "Commands")
         self.list.itemActivated.connect(lambda _i: self.run_current())
         v.addWidget(self.list)
         self.resize(520, 380)

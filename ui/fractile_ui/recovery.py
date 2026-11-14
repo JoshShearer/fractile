@@ -6,6 +6,7 @@ from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QProgressBar, QPushButton, QTableWidget, QTableWidgetItem,
                              QVBoxLayout)
 
+from . import a11y
 from .theme import mute
 
 ACTION_TEXT = {
@@ -72,7 +73,7 @@ class RecoveryDialog(QDialog):
         self.sub = QLabel("Checking what can be restored…")
         self.sub.setWordWrap(True)
         v.addWidget(self.sub)
-        self.table = QTableWidget(0, 4)
+        self.table = a11y.name(QTableWidget(0, 4), "Windows to restore")
         self.table.setHorizontalHeaderLabels(["", "Application", "What will happen", "Content"])
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)

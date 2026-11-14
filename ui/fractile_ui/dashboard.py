@@ -9,6 +9,7 @@ from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (QFileDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QSplitter,
                              QTabWidget, QVBoxLayout, QWidget)
 
+from . import a11y
 from .theme import accent, is_dark
 
 MODE_LABEL = {"manual": "Saved by you", "periodic": "Automatic", "logout": "At logout", "shutdown": "At shutdown", "pre_restore": "Before a restore", "layout": "Layout", "topology": "Monitor setup"}
@@ -77,10 +78,10 @@ class DashboardWindow(QWidget):
         v = QVBoxLayout(self)
         split = QSplitter()
         v.addWidget(split, 1)
-        left = QTabWidget()
-        self.snaps = QListWidget()
+        left = a11y.name(QTabWidget(), "Snapshots and layouts")
+        self.snaps = a11y.name(QListWidget(), "Snapshots")
         self.snaps.currentItemChanged.connect(lambda *_: self.show_snapshot())
-        self.layouts = QListWidget()
+        self.layouts = a11y.name(QListWidget(), "Layouts")
         self.layouts.currentItemChanged.connect(lambda *_: self.show_layout())
         left.addTab(self.snaps, "Snapshots")
         left.addTab(self.layouts, "Layouts")

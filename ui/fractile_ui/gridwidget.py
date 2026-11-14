@@ -23,6 +23,9 @@ class GridWidget(QWidget):
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        # The grid is a map of the monitor: column 0 is its left edge in
+        # every language, so it never mirrors in a right-to-left layout.
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.setAccessibleName("Placement grid")
         self.setAccessibleDescription("Drag across cells, or use arrow keys and Shift+arrow keys, then Enter to place the window.")
 

@@ -37,6 +37,7 @@ cannot show.
 | Real apps (T14: browsers, editors, terminals) | `python3 tests/integration/e2e_x11_apps.py` | E1 | 13/13, Chrome incognito recorded as a known limitation | `tests/evidence/e2e-x11-apps.json` |
 | GUI (real PyQt6 UI) | `python3 tests/gui/gui_x11.py` | E1 | 18/18 | `tests/evidence/gui-x11.json`, screenshots `tests/evidence/gui/` |
 | GUI (real PyQt6 UI) under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 21/21, G15 skipped (kwin_x11 takes Alt+click; G18 covers tap-then-drag). G19-G21 are new and have not run under GNOME yet | `tests/evidence/gui-x11-kwin.json` |
+| Accessibility (UX-06) | `bash tests/gui/a11y-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27, at-spi2-core) | 4/4: A1 names over AT-SPI, A2 high contrast, A3 150% font, A4 right to left (ar_EG locale) | `tests/evidence/a11y-kwin.json` |
 | GUI on two monitors (DV-13) | `bash tests/gui/gui-two-monitors-in-container.sh` | kwin-x11 test image, Xvfb split into two RandR monitors (1600x1200 + 1280x1024) | 5/5 | `tests/evidence/gui-two-monitors-kwin.json` |
 | Settings and shortcut editor under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh settings_x11.py settings-x11-kwin.json` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 22/22, including S18-S21 (Duplicate, Export, Remove, Import) which have not run under GNOME yet | `tests/evidence/settings-x11-kwin.json` |
 | Settings and shortcut editor (X11) | `python3 tests/gui/settings_x11.py` | E1 | 18/18 | `tests/evidence/settings-x11.json` |

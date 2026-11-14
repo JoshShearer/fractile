@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, Q
                              QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
 
 from . import __version__
-from . import keys
+from . import a11y, keys
 from .theme import mute
 from .widgets import GridPicker, ShortcutEdit
 
@@ -371,6 +371,8 @@ class SettingsWindow(QWidget):
         self.tabs.addTab(self._diagnostics(), "Diagnostics")
         self.tabs.addTab(self._about(), "About")
         self.tabs.currentChanged.connect(self._tab_changed)
+        a11y.name(self.tabs, "Settings pages")
+        a11y.name_form_fields(self)
         row = QHBoxLayout()
         self.dirty_lbl = QLabel()
         row.addWidget(self.dirty_lbl, 1)
@@ -527,6 +529,7 @@ class SettingsWindow(QWidget):
         v = QVBoxLayout(w)
         v.addWidget(QLabel("Global shortcuts work anywhere. Panel shortcuts only work while the panel is open."))
         self.sc_table = QTableWidget(0, 5)
+        a11y.name(self.sc_table, "Shortcuts")
         self.sc_table.setHorizontalHeaderLabels(["Name", "Keys", "Where", "Action", "Status"])
         self.sc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.sc_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -698,7 +701,7 @@ class SettingsWindow(QWidget):
                       "It cannot bring back unsaved document contents or in-memory state; apps that have their own session restore (browsers, many editors) reopen their own tabs.")
         note.setWordWrap(True)
         v.addWidget(note)
-        tabs = QTabWidget()
+        tabs = a11y.name(QTabWidget(), "Session restore sections")
         v.addWidget(tabs, 1)
         w = QWidget()
         f = QFormLayout(w)
@@ -732,6 +735,7 @@ class SettingsWindow(QWidget):
         f.addRow(self.b.check("session.store_titles", "Store window titles (helps tell windows apart; turn off for privacy)"))
         f.addRow(self.b.check("session.ignore_private_windows", "Never save private/incognito windows"))
         self.priv = QPlainTextEdit()
+        a11y.name(self.priv, "Private title patterns", "One pattern per line")
         self.priv.setFixedHeight(80)
         self.b.loaders.append(lambda: self.priv.setPlainText("\n".join(getp(self.cfg, "session.private_title_patterns", []))))
         self.priv.textChanged.connect(lambda: self.edit("session.private_title_patterns", [l for l in self.priv.toPlainText().splitlines() if l.strip()]))
@@ -750,6 +754,7 @@ class SettingsWindow(QWidget):
         vv = QVBoxLayout(w)
         vv.addWidget(QLabel("How each application may be started during a restore. New apps default to Ask."))
         self.apps_table = QTableWidget(0, 4)
+        a11y.name(self.apps_table, "Applications")
         self.apps_table.setHorizontalHeaderLabels(["Application", "Launch", "Restores its own documents", "Never restore"])
         self.apps_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         vv.addWidget(self.apps_table, 1)
@@ -809,6 +814,7 @@ class SettingsWindow(QWidget):
         v.addWidget(self.b.check("rules_enabled", "Place matching windows automatically when they open"))
         v.addWidget(self.b.check("allow_title_regex", "Allow matching on window titles (titles change often; less reliable)"))
         self.rules_list = QListWidget()
+        a11y.name(self.rules_list, "Window rules")
         self.rules_list.itemDoubleClicked.connect(lambda _i: self._rule_edit())
         v.addWidget(self.rules_list, 1)
         row = QHBoxLayout()
@@ -890,6 +896,7 @@ class SettingsWindow(QWidget):
         v.addWidget(self.mon_lbl)
         v.addWidget(self.b.check("auto_switch_profiles", "Switch profile automatically when the monitor setup matches"))
         self.prof_list = QListWidget()
+        a11y.name(self.prof_list, "Monitor profiles")
         v.addWidget(self.prof_list, 1)
         row = QHBoxLayout()
         b = QPushButton("Create profile for the current monitors…")
@@ -958,6 +965,7 @@ class SettingsWindow(QWidget):
         w = QWidget()
         v = QVBoxLayout(w)
         self.diag = QPlainTextEdit()
+        a11y.name(self.diag, "Diagnostics report")
         self.diag.setReadOnly(True)
         f = self.diag.font()
         f.setFamily("monospace")

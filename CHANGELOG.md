@@ -84,6 +84,14 @@ desktops only. See PLATFORM_MATRIX.md.
   being silently replaced; minimize is the scratchpad; the service exits with
   a saved layout when Sway exits. No preview overlay. See
   docs/compatibility/sway.md.
+- **Accessibility (UX-06).** Every control that a keyboard user can reach now
+  has a name that screen readers announce. This includes the spacing fields,
+  shortcut and application tables, rule and profile lists, the diagnostics
+  text, the dashboard lists, the recovery table and the command palette. In
+  a right-to-left locale the windows mirror, while the placement grid keeps
+  the monitor's left-to-right order. A new probe checks these names over
+  AT-SPI, plus high contrast, 150% font scale and right-to-left
+  (tests/gui/a11y-in-container.sh).
 - **Restore-policy E2E checks (RS1-RS6).** Each policy is checked across a
   simulated logout and login: off saves and restores nothing, last_known
   restores the last autosave after a crash, last_clean asks after a crash,

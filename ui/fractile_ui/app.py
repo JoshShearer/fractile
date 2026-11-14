@@ -11,7 +11,7 @@ import os
 import sys
 
 from PyQt6 import sip
-from PyQt6.QtCore import QRect, QTimer
+from PyQt6.QtCore import QLocale, QRect, Qt, QTimer
 from PyQt6.QtGui import QAction, QGuiApplication, QIcon
 from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
@@ -63,6 +63,10 @@ class FractileApp:
     def __init__(self, qapp: QApplication, args):
         self.qapp = qapp
         self.args = args
+        # Right-to-left languages (UX-06). Qt only takes the direction from a
+        # loaded translation, and Fractile ships none, so follow the locale.
+        if QLocale.system().textDirection() == Qt.LayoutDirection.RightToLeft:
+            qapp.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         # Follow the desktop's light/dark switch live when the theme is "system".
         self.scheme_watcher = SchemeWatcher(self.on_desktop_scheme)
         # Restart onto new code after a package upgrade (see code_fingerprint).
