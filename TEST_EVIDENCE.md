@@ -27,6 +27,7 @@ cannot show.
 | E10 | archlinux:latest container on the host kernel, host GPU render node | Hyprland 0.57.2 nested in `kwin_wayland --virtual` (KWin is only the parent display); native Wayland GTK4/Qt clients; keys with wtype | Hyprland E2E |
 | E11 | archlinux:latest container on the host kernel | Sway 1.12 nested in `kwin_wayland --virtual` (wlroots Wayland backend, pixman renderer); native Wayland GTK4/Qt clients; keys with wtype | Sway E2E |
 | E12 | fedora:39 container | GNOME Shell 45.10 `--x11` (real mutter WM) on Xvfb 1600x1200, private D-Bus session, AT-SPI | X11 suites under GNOME without a host display |
+| E13 | ubuntu:24.04 container (as on Pop!_OS 24.04) | GNOME Shell 46.0 `--x11` (mutter 46.2) on Xvfb 1600x1200, system bus, AT-SPI | X11 suites under GNOME 46 without a host display |
 
 ## Results
 
@@ -40,6 +41,7 @@ cannot show.
 | GUI (real PyQt6 UI) under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 21/21, G15 skipped (kwin_x11 takes Alt+click; G18 covers tap-then-drag). G18-G21 also pass under GNOME 45 (E12) | `tests/evidence/gui-x11-kwin.json` |
 | Accessibility (UX-06) | `bash tests/gui/a11y-in-container.sh` | kwin-x11 test image (Xvfb, kwin_x11 5.27, at-spi2-core) | 5/5: A1 names over AT-SPI, A2 high contrast, A3 150% font, A4 right to left (ar_EG locale) | `tests/evidence/a11y-kwin.json` |
 | X11 suites under GNOME Shell 45 | `bash tests/gnome/x11-gnome-in-container.sh fedora:39 [suite.py ...]` (default: E2E, GUI, Settings; also `tests/gui/a11y_x11.py`) | E12 | X11 E2E 50/50, GUI 22/22 (G15 runs: mutter leaves Alt+click to the app), Settings 22/22, accessibility 5/5 | `tests/evidence/e2e-x11-gnome45-x11.json`, `gui-x11-gnome45-x11.json`, `settings-x11-gnome45-x11.json`, `a11y-x11-gnome45-x11.json` |
+| X11 suites under GNOME Shell 46 | `bash tests/gnome46-x11/run.sh [suite.py ...]` (default: E2E, GUI, Settings, accessibility) | E13 | X11 E2E 50/50, GUI 22/22, Settings 22/22, accessibility 5/5 | `tests/evidence/e2e-x11-gnome46-x11.json`, `gui-x11-gnome46-x11.json`, `settings-x11-gnome46-x11.json`, `a11y-x11-gnome46-x11.json` |
 | GUI on two monitors (DV-13) | `bash tests/gui/gui-two-monitors-in-container.sh` | kwin-x11 test image, Xvfb split into two RandR monitors (1600x1200 + 1280x1024) | 5/5 | `tests/evidence/gui-two-monitors-kwin.json` |
 | Settings and shortcut editor under Plasma X11 | `bash tests/gui/gui-kwin-x11-in-container.sh settings_x11.py settings-x11-kwin.json` | kwin-x11 test image (Xvfb, kwin_x11 5.27) | 22/22, including S18-S21 (Duplicate, Export, Remove, Import) which have not run under GNOME yet | `tests/evidence/settings-x11-kwin.json` |
 | Settings and shortcut editor (X11) | `python3 tests/gui/settings_x11.py` | E1 | 18/18 | `tests/evidence/settings-x11.json` |

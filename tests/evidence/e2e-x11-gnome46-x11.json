@@ -1,0 +1,307 @@
+{
+  "suite": "e2e-x11",
+  "when": "2026-11-14T16:46:54+0000",
+  "environment": "Xephyr nested GNOME Shell 46.0 (X11), real mutter WM",
+  "results": [
+    {
+      "id": "X01",
+      "name": "service starts unprivileged with X11 adapter and window control",
+      "ok": true,
+      "detail": "pid 285"
+    },
+    {
+      "id": "SEC1",
+      "name": "IPC socket is 0600 in a 0700 dir",
+      "ok": true,
+      "detail": "sock 0o600 dir 0o700"
+    },
+    {
+      "id": "X02",
+      "name": "second instance exits without starting twice",
+      "ok": true,
+      "detail": "fractiled: already running"
+    },
+    {
+      "id": "SEC2",
+      "name": "IPC rejects requests before hello",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X03",
+      "name": "real GTK4 and Qt windows are listed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X04",
+      "name": "grid placements land on the requested rectangle (GTK4)",
+      "ok": true,
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+    },
+    {
+      "id": "X05",
+      "name": "grid placement on a Qt (server-side decorated) window",
+      "ok": true,
+      "detail": "err=0px"
+    },
+    {
+      "id": "X06",
+      "name": "1x1 selection fills the work area exactly (no panel overlap)",
+      "ok": true,
+      "detail": "{'h': 1168, 'w': 1600, 'x': 0, 'y': 32} vs work area {'h': 1168, 'w': 1600, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "X07",
+      "name": "undo restores the previous geometry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X08",
+      "name": "invalid selection exits 7",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X08b",
+      "name": "unknown window exits 5",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X09",
+      "name": "global shortcut places the focused window (real key event)",
+      "ok": true,
+      "detail": "57 ms incl. polling"
+    },
+    {
+      "id": "X10",
+      "name": "global undo shortcut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X11",
+      "name": "shortcut conflict detection reports Fractile's own binding",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X12",
+      "name": "dry run classifies open windows and changes nothing",
+      "ok": true,
+      "detail": "{'already_open': 2}"
+    },
+    {
+      "id": "X13",
+      "name": "restore puts existing windows back exactly",
+      "ok": true,
+      "detail": "1755 ms"
+    },
+    {
+      "id": "X14",
+      "name": "undo-restore returns to the pre-restore layout",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X15",
+      "name": "launchable test app identified by desktop id",
+      "ok": true,
+      "detail": "app-id"
+    },
+    {
+      "id": "X16",
+      "name": "missing app needs approval by default (no silent launch)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X17",
+      "name": "unapproved restore does not launch and exits 6 (partial)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X18",
+      "name": "approved restore launches the app and places it",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "id": "X19",
+      "name": "repeated restore never duplicates windows",
+      "ok": true,
+      "detail": "1 window(s), 0 launches"
+    },
+    {
+      "id": "SEC3",
+      "name": "imported snapshots cannot auto-launch (policies forced to ask)",
+      "ok": true,
+      "detail": "{'ask'}"
+    },
+    {
+      "id": "SEC4",
+      "name": "import rejects a path-like desktop id",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X20",
+      "name": "redacted logs contain no window titles",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X21",
+      "name": "daemon killed mid-restore: restart resumes, no duplicate launches",
+      "ok": true,
+      "detail": "1 Launchme window(s); last runs ['completed', 'completed', 'completed']"
+    },
+    {
+      "id": "X22",
+      "name": "orderly stop (logout) captures a snapshot",
+      "ok": true,
+      "detail": "8 -> 9"
+    },
+    {
+      "id": "X23",
+      "name": "corrupt config: service starts on defaults, reports it, keeps the file",
+      "ok": true,
+      "detail": "config parse error: TOML parse error at line 1, column 6\n  |"
+    },
+    {
+      "id": "X25",
+      "name": "10px margins and a 10px gap: halves sit exactly inside the work area with the gap between them",
+      "ok": true,
+      "detail": "work area {'h': 1168, 'w': 1600, 'x': 0, 'y': 32}; left {'h': 1148, 'w': 785, 'x': 10, 'y': 42}; right {'h': 1148, 'w': 785, 'x': 805, 'y': 42}"
+    },
+    {
+      "id": "X26",
+      "name": "a named layout puts existing windows back exactly",
+      "ok": true,
+      "detail": "{'h': 584, 'w': 800, 'x': 0, 'y': 32} {'h': 584, 'w': 800, 'x': 800, 'y': 616}"
+    },
+    {
+      "id": "SEC7",
+      "name": "hostile layout import: command fields dropped, launches demoted to ask, nothing executed or launched; path-like ids rejected",
+      "ok": true,
+      "detail": "import 0, policies {'ask'}, apply exit 6, relaunched False, path-like import exit 7"
+    },
+    {
+      "id": "X27",
+      "name": "new login with 'restore last session': missing app relaunched and both windows placed; a same-session restart adds nothing",
+      "ok": true,
+      "detail": "launchme {'h': 584, 'w': 800, 'x': 800, 'y': 616} want {'h': 584, 'w': 800, 'x': 800, 'y': 616}; editor back True; instances after restart 1"
+    },
+    {
+      "id": "X28",
+      "name": "logging out during the login restore: the next login restores that layout again",
+      "ok": true,
+      "detail": "exit snapshot of the unrestored desktop skipped: True; editor back True at {'h': 584, 'w': 800, 'x': 800, 'y': 32} want {'h': 584, 'w': 800, 'x': 800, 'y': 32}"
+    },
+    {
+      "id": "RS1",
+      "name": "policy off: no snapshot at logout, nothing restored or offered at the next login",
+      "ok": true,
+      "detail": "snapshots 18 -> 18; editor left alone True; asked []"
+    },
+    {
+      "id": "RS2",
+      "name": "policy last_known: after a crash (no logout snapshot) the last autosave is restored at the next login",
+      "ok": true,
+      "detail": "autosaved True; editor back True at {'h': 584, 'w': 800, 'x': 0, 'y': 616} want {'h': 584, 'w': 800, 'x': 0, 'y': 616}; restore finished True"
+    },
+    {
+      "id": "RS3",
+      "name": "policy last_clean: after a crash nothing is restored without asking; the recovery prompt is shown for the last autosave",
+      "ok": true,
+      "detail": "autosaved True (a5b48fd6-39fe-495e-9105-1fb82ec34ff5); asked [{'reason': 'unclean_shutdown', 'snapshot_id': 'a5b48fd6-39fe-495e-9105-1fb82ec34ff5', 'unclean': True}]; editor left alone True"
+    },
+    {
+      "id": "RS4",
+      "name": "policy ask: each login offers the last session (the logout snapshot) and restores nothing until the user answers",
+      "ok": true,
+      "detail": "asked [{'reason': 'ask_each_login', 'snapshot_id': 'ca5312d3-738b-4749-ae38-830a6c8d0171', 'unclean': False}]; latest logout snapshot ca5312d3-738b-4749-ae38-830a6c8d0171; editor left alone True"
+    },
+    {
+      "id": "RS5",
+      "name": "policy named: the chosen layout is applied at login",
+      "ok": true,
+      "detail": "layout save exit 0 ; editor at {'h': 1168, 'w': 800, 'x': 0, 'y': 32} want {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "RS6",
+      "name": "policy named with 'confirm before restoring': the layout is offered at login, not applied",
+      "ok": true,
+      "detail": "asked [{'layout': 'rs-login', 'reason': 'named_layout'}]; editor left alone True"
+    },
+    {
+      "id": "X29a",
+      "name": "a window with a unicode title is listed with its exact title",
+      "ok": true,
+      "detail": "R\u00e9sum\u00e9 \u5c65\u6b74\u66f8 \u00dcn\u00efcode \u2713 \ud83c\udf89"
+    },
+    {
+      "id": "X29",
+      "name": "unicode app name and title: identified by desktop id, recorded, restored exactly; redacted export and logs omit the title",
+      "ok": true,
+      "detail": "desktop id org.fractile.Unicode.desktop, title hint ok True, restored True, title in redacted export False, in redacted logs False"
+    },
+    {
+      "id": "X30a",
+      "name": "two windows of the same app are listed separately",
+      "ok": true,
+      "detail": "['Doc 1', 'Doc 2']"
+    },
+    {
+      "id": "X30",
+      "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
+      "ok": true,
+      "detail": "retitled True; Doc 1 at {'h': 1168, 'w': 800, 'x': 0, 'y': 32} want {'h': 1168, 'w': 800, 'x': 0, 'y': 32}; Doc 2 at {'h': 1168, 'w': 800, 'x': 800, 'y': 32} want {'h': 1168, 'w': 800, 'x': 800, 'y': 32}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2192, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 584, \"w\": 800, \"x\": 800, \"y\": 616}, \"record_"
+    },
+    {
+      "id": "X31",
+      "name": "a transient dialog is seen (list-windows --all) but never offered for placement, recorded, or moved by a restore",
+      "ok": true,
+      "detail": "all ['Main', 'Main dialog']; placeable ['Main']; recorded ['Main']; dialog frame {'h': 197, 'w': 300, 'x': 0, 'y': 32} -> {'h': 197, 'w': 300, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "X32",
+      "name": "layout modes (LR-03): position_existing leaves a missing app closed; launch_missing launches it and places it",
+      "ok": true,
+      "detail": "position_existing exit 6, launched False; launch_missing exit 0 ; frame {'h': 1168, 'w': 800, 'x': 800, 'y': 32} want {'x': 800, 'y': 32, 'w': 800, 'h': 1168}"
+    },
+    {
+      "id": "X33",
+      "name": "layout mode exact_n (LR-03): 3 instances wanted with 1 open launches 2; applying again launches none; asking for 2 with 3 open closes nothing",
+      "ok": true,
+      "detail": "exit 0/0/0; windows 3, after re-apply 3, after asking for 2: 3"
+    },
+    {
+      "id": "X34",
+      "name": "ordered, delayed launching (LR-05): the dependent app starts only after the first has a window, at least its 2 s delay later; both placed",
+      "ok": true,
+      "detail": "first window 0.4458901882171631 s, second 3.0676963329315186 s (gap 2.62 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
+    },
+    {
+      "id": "X35",
+      "name": "per-monitor variants (LR-04): with one monitor the one-monitor variant applies; with two, the two-monitor variant puts the window on the second",
+      "ok": true,
+      "detail": "one monitor {'h': 1168, 'w': 800, 'x': 0, 'y': 32} (exit 0); setmonitor 1/0; outputs ['conn-screen-1600x1200', 'conn-fr-b-800x1200']; two monitors {'h': 1168, 'w': 400, 'x': 1200, 'y': 32} want {'x': 1200, 'y': 32, 'w': 400, 'h': 1168} (exit 0)"
+    },
+    {
+      "id": "X36",
+      "name": "profile auto-switch (LR-07): when the docked monitor setup appears, its profile becomes active and its layout is applied",
+      "ok": true,
+      "detail": "active profile 'docked'; window {'h': 1168, 'w': 400, 'x': 1200, 'y': 32}; [\"2026-11-14T16:46:53.047 Info monitor topology matched profile 'docked'\"]"
+    },
+    {
+      "id": "X24",
+      "name": "unknown Wayland desktop reports unsupported (no fake support)",
+      "ok": true,
+      "detail": "adapter=none levels={'unsupported'}"
+    }
+  ]
+}
