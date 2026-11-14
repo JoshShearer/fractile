@@ -75,6 +75,34 @@ def run_all(e: GuiEnv) -> None:
     got = e.wait_for(lambda: (lambda f: f if rect_eq(f, want) else None)(e.frame(wid)), 4.0) or e.frame(wid)
     check("G23", "dragging on the other monitor's panel places the window on that monitor exactly",
           rect_eq(got, want) and inside(got, by_out[other["output"]]), f"want {want} got {got}")
+    if e.visible_named("Fractile panel"):
+        e.xdo("key", "Escape")
+        time.sleep(0.5)
+
+    # G25: pressing the same placement shortcut repeatedly cycles the window
+    # across the monitors (DV-17; M04 on GNOME Wayland)
+    c = e.client()
+    try:
+        cfg = c.call("get_config")["config"]
+        cfg["shortcuts"].append({"id": "t-left-third", "name": "Left third", "scope": "global", "accelerator": "Ctrl+Alt+1", "cycle_monitors": True,
+                                 "action": {"type": "place", "grid": {"cols": 3, "rows": 1}, "selection": {"col0": 0, "row0": 0, "col1": 0, "row1": 0}}})
+        r = c.call("set_config", {"config": cfg})
+        t = {o["stable_id"]: c.call("compute_rect", {"output": o["stable_id"], "grid": {"cols": 3, "rows": 1},
+                                                    "selection": {"col0": 0, "row0": 0, "col1": 0, "row1": 0}}) for o in outs}
+    finally:
+        c.close()
+    a, b = home["stable_id"], next(o["stable_id"] for o in outs if o["stable_id"] != home["stable_id"])
+    e.cli_json("place", "--grid", "2x2", "--cells", "1,1,1,1", "--window", wid, "--output", a)
+    seen = []
+    for want_out in (a, b, a):
+        e.xdo("windowactivate", "--sync", str(xid))
+        time.sleep(0.3)
+        e.xdo("key", "ctrl+alt+1")
+        hit = e.wait_for(lambda w=want_out: rect_eq(e.frame(wid), t[w]), 3.0, 0.05)
+        seen.append(want_out if hit else f"miss:{e.frame(wid)}")
+    check("G25", "pressing the same placement shortcut repeatedly cycles the window across monitors",
+          not r.get("hotkey_errors") and seen == [a, b, a], " -> ".join(seen) + (f"; hotkey errors {r.get('hotkey_errors')}" if r.get("hotkey_errors") else ""))
+
     log = e.ui_log.read_text() if e.ui_log.exists() else ""
     tb = [line for line in log.splitlines() if "Traceback" in line or "Error" in line]
     check("G24", "UI logged no Python errors", not tb, "; ".join(tb[:3]))

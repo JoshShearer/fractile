@@ -7,6 +7,12 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Added
 
+- **Panel tests on GNOME Wayland** (tests/gui/panel_gnome_wayland.py): drag,
+  the extension's preview, Esc, grid size keys, Shift+drag, Alt subdivision,
+  the panel-local shortcut and grid reset, with the real UI on GNOME Shell
+  45, 47 and 48 Wayland. Keys and pointer come from Mutter's RemoteDesktop
+  virtual devices (test harness only). The two-monitor X11 suite also checks
+  that a repeated placement shortcut cycles the monitors (G25).
 - **Glass panel.** The placement panel is a translucent, rounded slab with a
   rim light. The cells are frosted panes, and the selection is drawn as one lit
   pane spanning its cells. It fades in over 120 ms on X11. On compositors that

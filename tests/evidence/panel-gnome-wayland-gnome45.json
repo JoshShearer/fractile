@@ -1,0 +1,79 @@
+{
+  "suite": "panel-gnome-wayland",
+  "when": "2026-11-14T19:24:40+0000",
+  "environment": "headless GNOME Shell 45.10 --wayland --no-x11, Fractile extension fractile@fractile.io, PyQt6 UI on Wayland; input from Mutter's RemoteDesktop virtual keyboard and pointer (test harness)",
+  "results": [
+    {
+      "id": "PW00",
+      "name": "test window is up and the GNOME integration is connected (Wayland)",
+      "ok": true,
+      "detail": "adapter=gnome session=wayland"
+    },
+    {
+      "id": "PW01a",
+      "name": "the panel opens on the shortcut and reports its grid",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "PW01",
+      "name": "dragging across the grid places the window exactly (Wayland)",
+      "ok": true,
+      "detail": "want {'h': 1168, 'w': 800, 'x': 0, 'y': 32} got {'h': 1168, 'w': 800, 'x': 0, 'y': 32}; pointer at drag end (779, 709) (aimed at (779, 709))"
+    },
+    {
+      "id": "PW02",
+      "name": "during the drag the extension draws a non-interactive preview of the exact target, and the window has not moved yet",
+      "ok": true,
+      "detail": "preview {'x': 0, 'y': 32, 'w': 800, 'h': 1168, 'reactive': False} want {'h': 1168, 'w': 800, 'x': 0, 'y': 32}; window then {'h': 584, 'w': 800, 'x': 400, 'y': 324}"
+    },
+    {
+      "id": "PW02b",
+      "name": "the preview is gone after the drop",
+      "ok": true,
+      "detail": "None"
+    },
+    {
+      "id": "PW03",
+      "name": "Esc closes the panel without moving the window and focus returns to it",
+      "ok": true,
+      "detail": "active gnome:1900437715; {'h': 1168, 'w': 800, 'x': 0, 'y': 32} -> {'h': 1168, 'w': 800, 'x': 0, 'y': 32}"
+    },
+    {
+      "id": "PW04",
+      "name": "Alt+= / Alt+Shift+= add a column / row, and the new size is kept the next time the panel opens",
+      "ok": true,
+      "detail": "(6, 6) -> (7, 7)"
+    },
+    {
+      "id": "PW05",
+      "name": "Shift+drag places the window and keeps the panel open",
+      "ok": true,
+      "detail": "want {'h': 389, 'w': 534, 'x': 1066, 'y': 32} got {'h': 389, 'w': 534, 'x': 1066, 'y': 32} panel_open=True"
+    },
+    {
+      "id": "PW06",
+      "name": "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly",
+      "ok": true,
+      "detail": "want {'h': 818, 'w': 960, 'x': 80, 'y': 90} got {'h': 818, 'w': 960, 'x': 80, 'y': 90}"
+    },
+    {
+      "id": "PW07",
+      "name": "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
+      "ok": true,
+      "detail": "in panel {'h': 1168, 'w': 800, 'x': 0, 'y': 32}; after close {'h': 584, 'w': 800, 'x': 400, 'y': 324} (centered {'h': 584, 'w': 800, 'x': 400, 'y': 324})"
+    },
+    {
+      "id": "PW08",
+      "name": "with reset on open, a grid changed with Alt+= is back to the default 6x6 next time",
+      "ok": true,
+      "detail": "(6, 6) -> (6, 6)"
+    },
+    {
+      "id": "PW09",
+      "name": "the UI logged no Python errors",
+      "ok": true,
+      "detail": "G **: 19:24:08.797: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files\nMESA: error: ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)\nlibEGL warning: egl: failed to create dri2 screen\n"
+    }
+  ]
+}

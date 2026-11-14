@@ -393,7 +393,9 @@ class PanelController:
         out = []
         for p in self.panels:
             tl = p.grid.mapToGlobal(QPoint(0, 0))
+            off = p.grid.mapTo(p, QPoint(0, 0))  # inside the panel window (on Wayland global positions are unknown)
             out.append({"output": p.output.get("stable_id"), "x": tl.x(), "y": tl.y(), "w": p.grid.width(), "h": p.grid.height(),
+                        "ox": off.x(), "oy": off.y(),
                         "cols": self.model.eff_cols, "rows": self.model.eff_rows, "active": p.isActiveWindow()})
         try:
             with open(os.environ["FRACTILE_UI_TEST_GEOMETRY"], "w") as f:
