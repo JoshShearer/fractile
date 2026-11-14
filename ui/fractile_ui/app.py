@@ -10,6 +10,7 @@ import argparse
 import os
 import sys
 
+from PyQt6 import sip
 from PyQt6.QtCore import QRect, QTimer
 from PyQt6.QtGui import QAction, QGuiApplication, QIcon
 from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
@@ -254,6 +255,8 @@ class FractileApp:
         self.bridge.try_call("ui_register", {"windows": self.own_window_ids()})
 
     def focus_own(self, w):
+        if sip.isdeleted(w):  # called from timers; the window may be gone
+            return
         if QGuiApplication.platformName() == "xcb":
             self.bridge.try_call("focus_own_window", {"window": f"x11:0x{int(w.winId()):x}"})
         elif self.wayland:
@@ -278,7 +281,10 @@ class FractileApp:
         target = rect.topLeft()
 
         def check() -> None:
-            if not w.isVisible():
+            # The panel may be gone already: reopening the panel within this
+            # time deletes the old window, and a Python error in a timer
+            # aborts the whole UI under PyQt6.
+            if sip.isdeleted(w) or not w.isVisible():
                 return
             p = w.pos()
             if abs(p.x() - target.x()) > 2 or abs(p.y() - target.y()) > 2:

@@ -24,7 +24,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "integration"))
 from e2e_x11 import Env, check, rect_eq, results  # noqa: E402
 
-SHOTS = ROOT / "tests" / "evidence" / "gui"
+KWIN = os.environ.get("FRACTILE_TEST_WM") == "kwin"
+SHOTS = Path(os.environ.get("FRACTILE_GUI_SHOTS", ROOT / "tests" / "evidence" / "gui"))
 
 
 class GuiEnv(Env):
@@ -299,13 +300,20 @@ def run_all(e: GuiEnv) -> None:
           f"{len(own)} own windows, flagged {len(flagged)}")
     e.shot("08-dashboard")
 
+    def close_panel_if_open() -> None:
+        if e.visible_named("Fractile panel"):
+            e.xdo("key", "Escape")
+            e.wait_for(lambda: not e.visible_named("Fractile panel"), 3.0)
+
     # G15: 10x10 grid, hold Alt for 20x20 subdivision, drag half cells
     e.run("config", "set", "appearance.default_grid", '{"cols": 10, "rows": 10}')
     e.run("config", "set", "appearance.reset_grid_on_open", "true")
     e.xdo("windowactivate", "--sync", str(xid))
     time.sleep(0.3)
     g = open_panel()
-    if g and (g[0]["cols"], g[0]["rows"]) == (10, 10):
+    if KWIN:
+        print("SKIP G15 holding Alt while dragging: kwin_x11 takes Alt+click for moving windows by default; tap-then-drag is G18")
+    elif g and (g[0]["cols"], g[0]["rows"]) == (10, 10):
         g = g[0]
         sub = dict(g, cols=20, rows=20)
         ax, ay = e.cell_center(sub, 1, 1)
@@ -325,6 +333,32 @@ def run_all(e: GuiEnv) -> None:
         check("G15", "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly", rect_eq(got, want), f"want {want} got {got}")
     else:
         check("G15", "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly", False, f"panel grid {g and (g[0]['cols'], g[0]['rows'])}")
+    close_panel_if_open()
+
+    # G18: tap Alt (press and release), then drag: the finer grid stays on.
+    # This is the way that works where the window manager owns Alt+click
+    # (kwin_x11 5.27 by default), which is why G15 does not run there.
+    e.xdo("windowactivate", "--sync", str(xid))
+    time.sleep(0.3)
+    g = open_panel()
+    if g and (g[0]["cols"], g[0]["rows"]) == (10, 10):
+        g = g[0]
+        sub = dict(g, cols=20, rows=20)
+        ax, ay = e.cell_center(sub, 3, 2)
+        bx, by = e.cell_center(sub, 16, 11)
+        e.xdo("key", "alt")
+        time.sleep(0.4)
+        e.xdo("mousemove", str(ax), str(ay), "mousedown", "1")
+        time.sleep(0.15)
+        e.xdo("mousemove", str(bx), str(by))
+        time.sleep(0.3)
+        e.xdo("mouseup", "1")
+        want = expected(e, 20, 20, 3, 2, 16, 11)
+        got = e.wait_for(lambda: (lambda f: f if rect_eq(f, want) else None)(e.frame(wid)), 4.0) or e.frame(wid)
+        check("G18", "tapping Alt keeps the 20x20 subdivision for a plain drag, and the half-cell selection lands exactly", rect_eq(got, want), f"want {want} got {got}")
+    else:
+        check("G18", "tapping Alt keeps the 20x20 subdivision for a plain drag, and the half-cell selection lands exactly", False, f"panel grid {g and (g[0]['cols'], g[0]['rows'])}")
+    close_panel_if_open()
     e.run("config", "set", "appearance.default_grid", '{"cols": 6, "rows": 6}')
     time.sleep(0.5)
 
@@ -347,6 +381,64 @@ def run_all(e: GuiEnv) -> None:
     time.sleep(0.8)
     check("G16", "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
           in_panel and closed and rect_eq(e.frame(wid), centered), f"in panel {got}; after close {e.frame(wid)} (centered {centered})")
+
+    # G19: "reset the grid each time the panel opens" (DV-24; G08 covers keep)
+    e.run("config", "set", "appearance.reset_grid_on_open", "true")
+    time.sleep(0.5)
+    g1 = open_panel()
+    e.xdo("key", "alt+equal")
+    time.sleep(0.4)
+    close_panel_if_open()
+    g2 = open_panel()
+    check("G19", "with reset on open, a grid changed with Alt+= is back to the default 6x6 next time",
+          bool(g1 and g2) and (g1[0]["cols"], g2[0]["cols"], g2[0]["rows"]) == (6, 6, 6), f"{g1 and (g1[0]['cols'], g1[0]['rows'])} -> {g2 and (g2[0]['cols'], g2[0]['rows'])}")
+    close_panel_if_open()
+    e.run("config", "set", "appearance.reset_grid_on_open", "false")
+
+    # G21: closing and reopening the panel at once does not crash the UI
+    # (a position re-check timer used to touch the deleted panel window and
+    # PyQt aborted the UI)
+    pids = sorted(e.ui_pids())
+    open_panel()
+    e.xdo("key", "Escape")
+    time.sleep(0.2)
+    g = open_panel()
+    time.sleep(2.0)
+    check("G21", "closing and reopening the panel straight away keeps the UI running and the panel open",
+          bool(g) and sorted(e.ui_pids()) == pids and bool(e.visible_named("Fractile panel")), f"ui pids {pids} -> {sorted(e.ui_pids())}")
+    close_panel_if_open()
+
+    # G20: the target closes while the panel is open (DV-27): the panel says
+    # so, a drag places nothing, and nothing crashes
+    tmp = e.window("gtk4", "org.fractile.Gone", "Short-lived window")
+    tw = e.wait_window(lambda w: w.get("app_id") == "org.fractile.Gone")
+    if tw:
+        txid = int(tw["id"].split(":")[1], 16)
+        before_ed = e.frame(wid)
+        e.geom.unlink(missing_ok=True)
+        e.xdo("windowactivate", "--sync", str(txid))
+        time.sleep(0.3)
+        e.xdo("key", "ctrl+alt+g")
+        g = e.panel_geometry(8.0)
+        tmp.terminate()
+        gone = e.wait_for(lambda: not any(w.get("id") == tw["id"] for w in e.cli_json("list-windows")), 5.0)
+        time.sleep(0.5)
+        e.shot("11-target-closed")
+        if g:
+            x0, y0 = e.cell_center(g[0], 0, 0)
+            x1, y1 = e.cell_center(g[0], 2, 2)
+            e.xdo("mousemove", str(x0), str(y0), "mousedown", "1")
+            time.sleep(0.15)
+            e.xdo("mousemove", str(x1), str(y1))
+            time.sleep(0.2)
+            e.xdo("mouseup", "1")
+            time.sleep(0.8)
+        still_open = bool(e.visible_named("Fractile panel"))
+        check("G20", "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves",
+              bool(g) and bool(gone) and still_open and rect_eq(e.frame(wid), before_ed), f"panel={bool(g)} gone={bool(gone)} open_after_drag={still_open} editor {before_ed} -> {e.frame(wid)}")
+        close_panel_if_open()
+    else:
+        check("G20", "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves", False, "test window did not appear")
 
     # G17: launching the app again (menu entry) shows the panel for the focused window (DV-02)
     pids = sorted(e.ui_pids())
@@ -389,8 +481,13 @@ def main() -> int:
         e.cleanup()
         if not a.keep:
             subprocess.run(["bash", str(nested), "stop", str(a.display)])
-    gs = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True).stdout.strip()
-    ev = {"suite": "gui-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": f"Xephyr nested {gs} (X11), PyQt6 UI", "screenshots": "tests/evidence/gui/", "results": results}
+    wm = ["kwin_x11", "--version"] if KWIN else ["gnome-shell", "--version"]
+    try:
+        wmv = subprocess.run(wm, capture_output=True, text=True).stdout.strip()
+    except OSError:
+        wmv = wm[0]
+    server = "Xvfb" if os.environ.get("FRACTILE_TEST_XSERVER") == "xvfb" else "Xephyr nested"
+    ev = {"suite": "gui-x11", "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "environment": f"{server} {wmv} (X11), PyQt6 UI", "screenshots": "tests/evidence/gui/", "results": results}
     Path(a.evidence).write_text(json.dumps(ev, indent=2) + "\n")
     failed = [r for r in results if not r["ok"]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed; evidence: {a.evidence}")

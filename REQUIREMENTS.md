@@ -30,7 +30,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | DV-02 | Panel via tray, shortcut, relaunch | PARTIAL: shortcut (G01) and relaunch (G17) verified; tray NOT TESTED on X11 | PARTIAL: shortcut (W12) and tray click (Y07, with the AppIndicator extension); relaunch not run on GW | PARTIAL: shortcut (K12) | BLOCKED BY PLATFORM |
 | DV-03 | Panel shows the active app; target captured before focus moves | VERIFIED (G03, G04; screenshot 01-panel) | VERIFIED (W12-W14) | PARTIAL: panel shown (K12); placement from the panel not run | BLOCKED BY PLATFORM |
 | DV-04 | Default 6x6, drag selection | VERIFIED (G03) | PARTIAL: keyboard selection (W13); drag not run | NOT TESTED | BLOCKED BY PLATFORM |
-| DV-05 | Alt subdivides 2x | VERIFIED (G15) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
+| DV-05 | Alt subdivides 2x | VERIFIED: holding Alt (G15, GNOME); tapping Alt keeps it for a plain drag (G18, kwin_x11 5.27, where the window manager takes Alt+click so holding cannot reach the panel) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-06 | 1x1..10x10, subdivision to 20x20 | VERIFIED (G15, X04, X06) | PARTIAL: 1x1..10x10 (W06, M06); 20x20 not run | PARTIAL: K04, K06 | BLOCKED BY PLATFORM |
 | DV-07 | Alt+=/- and Alt+Shift+=/- change columns/rows | VERIFIED (G08) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-08 | Move and resize to the selection, pixel-accurate | VERIFIED (X04-X06) | VERIFIED (W04-W06, W08, M02, M06) | VERIFIED (K04-K06) | BLOCKED BY PLATFORM |
@@ -49,10 +49,10 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | DV-21 | Live preview, non-interactive | VERIFIED (G14) | NOT TESTED (drawn by the extension) | NOT TESTED (drawn by the UI) | BLOCKED BY PLATFORM |
 | DV-22 | Horizontal/vertical gaps | VERIFIED (X25) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-23 | Per-side margins, px or %, 10 px default, 0-300 | VERIFIED (X25; ranges validated in config tests) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
-| DV-24 | Default grid size; keep or reset | PARTIAL: size kept (G08); reset-on-next-open not run | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
+| DV-24 | Default grid size; keep or reset | VERIFIED: size kept (G08); reset on next open (G19, kwin_x11 5.27 in a container; not yet run under GNOME) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-25 | General/Appearance/Shortcuts settings | VERIFIED: all 8 pages open and render (S01, S02, screenshots 20-27); a General change is held until Apply, then saved by the service (S08); the wizard (G05). Not every control is exercised | VERIFIED: same checks on Wayland (S01, S02, S08) | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-26 | Shortcut editor conflict feedback | VERIFIED: real X key events into the editor: no modifier refused (S03), Fractile's own binding named (S04), another X client's grab reported in plain words (S05), free combination (S06), reserved panel key (S07); the panel shortcut listed with its keys (S13); global shortcuts paused while the editor listens and resumed on close, disconnect and timeout (S14-S17) | VERIFIED: real key events through Mutter's RemoteDesktop portal into the editor (S03-S07, S09-S11, S13); while it listens Fractile pauses its own global shortcuts so GNOME passes the keys on (S14-S17); a GNOME-assigned combination is reported with where it is set (S05) | NOT TESTED | BLOCKED BY PLATFORM |
-| DV-27 | Target captured on open; closed window handled | PARTIAL: target capture (G03, G17); an unknown window is refused (X08b); closing the target while the panel is open not run | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
+| DV-27 | Target captured on open; closed window handled | VERIFIED: target capture (G03, G17); an unknown window is refused (X08b); the target closing while the panel is open leaves the panel up with a notice and a drag places nothing (G20, kwin_x11 5.27 in a container; not yet run under GNOME) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM |
 | DV-28 | No changes during preview; undo | VERIFIED (G14, X07) | PARTIAL: undo (W07) | PARTIAL: undo (K07) | BLOCKED BY PLATFORM |
 
 ## Session restore (SRS 2.1, 2.2, 6)

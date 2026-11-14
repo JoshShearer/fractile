@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 
-from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QGuiApplication, QIcon, QKeyEvent, QLinearGradient, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout
 
@@ -164,7 +164,7 @@ class PanelWindow(QFrame):
         foot.addWidget(mk("⚙", "Settings", lambda: ctl.app.show_settings()))
         foot.addWidget(mk("▦", "Workspace dashboard", lambda: ctl.app.show_dashboard()))
         v.addLayout(foot)
-        self.help = QLabel("Drag to place  ·  Alt: finer grid  ·  Shift: keep open  ·  Esc: close")
+        self.help = QLabel("Drag to place  ·  Alt: finer grid (hold, or tap to keep)  ·  Shift: keep open  ·  Esc: close")
         mute(self.help, small=True)
         v.addWidget(self.help)
 
@@ -301,6 +301,8 @@ class PanelWindow(QFrame):
 
     # ---- keys ----
     def eventFilter(self, obj, ev):
+        if ev.type() == QEvent.Type.MouseButtonPress:
+            self.ctl.other_input()
         if isinstance(ev, QKeyEvent):
             if ev.type() == QKeyEvent.Type.KeyPress and self.ctl.key_press(self, ev):
                 return True
@@ -332,6 +334,13 @@ class PanelController:
         self.visible = False
         self._preview_cache: dict = {}
         self._last_grid_cfg = None
+        # Alt: held = finer grid while held; tapped (pressed and released
+        # with nothing else) = finer grid until tapped again or the panel
+        # closes. The tap matters where the window manager owns Alt+click
+        # (kwin_x11 5.27 by default): holding Alt there never lets a drag
+        # reach the panel.
+        self._alt_tap = False
+        self._alt_latched = False
 
     # ---- lifecycle ----
     def show(self, payload: dict):
@@ -399,6 +408,8 @@ class PanelController:
         was = self.visible
         self.visible = False
         self.model.set_subdivided(False)
+        self._alt_latched = False
+        self._alt_tap = False
         if notify and was:
             self.app.bridge.try_call("panel_visible", {"visible": False})
         if was:
@@ -518,9 +529,12 @@ class PanelController:
         if k == Qt.Key.Key_Escape:
             self.cancel()
             return True
-        if k == Qt.Key.Key_Alt and not ev.isAutoRepeat():
-            self.set_subdivided(True)
+        if k == Qt.Key.Key_Alt:
+            if not ev.isAutoRepeat():
+                self._alt_tap = True
+                self.set_subdivided(True)
             return True
+        self._alt_tap = False
         if alt and k in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
             self.resize(0, 1) if shift else self.resize(1, 0)
             return True
@@ -549,8 +563,15 @@ class PanelController:
                     return True
         return False
 
+    def other_input(self) -> None:
+        """A click or another key while Alt is down: Alt is being held, not tapped."""
+        self._alt_tap = False
+
     def key_release(self, panel: PanelWindow, ev) -> bool:
         if ev.key() == Qt.Key.Key_Alt and not ev.isAutoRepeat():
-            self.set_subdivided(False)
+            if self._alt_tap:
+                self._alt_latched = not self._alt_latched
+            self._alt_tap = False
+            self.set_subdivided(self._alt_latched)
             return True
         return False

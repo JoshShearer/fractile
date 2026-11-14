@@ -87,6 +87,17 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Closing and reopening the panel quickly crashed the UI (X11).** The
+  position re-check added for GNOME Xorg ran up to 1.2 s after the panel
+  opened. If the panel was reopened within that time, the old window had been
+  deleted, and the check's error aborted the UI (PyQt6 aborts on errors in
+  timers). The timers now skip deleted windows. Found by the new G21 run
+  under KWin.
+- **The Alt finer grid could not be used with a mouse on Plasma 5 X11.**
+  kwin_x11 5.27 takes Alt+click for moving windows by default, so a drag with
+  Alt held never reached the panel. Tapping Alt (press and release) now keeps
+  the finer grid until you tap again or the panel closes. Holding works as
+  before. The panel's help line says so.
 - **Setup said the panel's own shortcut was "already used".** The wizard
   checked its suggestions without saying they were for the panel shortcut, so
   the panel's current binding was reported as taken by "Show/hide panel".
