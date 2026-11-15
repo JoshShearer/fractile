@@ -253,6 +253,27 @@ def run_all(e: Env) -> None:
     e.cli_json("undo")
     check("X07", "undo restores the previous geometry", rect_eq(e.frame(g), before, 2))
 
+    # workspaces (EWMH _NET_NUMBER_OF_DESKTOPS / _NET_WM_DESKTOP)
+    c = e.client()
+    try:
+        wss = c.call("list_workspaces")
+        if len(wss) < 2:
+            # kwin_x11 starts with one virtual desktop: the harness asks the
+            # window manager for two (EWMH _NET_NUMBER_OF_DESKTOPS)
+            e.xdo("set_num_desktops", "2")
+            time.sleep(1.0)
+            wss = c.call("list_workspaces")
+        moved = back = None
+        if len(wss) >= 2:
+            c.call("move_to_workspace", {"window": q, "workspace": 1})
+            moved = e.wait_for(lambda: next((w.get("workspace") for w in e.cli_json("list-windows", "--all") if w["id"] == q), None) == 1, 4.0)
+            c.call("move_to_workspace", {"window": q, "workspace": 0})
+            back = e.wait_for(lambda: next((w.get("workspace") for w in e.cli_json("list-windows", "--all") if w["id"] == q), None) == 0, 4.0)
+    finally:
+        c.close()
+    check("X37", "workspaces are listed and a window moves to another workspace and back", len(wss) >= 2 and bool(moved) and bool(back),
+          f"{[(w['index'], w['name'], w['active']) for w in wss]}; moved {moved} back {back}")
+
     # error exit codes
     check("X08", "invalid selection exits 7", e.run("place", "--grid", "6x6", "--cells", "0,0,9,9", "--window", g).returncode == 7)
     check("X08b", "unknown window exits 5", e.run("place", "--grid", "6x6", "--cells", "0,0,1,1", "--window", "x11:0xdead").returncode == 5)

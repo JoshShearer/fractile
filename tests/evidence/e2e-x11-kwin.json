@@ -1,13 +1,13 @@
 {
   "suite": "e2e-x11",
-  "when": "2026-11-14T15:19:47+0000",
+  "when": "2026-11-15T03:58:56+0000",
   "environment": "xvfb with kwin_x11 4:5.27.11-0ubuntu3 (Plasma X11 window manager, no plasmashell)",
   "results": [
     {
       "id": "X01",
       "name": "service starts unprivileged with X11 adapter and window control",
       "ok": true,
-      "detail": "pid 158"
+      "detail": "pid 156"
     },
     {
       "id": "SEC1",
@@ -58,6 +58,12 @@
       "detail": ""
     },
     {
+      "id": "X37",
+      "name": "workspaces are listed and a window moves to another workspace and back",
+      "ok": true,
+      "detail": "[(0, 'Desktop 1', True), (1, 'Desktop 2', False)]; moved True back True"
+    },
+    {
       "id": "X08",
       "name": "invalid selection exits 7",
       "ok": true,
@@ -73,7 +79,7 @@
       "id": "X09",
       "name": "global shortcut places the focused window (real key event)",
       "ok": true,
-      "detail": "52 ms incl. polling"
+      "detail": "51 ms incl. polling"
     },
     {
       "id": "X10",
@@ -97,7 +103,7 @@
       "id": "X13",
       "name": "restore puts existing windows back exactly",
       "ok": true,
-      "detail": "1769 ms"
+      "detail": "1759 ms"
     },
     {
       "id": "X14",
@@ -217,13 +223,13 @@
       "id": "RS3",
       "name": "policy last_clean: after a crash nothing is restored without asking; the recovery prompt is shown for the last autosave",
       "ok": true,
-      "detail": "autosaved True (a59dde0d-bb2e-44cd-a8a6-0b8385f554dc); asked [{'reason': 'unclean_shutdown', 'snapshot_id': 'a59dde0d-bb2e-44cd-a8a6-0b8385f554dc', 'unclean': True}]; editor left alone True"
+      "detail": "autosaved True (817fb4d6-0cc6-4f12-a53f-606420fa5be6); asked [{'reason': 'unclean_shutdown', 'snapshot_id': '817fb4d6-0cc6-4f12-a53f-606420fa5be6', 'unclean': True}]; editor left alone True"
     },
     {
       "id": "RS4",
       "name": "policy ask: each login offers the last session (the logout snapshot) and restores nothing until the user answers",
       "ok": true,
-      "detail": "asked [{'reason': 'ask_each_login', 'snapshot_id': '6b644ab4-f57a-43f0-96ac-4f7679838778', 'unclean': False}]; latest logout snapshot 6b644ab4-f57a-43f0-96ac-4f7679838778; editor left alone True"
+      "detail": "asked [{'reason': 'ask_each_login', 'snapshot_id': 'e3c023cd-4dec-4a9e-a8fa-1384b5c68ffa', 'unclean': False}]; latest logout snapshot e3c023cd-4dec-4a9e-a8fa-1384b5c68ffa; editor left alone True"
     },
     {
       "id": "RS5",
@@ -259,7 +265,7 @@
       "id": "X30",
       "name": "a window retitled after the snapshot keeps its identity: both same-app windows return to their own places, nothing duplicated",
       "ok": true,
-      "detail": "retitled True; Doc 1 at {'h': 1200, 'w': 800, 'x': 0, 'y': 0} want {'h': 1200, 'w': 800, 'x': 0, 'y': 0}; Doc 2 at {'h': 1200, 'w': 800, 'x': 800, 'y': 0} want {'h': 1200, 'w': 800, 'x': 800, 'y': 0}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2228, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 600, \"w\": 800, \"x\": 800, \"y\": 600}, \"record_"
+      "detail": "retitled True; Doc 1 at {'h': 1200, 'w': 800, 'x': 0, 'y': 0} want {'h': 1200, 'w': 800, 'x': 0, 'y': 0}; Doc 2 at {'h': 1200, 'w': 800, 'x': 800, 'y': 0} want {'h': 1200, 'w': 800, 'x': 800, 'y': 0}; windows 2; report {\"report\": {\"cancelled\": false, \"duration_ms\": 2159, \"items\": [{\"excluded\": false, \"label\": \"testqt\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 600, \"w\": 800, \"x\": 800, \"y\": 600}, \"record_"
     },
     {
       "id": "X31",
@@ -283,7 +289,7 @@
       "id": "X34",
       "name": "ordered, delayed launching (LR-05): the dependent app starts only after the first has a window, at least its 2 s delay later; both placed",
       "ok": true,
-      "detail": "first window 0.4439961910247803 s, second 3.033895254135132 s (gap 2.59 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
+      "detail": "first window 0.3780672550201416 s, second 2.919373035430908 s (gap 2.54 s); exit 0; run completed LAUNCHED_AND_PLACED=2; placed True"
     },
     {
       "id": "X35",
@@ -295,7 +301,7 @@
       "id": "X36",
       "name": "profile auto-switch (LR-07): when the docked monitor setup appears, its profile becomes active and its layout is applied",
       "ok": true,
-      "detail": "active profile 'docked'; window {'h': 1200, 'w': 400, 'x': 1200, 'y': 0}; [\"2026-11-14T15:19:46.545 Info monitor topology matched profile 'docked'\"]"
+      "detail": "active profile 'docked'; window {'h': 1200, 'w': 400, 'x': 1200, 'y': 0}; [\"2026-11-15T03:58:54.844 Info monitor topology matched profile 'docked'\"]"
     },
     {
       "id": "X24",

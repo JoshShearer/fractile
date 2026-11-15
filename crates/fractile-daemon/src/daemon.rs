@@ -967,6 +967,11 @@ impl Daemon {
 
 /// Look up accelerators bound in GNOME settings (best effort, read-only).
 pub fn desktop_binding_conflicts(a: &fractile_core::accel::Accelerator) -> Option<String> {
+    // GNOME's settings only mean something in a GNOME session: on KDE or
+    // elsewhere the schemas can be installed (GNOME apps) without being used.
+    if !is_gnome_session(&std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default()) {
+        return None;
+    }
     let schemas = ["org.gnome.desktop.wm.keybindings", "org.gnome.shell.keybindings", "org.gnome.mutter.keybindings", "org.gnome.settings-daemon.plugins.media-keys", "org.gnome.mutter.wayland.keybindings"];
     for s in schemas {
         let Ok(out) = std::process::Command::new("gsettings").args(["list-recursively", s]).output() else { return None };
@@ -990,6 +995,11 @@ pub fn desktop_binding_conflicts(a: &fractile_core::accel::Accelerator) -> Optio
         }
     }
     None
+}
+
+/// XDG_CURRENT_DESKTOP names GNOME (GNOME, ubuntu:GNOME, pop:GNOME, ...).
+pub fn is_gnome_session(current_desktop: &str) -> bool {
+    current_desktop.split(':').any(|d| d.eq_ignore_ascii_case("GNOME"))
 }
 
 /// Locate a sibling binary (installed layout) or fall back to PATH.
@@ -1019,5 +1029,20 @@ pub fn spawn_ui(d: &Daemon, args: &[&str]) {
     match fractile_session::launch::spawn(&plan) {
         Ok(pid) => info!(d.log, "spawned UI pid {pid}"),
         Err(e) => error!(d.log, "cannot start UI: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod gnome_session_tests {
+    use super::is_gnome_session;
+
+    #[test]
+    fn gnome_bindings_are_read_only_in_gnome_sessions() {
+        for d in ["GNOME", "ubuntu:GNOME", "pop:GNOME", "GNOME-Classic:GNOME"] {
+            assert!(is_gnome_session(d), "{d}");
+        }
+        for d in ["KDE", "", "Hyprland", "sway", "COSMIC", "X-Cinnamon"] {
+            assert!(!is_gnome_session(d), "{d}");
+        }
     }
 }

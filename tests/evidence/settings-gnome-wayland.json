@@ -1,6 +1,6 @@
 {
   "suite": "settings-gnome-wayland",
-  "when": "2026-11-14T20:47:19-0600",
+  "when": "2026-11-14T21:49:51-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, Fractile extension fractile@fractile.io, PyQt6 UI on Wayland",
   "screenshots": "tests/evidence/gui/wayland/",
   "results": [
@@ -86,7 +86,7 @@
       "id": "S10",
       "name": "after Apply the service saved and registered it; the table says active",
       "ok": true,
-      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-9c082504', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-818adcfc', 'name': 'Probe left half', 'scope': 'global'}] status=active"
     },
     {
       "id": "S13",
@@ -98,7 +98,7 @@
       "id": "S18",
       "name": "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
       "ok": true,
-      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-d1383fcd', 'name': 'Probe left half (copy)', 'scope': 'global'}"
+      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-f12d8c87', 'name': 'Probe left half (copy)', 'scope': 'global'}"
     },
     {
       "id": "S19",

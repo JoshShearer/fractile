@@ -166,15 +166,17 @@ def drive_dialog(state: dict) -> None:
         # the desktop's keybindings while the editor listens; without that the
         # window manager takes it and the editor never hears about it.
         msg = capture(ed, "super+up")
+        kde = "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "").split(":")
         check("S05b", "a window manager keybinding (Super+Up) reaches the editor while it listens and is reported as taken",
-              msg.startswith("⚠") and (ed.value or "").lower() in ("super+up", "meta+up"), f"{msg} (value {ed.value})")
+              msg.startswith("⚠") and (ed.value or "").lower() in ("super+up", "meta+up") and ("KDE shortcut" in msg or not kde),
+              f"{msg} (value {ed.value})")
         # Ctrl+Alt+Delete is GNOME's log-out shortcut (media-keys) on every
         # GNOME version and distribution (Ctrl+Alt+T for the terminal is an
         # Ubuntu addition). The service reads the desktop's bindings.
         # KDE binds the same combination to Log Out (ksmserver).
         msg = capture(ed, "ctrl+alt+delete")
         kde = "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "").split(":")
-        named = ("log out" in msg.lower() or "logout" in msg.lower()) if kde else ("assigned in desktop settings" in msg and "logout" in msg)
+        named = ("KDE shortcut" in msg and ("log out" in msg.lower() or "logout" in msg.lower())) if kde else ("assigned in desktop settings" in msg and "logout" in msg)
         check("S05", "a combination the desktop's own settings assign (log out) is reported as taken, with where it is set",
               msg.startswith("⚠") and named and (ed.value or "").startswith("Ctrl+Alt+Del"), f"{msg} (value {ed.value})")
     else:
@@ -187,7 +189,9 @@ def drive_dialog(state: dict) -> None:
         # The service names the desktop's own binding when it can read it
         # (GNOME's settings, KDE's KGlobalAccel), else the live grab test
         # says another application holds it.
-        told = "another application already uses" in msg or "assigned in desktop settings" in msg or "KDE shortcut" in msg
+        kde = "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "").split(":")
+        told = ("KDE shortcut" in msg or "another application already uses" in msg) if kde else \
+            ("another application already uses" in msg or "assigned in desktop settings" in msg)
         check("S05", "a combination another X client or the desktop holds is reported as taken, in plain words",
               msg.startswith("⚠") and told and (ed.value or "").lower() == want.lower(), f"{msg} (value {ed.value})")
     msg = capture(ed, "ctrl+alt+shift+F9")
