@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu26.04-sway",
-  "when": "2026-11-15T06:39:32+0000",
+  "when": "2026-11-15T08:28:45+0000",
   "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, sway session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -13,7 +13,7 @@
       "id": "V01",
       "name": "apt installs the .deb on Ubuntu 26.04 desktop (dependencies from the Ubuntu archive)",
       "ok": true,
-      "detail": "Ubuntu 26.04.1 LTS; sway version 1.11; 7.0.0-43-generic :: user manager: (sd-pam)[1419]\n tester @ user service: dbus.service[1454], filter-chain.service[1487], mpris-proxy.service[1480], pipewire-pulse.service[1490], pipewire.service[1455], wireplumber.service[1486]\n\nNo VM guests are running outdated hypervisor (qemu) binaries on this host.\nfractile\t0.9.0-1"
+      "detail": "Ubuntu 26.04.1 LTS; sway version 1.11; 7.0.0-43-generic :: user manager: (sd-pam)[1545]\n tester @ user service: dbus.service[1583], filter-chain.service[1599], mpris-proxy.service[1591], pipewire-pulse.service[1600], pipewire.service[1584], wireplumber.service[1596]\n\nNo VM guests are running outdated hypervisor (qemu) binaries on this host.\nfractile\t0.9.0-1"
     },
     {
       "id": "V02",
@@ -23,9 +23,9 @@
     },
     {
       "id": "V03",
-      "name": "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway without graphical-session.target the packaged Sway configuration) and it controls windows",
+      "name": "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway/Hyprland without graphical-session.target the compositor configuration: Sway's packaged snippet, Hyprland's documented start line) and it controls windows",
       "ok": true,
-      "detail": "logout {'rc': 1, 'stderr': '00:00:00.014 [ERROR] [common/ipc-client.c:86] Unable to receive IPC response', 'sway_exited': True, 'portal_stopped_first': True}; new shell True; unit inactive/enabled; graphical-session.target inactive; 2026-11-15T06:36:57.108 Info compositor start: this session did not reach graphical-session.target, starting the service from the compositor configuration; adapter sway window_control True session tty"
+      "detail": "logout {'rc': 1, 'stderr': '00:00:00.012 [ERROR] [common/ipc-client.c:86] Unable to receive IPC response', 'sway_exited': True, 'portal_stopped_first': True}; new shell True; unit inactive/enabled; graphical-session.target inactive; 2026-11-15T08:26:09.006 Info compositor start: this session did not reach graphical-session.target, starting the service from the compositor configuration; adapter sway window_control True session tty"
     },
     {
       "id": "V04",
@@ -41,21 +41,27 @@
     },
     {
       "id": "V06",
-      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
+      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates; the log-out saved one Logout snapshot",
       "ok": true,
-      "detail": "logout 1; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; org.gnome.Terminal: 4 placed at the recorded frame by the restore, then resized by the app itself; tests/evidence/vm/sway-03-after-logout.png; log: 2026-11-15T06:36:57.110 Info fractiled 0.9.0 starting pid=4341 autostart=true\n2026-11-15T06:36:57.115 Info login session 19 (from XDG_SESSION_ID)\n2026-11-15T06:36:57.629 Info no snapshot from the previous session to restore\n2026-11-15T06:37:34.668 Info snapshot 51536387-000f-4fcf-914e-8a89b6bad76a saved mode=Manual windows=15\n2026-11-15T06:37:35.421 Info Shutdown snapshot 3a416697-79f6-4964-b961-1834367e9d22 saved (15 windows)\n2026-11-15T06:37:35.440 Info signal 15: ending session\n2026-11-15T06:37:35.440 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T06:38:02.003 Info fractiled 0.9.0 starting pid=2554 autostart=true\n2026-11-15T06:38:02.007 Info login session 6 (from XDG_SESSION_ID)\n2026-11-15T06:38:02.517 Info login restore decision=ask unclean=false snapshot=3a416697-79f6-4964-b961-1834367e9d22\n2026-11-15T06:38:41.373 Warn exit capture failed (adapter disconnected: Sway IPC socket: No such file or directory (os error 2)); saved the layout last seen at 2026-11-15T06:38:36.665670943+00:00 as Logout snapshot 8f13aa75-8d73-4d3d-801c-3d588786e7eb (15 windows)\n2026-11-15T06:38:55.071 Info fractiled 0.9.0 starting pid=5848 autostart=true\n2026-11-15T06:38:55.074 Info login session 26 (from XDG_SESSION_ID)\n2026-11-15T06:38:55.586 Info login restore decision=restore unclean=false snapshot=8f13aa75-8d73-4d3d-801c-3d588786e7eb"
+      "detail": "logout 1; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; org.gnome.Terminal: 4 placed at the recorded frame by the restore, then resized by the app itself; tests/evidence/vm/sway-03-after-logout.png; log: 2026-11-15T08:26:09.016 Info login session 20 (from XDG_SESSION_ID)\n2026-11-15T08:26:09.530 Info no snapshot from the previous session to restore\n2026-11-15T08:26:47.700 Info snapshot 4ba7a4a5-81d7-446f-99a1-c85c3d0377d6 saved mode=Manual windows=15\n2026-11-15T08:26:48.460 Info Shutdown snapshot 52c79042-0231-4378-910f-bc171940438f saved (15 windows)\n2026-11-15T08:26:48.594 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T08:26:48.597 Info signal 15: ending session\n2026-11-15T08:26:48.600 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T08:27:14.851 Info fractiled 0.9.0 starting pid=2554 autostart=true\n2026-11-15T08:27:14.855 Info login session 6 (from XDG_SESSION_ID)\n2026-11-15T08:27:15.366 Info login restore decision=ask unclean=false snapshot=52c79042-0231-4378-910f-bc171940438f\n2026-11-15T08:27:53.916 Warn exit capture failed (adapter disconnected: Sway IPC socket: No such file or directory (os error 2)); saved the layout last seen at 2026-11-15T08:27:51.423074389+00:00 as Logout snapshot f9dac36b-b8ed-4760-ba79-323766227d6e (15 windows)\n2026-11-15T08:28:07.380 Info fractiled 0.9.0 starting pid=5873 autostart=true\n2026-11-15T08:28:07.385 Info login session 26 (from XDG_SESSION_ID)\n2026-11-15T08:28:07.897 Info login restore decision=restore unclean=false snapshot=f9dac36b-b8ed-4760-ba79-323766227d6e"
+    },
+    {
+      "id": "V09",
+      "name": "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the session's umask); fractiled's own umask is 0077",
+      "ok": true,
+      "detail": "10 app processes in Fractile's scopes, session umask 0002; not clean: []; fractiled Umask: 0077 NoNewPrivs: 0 Seccomp: 0 "
     },
     {
       "id": "V07",
       "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
       "ok": true,
-      "detail": "session 26; LockedHint no; swaylock pid 7904\n7906; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/sway-04-locked.png"
+      "detail": "session 26; LockedHint no; swaylock pid 8116\n8119; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/sway-04-locked.png"
     },
     {
       "id": "V08",
-      "name": "Sway: Fractile's icon is in swaybar's tray (StatusNotifierWatcher), active; a click on it (StatusNotifierItem.Activate) opens the panel",
+      "name": "sway: Fractile's icon is in swaybar's tray (StatusNotifierWatcher), active; a click on it (StatusNotifierItem.Activate) opens the panel",
       "ok": true,
-      "detail": "{\"registered\": true, \"service\": \":1.85\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}; status seen Active; {'activated': True, 'stderr': ''}; panel {'h': 374, 'w': 454, 'x': 573, 'y': 424}; tests/evidence/vm/sway-05-tray.png; tests/evidence/vm/sway-06-tray-panel.png"
+      "detail": "{\"registered\": true, \"service\": \":1.86\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}; status seen Active; {'activated': True, 'stderr': ''}; panel {'h': 374, 'w': 454, 'x': 573, 'y': 424}; tests/evidence/vm/sway-05-tray.png; tests/evidence/vm/sway-06-tray-panel.png"
     }
   ],
   "log": []
