@@ -566,6 +566,22 @@ def run(session: str, deb: str) -> None:
         check("V06", "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
               ok2 and bool(relog) and runs2[0].get("state") == "completed" and runs2[0].get("source") == "login",
               f"logout {lo.get('rc')}; new login {bool(relog)}; last restore {runs2[0].get('state')} source {runs2[0].get('source')} {runs2[0].get('summary')}; {'; '.join(notes2)[:600]}; {shot}; log: {decision[-2500:]}")
+        # real lock screen: logind asks the session's own locker (GNOME Shell's
+        # shield, KDE's kscreenlocker) to lock; the locker sets LockedHint
+        # the user's graphical session (older sessions from earlier log-outs can linger as "closing")
+        sid = vm.ssh("loginctl show-user tester -p Display --value").stdout.strip()
+        vm.ssh(f"sudo loginctl lock-session {sid}")
+        locked = wait_for(lambda: (vm.call("status").get("result") or {}).get("locked") or None, 30)
+        hint = vm.ssh(f"loginctl show-session {sid} -p LockedHint --value").stdout.strip()
+        shot_l = vm.screenshot(f"{session}-04-locked")
+        snaps = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile --json list-snapshots").stdout
+        snap_id = (json.loads(snaps or "[]") or [{}])[0].get("id", "")
+        rr = vm.ssh(f"XDG_RUNTIME_DIR=/run/user/$(id -u) fractile restore --snapshot {snap_id} 2>&1")
+        vm.ssh(f"sudo loginctl unlock-session {sid}")
+        unlocked = wait_for(lambda: (not (vm.call("status").get("result") or {}).get("locked")) or None, 30)
+        check("V07", "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
+              bool(locked) and hint == "yes" and rr.returncode != 0 and "locked" in (rr.stdout + rr.stderr).lower() and bool(unlocked),
+              f"session {sid}; LockedHint {hint}; status locked {bool(locked)}; restore exit {rr.returncode}: {(rr.stdout + rr.stderr).strip()[:160]}; unlocked {bool(unlocked)}; {shot_l}")
         hold("end")
         logs = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile logs --redacted --lines 400 2>&1 | grep -iE 'warn|error|restore' | tail -40").stdout
         (EVID / "vm").mkdir(parents=True, exist_ok=True)
@@ -993,13 +1009,15 @@ def run_panel(session: str, deb: str) -> None:
         log = vm.ssh("grep -c Traceback ~/.local/state/fractile/ui.log 2>/dev/null; journalctl --user -q --no-pager | grep -c 'Traceback' ").stdout.split()
         check("P17", "no Python errors in the UI's output", all(x == "0" for x in log), f"{log}")
 
-        # DV-19 / DV-02: the tray icon in the desktop's own tray
-        if plasma:
+        # DV-19 / DV-02: the tray icon in the desktop's own tray (Plasma's, or
+        # on Ubuntu GNOME the AppIndicator extension Ubuntu enables by default)
+        if True:
             vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set general.tray_icon true")
             tr = vm.vmctl("tray")
             shot = vm.screenshot(f"panel-{session}-18-tray")
-            check("P18", "with the tray icon on, Fractile's icon is registered in the desktop's tray (StatusNotifierWatcher) and active",
-                  tr.get("registered") and "Active" in (tr.get("status") or ""), f"{json.dumps(tr)[:300]}; {shot}")
+            if not check("P18", "with the tray icon on, Fractile's icon is registered in the desktop's tray (StatusNotifierWatcher) and active",
+                         tr.get("registered") and "Active" in (tr.get("status") or ""), f"{json.dumps(tr)[:300]}; {shot}"):
+                hold("tray")
             vm.call("activate_window", {"window": wid})
             time.sleep(0.8)
             vm.ssh("rm -f /run/user/$(id -u)/fractile-panel-geometry.json")
@@ -1266,7 +1284,7 @@ def main() -> int:
     ap.add_argument("--panel", action="store_true", help="the panel driven with the VM's keyboard and tablet instead of the reboot/log-out tests")
     ap.add_argument("--upgrade-from", nargs="+", help="PK-06: earlier .debs (oldest first) installed before --deb")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
-    ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail"])
+    ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail", "tray"])
     a = ap.parse_args()
     global HOLD, HOLD_AT, POWER_CUT, PANEL
     POWER_CUT = a.power_cut

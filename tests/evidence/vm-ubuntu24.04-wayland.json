@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu24.04-wayland",
-  "when": "2026-11-13T15:58:10+0000",
+  "when": "2026-11-15T02:53:54+0000",
   "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -43,7 +43,13 @@
       "id": "V06",
       "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/wayland-03-after-logout.png; log: 2026-11-13T15:54:52.192 Info snapshot fd35815f-2ccc-4d12-a98e-fc04c4cda99f saved mode=Manual windows=15\n2026-11-13T15:54:52.637 Info Shutdown snapshot da80a7f8-b978-4d53-9da7-e45a02862875 saved (15 windows)\n2026-11-13T15:54:52.661 Info signal 15: ending session\n2026-11-13T15:54:52.661 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-13T15:57:12.453 Info fractiled 0.9.0 starting pid=2458 autostart=true\n2026-11-13T15:57:12.465 Info login session 5 (from the user's graphical session (logind User.Display))\n2026-11-13T15:57:12.996 Info login restore decision=ask unclean=false snapshot=da80a7f8-b978-4d53-9da7-e45a02862875\n2026-11-13T15:57:41.050 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-13T15:57:41.059 Info Logout snapshot 5bce5ae5-38e1-4f69-a4bb-2ae58d11eaea saved (15 windows)\n2026-11-13T15:57:41.129 Info signal 15: ending session\n2026-11-13T15:57:41.129 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-13T15:57:49.735 Info fractiled 0.9.0 starting pid=5183 autostart=true\n2026-11-13T15:57:49.741 Info login session 20 (from the user's graphical session (logind User.Display))\n2026-11-13T15:57:50.266 Info login restore decision=restore unclean=false snapshot=5bce5ae5-38e1-4f69-a4bb-2ae58d11eaea"
+      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/wayland-03-after-logout.png; log: 2026-11-15T02:50:32.211 Info snapshot b18a86de-407f-4da3-a701-0cd25bdb45c8 saved mode=Manual windows=15\n2026-11-15T02:50:32.649 Info Shutdown snapshot be7cf92e-a497-41f7-9972-def48fd4db10 saved (15 windows)\n2026-11-15T02:50:32.669 Info signal 15: ending session\n2026-11-15T02:50:32.669 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T02:52:52.114 Info fractiled 0.9.0 starting pid=2469 autostart=true\n2026-11-15T02:52:52.128 Info login session 5 (from the user's graphical session (logind User.Display))\n2026-11-15T02:52:52.663 Info login restore decision=ask unclean=false snapshot=be7cf92e-a497-41f7-9972-def48fd4db10\n2026-11-15T02:53:21.255 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-15T02:53:21.269 Info Logout snapshot 711caf45-cff8-409a-b649-20844a1a336a saved (15 windows)\n2026-11-15T02:53:21.356 Info signal 15: ending session\n2026-11-15T02:53:21.356 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T02:53:30.180 Info fractiled 0.9.0 starting pid=5149 autostart=true\n2026-11-15T02:53:30.185 Info login session 20 (from the user's graphical session (logind User.Display))\n2026-11-15T02:53:30.713 Info login restore decision=restore unclean=false snapshot=711caf45-cff8-409a-b649-20844a1a336a"
+    },
+    {
+      "id": "V07",
+      "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
+      "ok": true,
+      "detail": "session 20; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/wayland-04-locked.png"
     }
   ],
   "log": []

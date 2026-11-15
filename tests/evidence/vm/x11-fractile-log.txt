@@ -1,3 +1,3 @@
-2026-11-11T17:07:34.498 Info login restore decision=restore unclean=false snapshot=8bbef9b7-ca6e-4c99-b821-7a0786af7823
-2026-11-11T17:07:37.521 Info restore 45fba20a-dc53-4224-8870-b1b91e523e78 started source=login targets=15
-2026-11-11T17:07:46.590 Info restore 45fba20a-dc53-4224-8870-b1b91e523e78 finished state=completed LAUNCHED_AND_PLACED=15 launches=15 9067ms
+2026-11-15T03:02:14.064 Info login restore decision=restore unclean=false snapshot=05e71b76-c8d1-487f-816c-3b517504377a
+2026-11-15T03:02:16.601 Info restore 83469b2e-b42a-4ec7-adb2-8ea5f6e9e8e1 started source=login targets=15
+2026-11-15T03:02:27.155 Info restore 83469b2e-b42a-4ec7-adb2-8ea5f6e9e8e1 finished state=completed LAUNCHED_AND_PLACED=15 launches=15 10552ms

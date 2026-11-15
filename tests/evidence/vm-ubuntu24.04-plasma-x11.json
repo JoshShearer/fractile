@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu24.04-plasma-x11",
-  "when": "2026-11-11T18:05:06+0000",
+  "when": "2026-11-15T03:11:22+0000",
   "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 5.27), GDM timed login, plasma-x11 session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -13,7 +13,7 @@
       "id": "V01",
       "name": "apt installs the .deb on Ubuntu 24.04 desktop (dependencies from the Ubuntu archive)",
       "ok": true,
-      "detail": "Ubuntu 24.04.5 LTS; kwin-x11 4:5.27.11-0ubuntu3; plasma-workspace 4:5.27.12-0ubuntu0.1; 6.8.0-149-generic :: No user sessions are running outdated binaries.\n\nNo VM guests are running outdated hypervisor (qemu) binaries on this host.\nfractile\t0.9.0-1"
+      "detail": "Ubuntu 24.04.5 LTS; kwin-wayland ; kwin-x11 4:5.27.11-0ubuntu3; plasma-workspace 4:5.27.12-0ubuntu0.1; 6.8.0-149-generic :: No user sessions are running outdated binaries.\n\nNo VM guests are running outdated hypervisor (qemu) binaries on this host.\nfractile\t0.9.0-1"
     },
     {
       "id": "V02",
@@ -43,7 +43,13 @@
       "id": "V06",
       "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login ALREADY_PRESENT=5 LAUNCHED_AND_PLACED=10; ; tests/evidence/vm/plasma-x11-03-after-logout.png; log: 2026-11-11T18:01:14.287 Info login session 16 (from XDG_SESSION_ID)\n2026-11-11T18:01:14.944 Info no snapshot from the previous session to restore\n2026-11-11T18:01:39.126 Info snapshot 06671408-38f1-4ee5-92bf-62694f7293c1 saved mode=Manual windows=15\n2026-11-11T18:01:39.808 Info Shutdown snapshot 67fe7d85-4316-449c-8ed7-8c7e082dc245 saved (15 windows)\n2026-11-11T18:01:39.971 Info signal 15: ending session\n2026-11-11T18:01:39.971 Info Logout: the exit snapshot was already taken when the session manager ended the session\n2026-11-11T18:04:07.093 Info fractiled 0.9.0 starting pid=2394 autostart=true\n2026-11-11T18:04:07.134 Info login session 2 (from XDG_SESSION_ID)\n2026-11-11T18:04:07.847 Info login restore decision=ask unclean=false snapshot=67fe7d85-4316-449c-8ed7-8c7e082dc245\n2026-11-11T18:04:34.261 Info signal 15: ending session\n2026-11-11T18:04:34.327 Info Logout snapshot e5a2daf3-71ca-41b7-94de-d2dbf3ceeffe saved (15 windows)\n2026-11-11T18:04:44.941 Info fractiled 0.9.0 starting pid=5148 autostart=true\n2026-11-11T18:04:44.984 Info login session 19 (from XDG_SESSION_ID)\n2026-11-11T18:04:45.614 Info login restore decision=restore unclean=false snapshot=e5a2daf3-71ca-41b7-94de-d2dbf3ceeffe"
+      "detail": "logout 0; new login True; last restore completed source login ALREADY_PRESENT=5 LAUNCHED_AND_PLACED=10; ; tests/evidence/vm/plasma-x11-03-after-logout.png; log: 2026-11-15T03:07:37.834 Info login session 16 (from XDG_SESSION_ID)\n2026-11-15T03:07:38.451 Info no snapshot from the previous session to restore\n2026-11-15T03:08:01.020 Info snapshot ff67ec90-d64d-463e-9e62-53b178697355 saved mode=Manual windows=15\n2026-11-15T03:08:01.604 Info Shutdown snapshot a38968c3-8171-42b7-9a27-bf2b081b5c3d saved (15 windows)\n2026-11-15T03:08:01.685 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:10:23.040 Info fractiled 0.9.0 starting pid=2330 autostart=true\n2026-11-15T03:10:23.079 Info login session 5 (from XDG_SESSION_ID)\n2026-11-15T03:10:23.654 Info login restore decision=ask unclean=false snapshot=a38968c3-8171-42b7-9a27-bf2b081b5c3d\n2026-11-15T03:10:46.619 Warn Plasma is ending the session (its windows are closing); saved the layout last seen at 2026-11-15T03:10:43.684785240+00:00 as Logout snapshot 6d236e21-2ce5-4b9c-bbbc-02d6ad9e938a (15 windows)\n2026-11-15T03:10:46.638 Info signal 15: ending session\n2026-11-15T03:10:46.638 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:10:56.419 Info fractiled 0.9.0 starting pid=5073 autostart=true\n2026-11-15T03:10:56.424 Info login session 19 (from XDG_SESSION_ID)\n2026-11-15T03:10:57.154 Info login restore decision=restore unclean=false snapshot=6d236e21-2ce5-4b9c-bbbc-02d6ad9e938a"
+    },
+    {
+      "id": "V07",
+      "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
+      "ok": true,
+      "detail": "session 19; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/plasma-x11-04-locked.png"
     }
   ],
   "log": []

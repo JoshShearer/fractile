@@ -1,7 +1,7 @@
 {
   "suite": "vm-ubuntu24.04-x11",
-  "when": "2026-11-11T17:07:53+0000",
-  "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM automatic and timed login, x11 session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "when": "2026-11-15T03:02:32+0000",
+  "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, x11 session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
       "id": "V00",
@@ -19,7 +19,7 @@
       "id": "V02",
       "name": "started from the app menu in a real x11 login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
       "ok": true,
-      "detail": "session x11, service socket True; {\"extension\": 0, \"extension_info\": [\"  Version: 0.9.0\", \"  Enabled: Yes\", \"  State: INITIALIZED\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"policy\": \"last_clean\"}"
+      "detail": "session x11, service socket True; {\"extension\": 0, \"extension_info\": [\"  Version: 0.9.0\", \"  Enabled: Yes\", \"  State: ACTIVE\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"policy\": \"last_clean\"}"
     },
     {
       "id": "V03",
@@ -43,7 +43,13 @@
       "id": "V06",
       "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/x11-03-after-logout.png; log: 2026-11-11T17:04:38.105 Info snapshot a6f91c14-6914-4ed7-a5b0-32addf42ccc3 saved mode=Manual windows=15\n2026-11-11T17:04:38.547 Info Shutdown snapshot 9c8f43d0-d7e9-40fe-97ef-1b6cd73507a4 saved (15 windows)\n2026-11-11T17:04:38.565 Info signal 15: ending session\n2026-11-11T17:04:38.565 Info Logout: the exit snapshot was already taken when the session manager ended the session\n2026-11-11T17:07:00.618 Info fractiled 0.9.0 starting pid=2266 autostart=true\n2026-11-11T17:07:00.635 Info login session 2 (from the user's graphical session (logind User.Display))\n2026-11-11T17:07:01.156 Info login restore decision=ask unclean=false snapshot=9c8f43d0-d7e9-40fe-97ef-1b6cd73507a4\n2026-11-11T17:07:24.877 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-11T17:07:24.911 Info Logout snapshot 8bbef9b7-ca6e-4c99-b821-7a0786af7823 saved (15 windows)\n2026-11-11T17:07:25.027 Info signal 15: ending session\n2026-11-11T17:07:25.027 Info Logout: the exit snapshot was already taken when the session manager ended the session\n2026-11-11T17:07:33.959 Info fractiled 0.9.0 starting pid=5206 autostart=true\n2026-11-11T17:07:33.967 Info login session 18 (from the user's graphical session (logind User.Display))\n2026-11-11T17:07:34.498 Info login restore decision=restore unclean=false snapshot=8bbef9b7-ca6e-4c99-b821-7a0786af7823"
+      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/x11-03-after-logout.png; log: 2026-11-15T02:59:19.927 Info Shutdown snapshot 5a4d98c2-460c-4db9-9236-de5f7de0d6cc saved (15 windows)\n2026-11-15T02:59:19.956 Info signal 15: ending session\n2026-11-15T02:59:19.956 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T02:59:19.969 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:01:40.830 Info fractiled 0.9.0 starting pid=2477 autostart=true\n2026-11-15T03:01:40.841 Info login session 5 (from the user's graphical session (logind User.Display))\n2026-11-15T03:01:41.370 Info login restore decision=ask unclean=false snapshot=5a4d98c2-460c-4db9-9236-de5f7de0d6cc\n2026-11-15T03:02:04.486 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-15T03:02:04.520 Info Logout snapshot 05e71b76-c8d1-487f-816c-3b517504377a saved (15 windows)\n2026-11-15T03:02:04.620 Info signal 15: ending session\n2026-11-15T03:02:04.620 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:02:13.526 Info fractiled 0.9.0 starting pid=5215 autostart=true\n2026-11-15T03:02:13.537 Info login session 19 (from the user's graphical session (logind User.Display))\n2026-11-15T03:02:14.064 Info login restore decision=restore unclean=false snapshot=05e71b76-c8d1-487f-816c-3b517504377a"
+    },
+    {
+      "id": "V07",
+      "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
+      "ok": true,
+      "detail": "session 19; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/x11-04-locked.png"
     }
   ],
   "log": []

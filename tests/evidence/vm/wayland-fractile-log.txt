@@ -1,3 +1,5 @@
-2026-11-13T15:57:50.266 Info login restore decision=restore unclean=false snapshot=5bce5ae5-38e1-4f69-a4bb-2ae58d11eaea
-2026-11-13T15:57:54.783 Info restore 76a6c055-f322-4bab-ba71-918a33b9eca9 started source=login targets=15
-2026-11-13T15:58:04.842 Info restore 76a6c055-f322-4bab-ba71-918a33b9eca9 finished state=completed LAUNCHED_AND_PLACED=15 launches=15 10057ms
+2026-11-15T02:53:30.713 Info login restore decision=restore unclean=false snapshot=711caf45-cff8-409a-b649-20844a1a336a
+2026-11-15T02:53:35.229 Info restore 328b2208-9ee6-4a90-8864-42a9e8eb87ad started source=login targets=15
+2026-11-15T02:53:48.139 Info restore 328b2208-9ee6-4a90-8864-42a9e8eb87ad finished state=completed LAUNCHED_AND_PLACED=15 launches=15 12908ms
+2026-11-15T02:53:50.912 Warn gnome integration disconnected
+2026-11-15T02:53:50.912 Error adapter disconnected: GNOME Shell integration disconnected

@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu26.04-plasma-wayland",
-  "when": "2026-11-13T15:49:19+0000",
+  "when": "2026-11-15T03:19:16+0000",
   "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -43,7 +43,13 @@
       "id": "V06",
       "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login ALREADY_PRESENT=9 LAUNCHED_AND_PLACED=6; ; tests/evidence/vm/plasma-wayland-03-after-logout.png; log: 2026-11-13T15:47:22.015 Info no snapshot from the previous session to restore\n2026-11-13T15:47:51.616 Info snapshot be68a943-7928-4ffd-9891-93821992c757 saved mode=Manual windows=15\n2026-11-13T15:47:52.059 Info Shutdown snapshot f1594be4-a475-4a7c-b22a-e85df430cfcc saved (15 windows)\n2026-11-13T15:47:52.083 Info signal 15: ending session\n2026-11-13T15:47:52.083 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-13T15:48:14.582 Info fractiled 0.9.0 starting pid=2938 autostart=true\n2026-11-13T15:48:14.598 Info login session 6 (from XDG_SESSION_ID)\n2026-11-13T15:48:15.161 Info login restore decision=ask unclean=false snapshot=f1594be4-a475-4a7c-b22a-e85df430cfcc\n2026-11-13T15:48:47.386 Warn Plasma is ending the session (its windows are closing); saved the layout last seen at 2026-11-13T15:48:45.393477531+00:00 as Logout snapshot 7d5f764b-2630-4aeb-8662-8050f43b4b2a (15 windows)\n2026-11-13T15:48:47.436 Info signal 15: ending session\n2026-11-13T15:48:47.436 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-13T15:48:57.788 Info fractiled 0.9.0 starting pid=6945 autostart=true\n2026-11-13T15:48:57.817 Info login session 22 (from XDG_SESSION_ID)\n2026-11-13T15:48:58.401 Info login restore decision=restore unclean=false snapshot=7d5f764b-2630-4aeb-8662-8050f43b4b2a"
+      "detail": "logout 0; new login True; last restore completed source login ALREADY_PRESENT=9 LAUNCHED_AND_PLACED=6; ; tests/evidence/vm/plasma-wayland-03-after-logout.png; log: 2026-11-15T03:17:09.657 Info no snapshot from the previous session to restore\n2026-11-15T03:17:41.776 Info snapshot a014a0c9-18d2-498a-b7db-4a9ce2807102 saved mode=Manual windows=15\n2026-11-15T03:17:42.254 Info Shutdown snapshot 8ec7e343-2270-4e96-aac2-0cfa68c75ee8 saved (15 windows)\n2026-11-15T03:17:43.062 Info signal 15: ending session\n2026-11-15T03:17:43.062 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:18:05.247 Info fractiled 0.9.0 starting pid=2929 autostart=true\n2026-11-15T03:18:05.257 Info login session 6 (from XDG_SESSION_ID)\n2026-11-15T03:18:05.852 Info login restore decision=ask unclean=false snapshot=8ec7e343-2270-4e96-aac2-0cfa68c75ee8\n2026-11-15T03:18:38.132 Warn Plasma is ending the session (its windows are closing); saved the layout last seen at 2026-11-15T03:18:36.009298151+00:00 as Logout snapshot 1b8fd7d2-9ca0-4e08-9a09-0bb58dabc50c (15 windows)\n2026-11-15T03:18:38.192 Info signal 15: ending session\n2026-11-15T03:18:38.192 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:18:48.898 Info fractiled 0.9.0 starting pid=6963 autostart=true\n2026-11-15T03:18:48.910 Info login session 22 (from XDG_SESSION_ID)\n2026-11-15T03:18:49.443 Info login restore decision=restore unclean=false snapshot=1b8fd7d2-9ca0-4e08-9a09-0bb58dabc50c"
+    },
+    {
+      "id": "V07",
+      "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
+      "ok": true,
+      "detail": "session 22; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/plasma-wayland-04-locked.png"
     }
   ],
   "log": []
