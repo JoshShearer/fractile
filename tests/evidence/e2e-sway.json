@@ -1,6 +1,6 @@
 {
   "suite": "e2e-sway",
-  "when": "2026-11-13T04:58:04+0000",
+  "when": "2026-11-15T06:35:21+0000",
   "environment": "sway version 1.12 nested in kwin_wayland --virtual (wlroots Wayland backend, pixman renderer), archlinux container; keys pressed with wtype",
   "results": [
     {
@@ -58,6 +58,12 @@
       "detail": ""
     },
     {
+      "id": "S24",
+      "name": "a cell smaller than the window's minimum size: the client keeps its minimum; the frame is not shrunk below the request (it contains the client where Sway grows it, else it stays at the request), in at most 4 attempts",
+      "ok": true,
+      "detail": "requested {'h': 292, 'w': 400, 'x': 0, 'y': 30} frame {'h': 292, 'w': 400, 'x': 0, 'y': 30} window_rect {'x': 2, 'y': 2, 'width': 396, 'height': 288} client 700x700 attempts 2 Sway kept the container at the request; the client draws past it (not visible over Sway IPC)"
+    },
+    {
       "id": "S08",
       "name": "activating a window focuses it",
       "ok": true,
@@ -103,7 +109,7 @@
       "id": "S14",
       "name": "panel shortcut starts the Wayland UI; the panel floats (Fractile's own for_window rule), is focused, inside the work area and flagged own",
       "ok": true,
-      "detail": "{'h': 359, 'w': 321, 'x': 639, 'y': 435} type=floating_con"
+      "detail": "{'h': 367, 'w': 424, 'x': 588, 'y': 431} type=floating_con"
     },
     {
       "id": "S15",
@@ -151,7 +157,7 @@
       "id": "S21",
       "name": "when Sway exits the service saves the last seen layout and exits",
       "ok": true,
-      "detail": "ing | 2026-11-13T04:58:04.465 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Sway IPC socket: No such file or directory (os error 2) | 2026-11-13T04:58:04.501 Info fractiled stopped"
+      "detail": "ing | 2026-11-15T06:35:21.529 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Sway IPC socket: No such file or directory (os error 2) | 2026-11-15T06:35:21.580 Info fractiled stopped"
     }
   ]
 }

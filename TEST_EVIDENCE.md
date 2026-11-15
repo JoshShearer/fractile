@@ -29,6 +29,7 @@ cannot show.
 | E12 | fedora:39 container | GNOME Shell 45.10 `--x11` (real mutter WM) on Xvfb 1600x1200, private D-Bus session, AT-SPI | X11 suites under GNOME without a host display |
 | E13 | ubuntu:24.04 container (as on Pop!_OS 24.04) | GNOME Shell 46.0 `--x11` (mutter 46.2) on Xvfb 1600x1200, system bus, AT-SPI, Orca 46.1 with speech-dispatcher (no audio) | X11 suites under GNOME 46 without a host display |
 | E14 | fedora:42 container | GNOME Shell 48.8 `--x11` on Xvfb, Qt 6.10.2, Orca from Fedora 42 | Orca suite on a current Qt |
+| E15 | Ubuntu 26.04.1 desktop with sway, swayidle and swaylock in QEMU/KVM (Docker), as E9 | Sway 1.11 with swaybar, real GDM timed logins into the Sway session | VM E2E on Sway |
 
 ## Results
 
@@ -71,7 +72,8 @@ cannot show.
 | GNOME 45 / 47 / 48 (all five GNOME Wayland suites) | `bash tests/gnome/e2e-gnome-in-container.sh fedora:39` (`:41`, `:42`) | E8 | all pass on each | `tests/evidence/*-gnome45.json`, `*-gnome47.json`, `*-gnome48.json` |
 | KWin Wayland E2E | `bash tests/kwin/e2e-kwin-in-container.sh` | E4 | 21/21 (K20: margins and gaps; K06b: 20x20 no drift, 2026-11-14) | `tests/evidence/e2e-kwin-wayland.json` |
 | Hyprland E2E | `bash tests/hyprland/e2e-hyprland-in-container.sh` | E10 | 25/25 | `tests/evidence/e2e-hyprland.json` |
-| Sway E2E | `bash tests/sway/e2e-sway-in-container.sh` | E11 | 25/25 (and 25/25 on three more runs after the placement-settling fix) | `tests/evidence/e2e-sway.json` |
+| Sway E2E | `bash tests/sway/e2e-sway-in-container.sh` | E11 | 26/26 (2026-11-15, with S24: a cell smaller than a window's minimum size) | `tests/evidence/e2e-sway.json` |
+| Real Sway login VM: start at login, restore after log-out and reboot (10 apps / 15 windows), swaylock, swaybar tray | `bash tests/vm/vm-e2e.sh sway` | E15 | 9/9 on the last two runs (2026-11-15). The run before them failed V05 once: GNOME Characters came back 400x319 for a 400x294 cell; not reproduced in 13 launches by hand, but one cold launch went back to its tiled size after placement (a late commit), so the Sway adapter now holds a just-mapped window at the target for 800 ms. gnome-terminal is compared by position only, with its placement checked in the restore report, because it resizes itself on focus changes | `tests/evidence/vm-ubuntu26.04-sway.json`, `tests/evidence/vm/sway-*.png` |
 | Ubuntu desktop VM: install, real logins, log-out, reboot, restore of 10 apps / 15 windows | `bash tests/vm/vm-e2e.sh wayland` / `x11` / `plasma-x11` / `plasma-wayland` | E9 | 8/8 on GNOME Wayland, GNOME Xorg and Plasma 5.27 X11 (Ubuntu 24.04) and on Plasma 6.6.6 Wayland (Ubuntu 26.04), 2026-11-14, including V07 (the real lock screen) | `tests/evidence/vm-ubuntu24.04-wayland.json`, `vm-ubuntu24.04-x11.json`, `vm-ubuntu24.04-plasma-x11.json`, `vm-ubuntu26.04-plasma-wayland.json`, screenshots `tests/evidence/vm/` |
 | Upgrade between builds (PK-06): 0.8.0 -> 0.8.5 -> 0.9.0 with apt over a running session, restore of an old snapshot, reboot | `FRACTILE_VM_UPGRADE_FROM="old-0.8.0.deb old-0.8.5.deb" bash tests/vm/vm-e2e.sh wayland new.deb` | Ubuntu 24.04 VM, GNOME Shell 46.0 Wayland, GDM timed login | 14/14 | `tests/evidence/vm-ubuntu24.04-wayland-upgrade.json` |
 | VM power loss (T15, RS-18): QEMU `system_reset` during back-to-back snapshot writes, twice, then the next login | `FRACTILE_VM_POWER_CUT=1 bash tests/vm/vm-e2e.sh x11` | E9 (GNOME Xorg session) | 9/9 | `tests/evidence/vm-ubuntu24.04-x11-power-cut.json`, `tests/evidence/vm/x11-power-cut-log.txt`, `x11-pc1-prompt.png`, `x11-pc2-after.png` |

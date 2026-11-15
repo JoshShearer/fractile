@@ -1,0 +1,4 @@
+2026-11-15T06:38:55.077 Warn tiling manager detected: sway
+2026-11-15T06:38:55.586 Info login restore decision=restore unclean=false snapshot=8f13aa75-8d73-4d3d-801c-3d588786e7eb
+2026-11-15T06:38:57.108 Info restore fdbb513c-a94b-404b-ae3d-7145f635b622 started source=login targets=15
+2026-11-15T06:39:20.805 Info restore fdbb513c-a94b-404b-ae3d-7145f635b622 finished state=completed LAUNCHED_AND_PLACED=15 launches=15 23693ms

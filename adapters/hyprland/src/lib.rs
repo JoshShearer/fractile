@@ -933,6 +933,12 @@ impl CompositorAdapter for HyprlandAdapter {
     fn set_own_windows(&self, ids: &[String]) {
         self.inner.state.lock().unwrap().own = ids.iter().cloned().collect();
     }
+
+    /// Locked while a screen locker of this user runs (see
+    /// fractile_core::lockers: these lockers do not set logind's LockedHint).
+    fn session_locked(&self) -> Option<bool> {
+        Some(fractile_core::lockers::locked_by(fractile_core::lockers::HYPRLAND_LOCKERS))
+    }
 }
 
 impl Drop for HyprlandAdapter {

@@ -17,6 +17,7 @@ p.add_argument("--role", default=None)
 p.add_argument("--windows", type=int, default=1)
 p.add_argument("--size", default="640x420")
 p.add_argument("--min-size", default=None, help="WxH minimum size hint")
+p.add_argument("--report-size", default=None, help="GTK4: write the window's own size (WxH) to this file every 200 ms")
 p.add_argument("--fight", action="store_true", help="re-apply own size 300ms after map (app overwrites geometry)")
 p.add_argument("--dialog", action="store_true", help="gtk4: also open a transient dialog for the first window")
 p.add_argument("--retitle", default=None, help="gtk4: on SIGUSR1, retitle the first window to this")
@@ -41,6 +42,13 @@ if a.toolkit == "gtk4":
                 mw, mh = (int(v) for v in a.min_size.split("x"))
                 w.get_child().set_size_request(mw, mh)
             w.present()
+            if a.report_size and i == 0:
+                def report(w=w):
+                    with open(a.report_size + ".tmp", "w") as f:
+                        f.write(f"{w.get_width()}x{w.get_height()}")
+                    os.replace(a.report_size + ".tmp", a.report_size)
+                    return True
+                GLib.timeout_add(200, report)
             first = first or w
         if a.dialog:
             d = Gtk.Window(title=f"{a.title} dialog", transient_for=first, modal=False)

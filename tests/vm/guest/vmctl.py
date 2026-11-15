@@ -61,14 +61,15 @@ def session_env() -> dict:
     p = subprocess.run(["systemctl", "--user", "show-environment"], env=env, capture_output=True, text=True)
     for line in p.stdout.splitlines():
         k, _, v = line.partition("=")
-        if k in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP", "DESKTOP_SESSION"):
+        if k in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP", "DESKTOP_SESSION", "SWAYSOCK"):
             env[k] = v
     return env
 
 
 ENV = session_env()
 PLASMA = "KDE" in ENV.get("XDG_CURRENT_DESKTOP", "").split(":")
-SHELL = "plasmashell" if PLASMA else "gnome-shell"
+SWAY = "sway" in ENV.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
+SHELL = "plasmashell" if PLASMA else "sway" if SWAY else "gnome-shell"
 
 
 def run(*args, timeout=60) -> subprocess.CompletedProcess:
@@ -150,8 +151,9 @@ def cmd_setup() -> dict:
                                                           "org.kde.kwin.Scripting.isScriptLoaded", "string:fractile").stdout, 20.0)
         out["extension"] = 0 if (w.returncode == 0 and r.returncode == 0 and loaded) else 1
         out["extension_info"] = [f"kwriteconfig6 {w.returncode}", f"reconfigure {r.returncode} {r.stderr.strip()[-200:]}", f"script loaded {bool(loaded)}"]
-    elif PLASMA:
-        # Plasma X11 needs no integration: the service talks to the X server.
+    elif PLASMA or SWAY:
+        # Plasma X11 needs no integration (the service talks to the X
+        # server), nor does Sway (its IPC socket).
         out["extension"] = "n/a"
     else:
         # The extension: what the docs tell the user to do (or the Extensions app).
@@ -218,6 +220,15 @@ def launch(desktop_id: str, another: bool = False) -> int:
                         "--method", "org.freedesktop.Application.ActivateAction", f"'{aid}'", "[]", "{}"]
         elif aexec:
             launcher = [a for a in aexec.split() if not a.startswith("%")]
+    if SWAY:
+        # Sway's launcher (wmenu-run) and `exec` bindings run the program
+        # itself. D-Bus activation does not work there for these GNOME apps on
+        # Ubuntu 26.04 (they exit without a window), so the Exec line, or for
+        # another window the entry's new-window action, through `swaymsg exec`.
+        nw = new_window_action(path) if another else None
+        exe = (nw[1] if nw and nw[1] else None) or next((ln.strip()[5:] for ln in open(path, encoding="utf-8") if ln.startswith("Exec=")), "")
+        argv = [a for a in exe.split() if not a.startswith("%")]
+        return run("swaymsg", "exec", " ".join(argv)).returncode
     # No pipes: the app inherits them, and waiting for EOF would wait for it.
     return subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", *launcher], env=ENV,
                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60).returncode
@@ -275,6 +286,22 @@ def cmd_logout() -> dict:
             p = run("dbus-send", "--session", "--print-reply", "--dest=org.kde.ksmserver", "/KSMServer",
                     "org.kde.KSMServerInterface.logout", "int32:0", "int32:0", "int32:0")
         return {"rc": p.returncode, "stderr": p.stderr.strip()}
+    if SWAY:
+        # Ubuntu's Sway session never reaches graphical-session.target, so the
+        # user services that are PartOf it (the desktop portal) are not
+        # stopped at log-out; normally they end with the user manager, and the
+        # session bus with it. The test's own ssh connections keep both
+        # running across the log-out. Then, when Sway exits, the old portal
+        # re-activates its GTK backend, which cannot open a display and fails;
+        # dbus-daemon keeps that activation pending for its 120 s timeout, and
+        # every GTK app of the next login waits on it (seen on Ubuntu 26.04).
+        # Stop the portal first, as the end of the user manager would.
+        st = run("systemctl", "--user", "stop", "xdg-desktop-portal.service", "xdg-desktop-portal-gtk.service")
+        # Sway's default "exit" binding asks first through swaynag; the
+        # command itself is `swaymsg exit`.
+        p = run("swaymsg", "exit")
+        gone = wait_for(lambda: run("pgrep", "-u", str(UID), "-x", "sway").returncode != 0, 30.0, 0.2)
+        return {"rc": p.returncode, "stderr": p.stderr.strip(), "sway_exited": bool(gone), "portal_stopped_first": st.returncode == 0}
     p = run("gnome-session-quit", "--logout", "--no-prompt")
     return {"rc": p.returncode, "stderr": p.stderr.strip()}
 

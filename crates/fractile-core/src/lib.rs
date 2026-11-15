@@ -7,6 +7,7 @@ pub mod desktop;
 pub mod geometry;
 pub mod identity;
 pub mod layout;
+pub mod lockers;
 pub mod output;
 pub mod rules;
 pub mod snapshot;

@@ -14,6 +14,7 @@
 #   $prefix/share/gnome-shell/extensions/fractile@fractile.io/   (GNOME integration)
 #   $prefix/share/kwin/scripts/fractile/                         (KDE Plasma integration)
 #   $prefix/share/doc/fractile/...
+#   /etc/sway/config.d/60-fractile.conf  (login start in Sway sessions without graphical-session.target)
 # Nothing is enabled at install time: the GNOME extension and the KWin
 # script are only made available; each user enables them (first-run setup
 # explains how). Login start is also the user's choice (first-run setup or
@@ -47,6 +48,7 @@ for f in "$ext"/*; do install -Dm644 "$f" "$P/share/gnome-shell/extensions/fract
 (cd adapters/kwin/fractile && find . -type f) | while read -r f; do
   install -Dm644 "adapters/kwin/fractile/$f" "$P/share/kwin/scripts/fractile/${f#./}"
 done
+install -Dm644 packaging/sway/60-fractile.conf "$dest/etc/sway/config.d/60-fractile.conf"
 install -Dm644 packaging/metainfo/io.fractile.Fractile.metainfo.xml "$P/share/metainfo/io.fractile.Fractile.metainfo.xml"
 for d in README.md CHANGELOG.md docs/*.md docs/*/*.md; do
   [[ -f $d ]] && install -Dm644 "$d" "$P/share/doc/fractile/$d"

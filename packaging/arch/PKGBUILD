@@ -7,6 +7,7 @@ pkgname=fractile
 pkgver=0.9.0
 pkgrel=1
 pkgdesc="Grid window placement (Divvy-style) and workspace session restore"
+backup=('etc/sway/config.d/60-fractile.conf')
 arch=('x86_64' 'aarch64')
 url="https://example.invalid/fractile"
 license=('GPL-3.0-or-later')

@@ -7,6 +7,21 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Added
 
+- **Sway start at login.** The packages install
+  `/etc/sway/config.d/60-fractile.conf` (`exec fractiled --autostart
+  --compositor-start`, a conffile). Ubuntu's Sway session never reaches
+  `graphical-session.target`, so the user unit does not run there; with
+  `--compositor-start` the service starts from the compositor only when login
+  start is on and that target is not active, so it never runs twice.
+  Hyprland users add the same `exec-once` line.
+- **Lock state on Sway and Hyprland** comes from a running locker of the
+  user (swaylock, gtklock, waylock, and hyprlock on Hyprland). swaylock does
+  not set logind's LockedHint. A restore is refused while one runs.
+- **Real Sway login suite** (`tests/vm/vm-e2e.sh sway`, Ubuntu 26.04 with
+  Sway 1.11 in a QEMU/KVM VM): start at login, restore after log-out/log-in
+  and after reboot with approved app launches, swaylock, and the swaybar
+  tray with its panel.
+
 - **GNOME holds its own shortcuts while the shortcut editor listens.** The
   extension filters Mutter's and GNOME Shell's keybindings and grabbed
   accelerators (filter-keybinding), so a desktop combination reaches the
@@ -141,6 +156,26 @@ desktops only. See PLATFORM_MATRIX.md.
   first. A stand-in UI records what the service asks the UI to show.
 
 ### Fixed during validation
+
+- **Sway and Hyprland start apps from their Exec line**, not by D-Bus
+  activation. GNOME 50 apps activated over D-Bus in Ubuntu's Sway session
+  exited without a window (the activation environment has no
+  XDG_SESSION_TYPE; with it set they look for Mutter).
+- **Sway: a window whose minimum size is larger than the cell no longer
+  collapses.** The size correction kept shrinking the request (GNOME
+  Calculator ended 50 px tall). A dimension now counts as held at the
+  client's minimum when the container is still too large after the same
+  request twice, and Fractile stops correcting it. Sway 1.12 keeps the
+  container at the requested size while such a client draws past it; its
+  IPC shows nothing of that, so it is a known limit (S24).
+- **Sway: a just-launched window stays where it was placed.** A cold-started
+  GNOME Characters committed the size of its first (tiled) configure after
+  Fractile had seen it at the target, and ended at the tiled size. A window
+  that was tiled, or drifted during the placement, now has to hold the
+  target for 800 ms (300 ms otherwise).
+- **gnome-terminal on Sway resizes itself to 80x24 when its focus changes**
+  (app behaviour, documented in docs/compatibility/sway.md); the VM suite
+  checks its position and the restore report's placement.
 
 - In a real GNOME login, Ctrl+Alt+Delete pressed in the shortcut editor ran
   GNOME's log-out action and never reached the editor (found by the GNOME VM
@@ -426,7 +461,7 @@ desktops only. See PLATFORM_MATRIX.md.
   read (Orca suite O1b).
 - Real logins, log-out and reboot are validated on Ubuntu 24.04 GNOME
   (Wayland and Xorg sessions), Plasma 5.27 X11 and Ubuntu 26.04 Plasma 6.6.6
-  Wayland, in a VM. Sway and Hyprland have no real login test. Mixed DPI and monitor
+  Wayland, and Ubuntu 26.04 Sway 1.11, in a VM. Hyprland has no real login test. Mixed DPI and monitor
   disconnect/reconnect are validated on headless GNOME (virtual monitors
   changed through DisplayConfig); physical monitors were used by hand only
   (Pop!_OS GNOME Xorg with two monitors, Omarchy at scale 1.5). The tray is

@@ -168,8 +168,8 @@ class Env:
             self.daemon.terminate()
             self.daemon.wait(10)
 
-    def window(self, tk, app, title):
-        p = subprocess.Popen([sys.executable, str(TESTWIN), "--toolkit", tk, "--app-id", app, "--title", title], env=self.env,
+    def window(self, tk, app, title, *extra):
+        p = subprocess.Popen([sys.executable, str(TESTWIN), "--toolkit", tk, "--app-id", app, "--title", title, *extra], env=self.env,
                              stdout=subprocess.DEVNULL, stderr=open(self.base / f"win-{app}.log", "a"))
         self.procs.append(p)
         return p
@@ -260,6 +260,36 @@ def run_all(s: Sway, e: Env):
     e.cli_json("snap", "right-half", "--window", g)
     e.cli_json("undo")
     check("S07", "undo restores the previous geometry", rect_eq(e.frame(g), before, 2))
+
+    # A cell smaller than the window's minimum size. The client (it reports
+    # its own size) keeps its minimum. Sway 1.11 grows a floating container to
+    # the size the client commits; Sway 1.12 keeps the container at the size
+    # asked for while the client draws past it, and its IPC shows nothing of
+    # that (`geometry` is the natural size, `window_rect` the configured one).
+    # Either way Fractile must not keep shrinking its request (the frame once
+    # collapsed to Sway's floating_minimum_size), and it must not loop.
+    size_file = os.path.join(tempfile.gettempdir(), "fractile-s24-size")
+    e.window("gtk4", "org.fractile.TestMin", "Min window", "--min-size", "700x700", "--report-size", size_file)
+    mw = e.wait_for(lambda: e.win("Min window"), 15.0)
+    if mw:
+        out = e.cli_json("place", "--grid", "4x4", "--cells", "0,0,0,0", "--window", mw["id"])
+        time.sleep(1.0)
+        try:
+            cw, ch = (int(v) for v in open(size_file).read().split("x"))
+        except (OSError, ValueError):
+            cw = ch = 0
+        n = s.node(mw["id"]) or {}
+        fr, wr, req = e.frame(mw["id"]) or {}, n.get("window_rect") or {}, out["requested"]
+        grown = fr.get("w", 0) >= cw and fr.get("h", 0) >= ch
+        held = rect_eq(fr, req, 2)
+        check("S24", "a cell smaller than the window's minimum size: the client keeps its minimum; the frame is not shrunk below the request "
+                     "(it contains the client where Sway grows it, else it stays at the request), in at most 4 attempts",
+              cw >= 700 and ch >= 700 and (grown or held) and out["attempts"] <= 4,
+              f"requested {req} frame {fr} window_rect {wr} client {cw}x{ch} attempts {out['attempts']} "
+              + ("Sway grew the container to the client" if grown else "Sway kept the container at the request; the client draws past it (not visible over Sway IPC)"))
+        s.cmd(f"[con_id={mw['id'].split(':')[1]}] kill")
+    else:
+        check("S24", "a cell smaller than the window's minimum size: the client keeps its minimum; the frame is not shrunk below the request", False, "no window")
 
     e.call("activate_window", {"window": q})
     check("S08", "activating a window focuses it", e.wait_for(lambda: e.call("active_window") == q, 3.0))

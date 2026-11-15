@@ -723,7 +723,10 @@ impl Inner {
     /// configure) makes a floating container take that size a moment later.
     /// So reaching the target once is not enough: the second value is true
     /// when the frame reached the target and then left it.
-    fn settle(&self, id: i64, target: Rect, tol: i32) -> AResult<(Rect, bool)> {
+    /// Wait until the container is stable. Once it is at the target it must
+    /// stay there for `hold`; leaving it again reports a drift (the client
+    /// committed an older size).
+    fn settle(&self, id: i64, target: Rect, tol: i32, hold: Duration) -> AResult<(Rect, bool)> {
         let start = Instant::now();
         let mut last: Option<Rect> = None;
         let mut same = 0;
@@ -732,7 +735,7 @@ impl Inner {
             let r = rect_of(&self.node(id)?["rect"]);
             if r.max_edge_delta(&target) <= tol {
                 let t = *reached.get_or_insert_with(Instant::now);
-                if t.elapsed() >= Duration::from_millis(300) {
+                if t.elapsed() >= hold {
                     return Ok((r, false));
                 }
             } else if reached.is_some() {
@@ -747,7 +750,7 @@ impl Inner {
             if reached.is_none() && ((same >= 3 && start.elapsed() > Duration::from_millis(200)) || start.elapsed() > Duration::from_millis(1500)) {
                 return Ok((r, false));
             }
-            if start.elapsed() > Duration::from_millis(2500) {
+            if start.elapsed() > Duration::from_millis(2500) + hold {
                 return Ok((r, false));
             }
             std::thread::sleep(Duration::from_millis(40));
@@ -922,6 +925,17 @@ impl CompositorAdapter for SwayAdapter {
         let mut corr = [0i32; 4];
         let mut observed = None;
         let mut attempts = 0;
+        // A client whose minimum size is larger than the target keeps its
+        // size; shrinking the request further would only shrink the container
+        // under it (down to Sway's floating_minimum_size) while the client
+        // still draws at its minimum, over its neighbours.
+        // A just-launched client may not have applied Sway's new size when the
+        // frame is read (it maps tiled, larger, and acks the configure later),
+        // so a dimension only counts as held at the minimum when it is still
+        // too large after the same request was sent again.
+        let (mut stuck_w, mut stuck_h) = (false, false);
+        let (mut over_w, mut over_h) = (false, false);
+        let mut drifts = 0;
         for attempt in 1..=4 {
             attempts = attempt;
             let (x, y) = (target.x + corr[0], target.y + corr[1]);
@@ -930,7 +944,12 @@ impl CompositorAdapter for SwayAdapter {
             // rectangle, border and title bar included, is what Sway sizes
             // and moves here).
             self.inner.command(&format!("[con_id={con}] floating enable, resize set width {w} px height {h} px, move absolute position {x} px {y} px"))?;
-            let (obs, drifted) = self.inner.settle(con, target, tol)?;
+            // A just-mapped client (it was tiled) can still commit the size of
+            // an older configure well after it first showed the new one (seen
+            // with GNOME Characters at a cold start: back at its tiled size
+            // half a second later), so it has to hold the target longer.
+            let hold = Duration::from_millis(if was_tiled || drifts > 0 { 800 } else { 300 });
+            let (obs, drifted) = self.inner.settle(con, target, tol, hold)?;
             observed = Some(obs);
             if obs.max_edge_delta(&target) <= tol {
                 break;
@@ -938,12 +957,39 @@ impl CompositorAdapter for SwayAdapter {
             if drifted {
                 // The client committed an older size after Sway's: ask again
                 // with the same numbers.
+                drifts += 1;
+                continue;
+            }
+            // The client's surface larger than the whole container asked for:
+            // its minimum size, not a decoration offset. Sway grows a floating
+            // container to the size a client commits, and `window_rect` then
+            // holds it. (Sway's `geometry` is only the client's natural size.)
+            let wr = rect_of(&self.inner.node(con)?["window_rect"]);
+            let big_w = wr.w > w + tol && obs.w > target.w + tol;
+            let big_h = wr.h > h + tol && obs.h > target.h + tol;
+            stuck_w |= big_w && over_w;
+            stuck_h |= big_h && over_h;
+            let first_over = (big_w && !over_w) || (big_h && !over_h);
+            over_w |= big_w;
+            over_h |= big_h;
+            let pos_ok = (obs.x - target.x).abs() <= tol && (obs.y - target.y).abs() <= tol;
+            let w_ok = stuck_w || (obs.w - target.w).abs() <= tol;
+            let h_ok = stuck_h || (obs.h - target.h).abs() <= tol;
+            if pos_ok && w_ok && h_ok {
+                break;
+            }
+            if first_over {
+                // ask again with the same numbers before deciding
                 continue;
             }
             corr[0] += target.x - obs.x;
             corr[1] += target.y - obs.y;
-            corr[2] += target.w - obs.w;
-            corr[3] += target.h - obs.h;
+            if !stuck_w {
+                corr[2] += target.w - obs.w;
+            }
+            if !stuck_h {
+                corr[3] += target.h - obs.h;
+            }
         }
         let err = observed.map(|o| o.max_edge_delta(&target));
         Ok(PlacementOutcome {
@@ -953,7 +999,11 @@ impl CompositorAdapter for SwayAdapter {
             max_error_px: err,
             within_tolerance: err.map(|e| e <= tol).unwrap_or(false),
             attempts,
-            note: if was_tiled { Some("the window was tiled; Sway now floats it at the placed size".into()) } else { None },
+            note: match (stuck_w || stuck_h, was_tiled) {
+                (true, _) => Some("the window's minimum size is larger than the target; it keeps that size".into()),
+                (false, true) => Some("the window was tiled; Sway now floats it at the placed size".into()),
+                _ => None,
+            },
         })
     }
 
@@ -1073,6 +1123,12 @@ impl CompositorAdapter for SwayAdapter {
 
     fn set_own_windows(&self, ids: &[String]) {
         self.inner.state.lock().unwrap().own = ids.iter().cloned().collect();
+    }
+
+    /// Locked while a screen locker of this user runs (see
+    /// fractile_core::lockers: these lockers do not set logind's LockedHint).
+    fn session_locked(&self) -> Option<bool> {
+        Some(fractile_core::lockers::locked_by(fractile_core::lockers::WLROOTS_LOCKERS))
     }
 }
 

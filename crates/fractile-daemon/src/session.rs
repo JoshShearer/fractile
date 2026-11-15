@@ -37,6 +37,20 @@ pub fn capture_now(d: &Daemon, mode: SnapshotMode, name: Option<String>) -> R<Sn
 /// Store an automatic snapshot (periodic, logout, shutdown, pre-restore) and
 /// apply rolling retention right away, so frequent restores or logouts cannot
 /// grow the store between periodic ticks. Manual saves are never pruned.
+
+/// Whether apps whose desktop entry is DBusActivatable are started with a
+/// D-Bus Activate call (the Desktop Entry spec's way) or with their Exec line.
+/// Sway and Hyprland run their apps from the Exec line, and in their sessions
+/// D-Bus activation is not reliable: on Ubuntu 26.04's Sway session the GNOME
+/// 50 apps started by D-Bus activation exit without a window (the activation
+/// environment lacks XDG_SESSION_TYPE, and with it set they look for GNOME's
+/// org.gnome.Mutter.ServiceChannel), while the same apps from their Exec line
+/// open normally. The Exec line runs with this service's environment, which
+/// the compositor gave it.
+fn dbus_activation_usable(d: &Daemon) -> bool {
+    which("gdbus") && !matches!(d.env.choose(None), crate::backend::Backend::Sway | crate::backend::Backend::Hyprland)
+}
+
 fn save_automatic(d: &Daemon, s: &fractile_core::snapshot::Snapshot) -> Result<(), String> {
     let cfg = d.config();
     let mut st = d.store.lock().unwrap();
@@ -97,14 +111,14 @@ impl RestoreHost for DaemonHost {
         // Launch what is installed now, not what was installed at login.
         self.d.apps.lock().unwrap().refresh_if_stale(Duration::from_secs(300));
         let entry = self.d.apps.lock().unwrap().get(desktop_id).cloned().ok_or_else(|| format!("{desktop_id} is not installed"))?;
-        let plan = plan_launch(&entry, extra, systemd_user_available(), which("gio"), which("gdbus"), another_window)?;
+        let plan = plan_launch(&entry, extra, systemd_user_available(), which("gio"), dbus_activation_usable(&self.d), another_window)?;
         info!(self.d.log, "launch {desktop_id} via {} argv={:?}", plan.method, plan.argv);
         spawn(&plan)
     }
     fn can_launch(&self, desktop_id: &str) -> Result<String, String> {
         self.d.apps.lock().unwrap().refresh_if_stale(Duration::from_secs(300));
         let entry = self.d.apps.lock().unwrap().get(desktop_id).cloned().ok_or_else(|| format!("{desktop_id} is not installed"))?;
-        plan_launch(&entry, &[], systemd_user_available(), which("gio"), which("gdbus"), false).map(|p| p.method.to_string())
+        plan_launch(&entry, &[], systemd_user_available(), which("gio"), dbus_activation_usable(&self.d), false).map(|p| p.method.to_string())
     }
     fn next_new_window(&self, timeout: Duration) -> Option<String> {
         self.new_windows.lock().unwrap().recv_timeout(timeout).ok()

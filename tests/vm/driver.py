@@ -46,9 +46,10 @@ QMP = "/tmp/qmp.sock"
 GUEST_TOOL = "/src/tests/vm/guest/vmctl.py"
 # session -> (GDM session name, logind session type, the shell process)
 SESSIONS = {"wayland": ("ubuntu", "wayland", "gnome-shell"), "x11": ("ubuntu-xorg", "x11", "gnome-shell"),
-            "plasma-x11": ("plasma", "x11", "plasmashell"), "plasma-wayland": ("plasma", "wayland", "plasmashell")}
+            "plasma-x11": ("plasma", "x11", "plasmashell"), "plasma-wayland": ("plasma", "wayland", "plasmashell"),
+            "sway": ("sway", "wayland", "sway")}
 # The Ubuntu release each session runs on.
-SESSION_RELEASE = {"wayland": "noble", "x11": "noble", "plasma-x11": "noble", "plasma-wayland": "resolute"}
+SESSION_RELEASE = {"wayland": "noble", "x11": "noble", "plasma-x11": "noble", "plasma-wayland": "resolute", "sway": "resolute"}
 PLASMA_VERSIONS = "dpkg-query -W -f='${Package} ${Version}; ' plasma-workspace kwin-wayland kwin-x11 2>/dev/null"
 APT = ("sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 -o Acquire::http::Timeout=60")
 APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-editor gnome-calculator "
@@ -232,6 +233,42 @@ def ensure_plasma_base(release: str = "noble") -> Path:
             vm.p.kill()
     subprocess.run(["mv", str(vm.disk), str(out)], check=True)
     say("Plasma image ready")
+    return out
+
+
+def ensure_sway_base(release: str = "resolute") -> Path:
+    """The desktop base plus Ubuntu's sway package (with swaybar, swayidle
+    and swaylock), GDM kept as the display manager and offering the "Sway"
+    session. The one thing added to Ubuntu's default Sway configuration is
+    the lock setup from swayidle(1): the logind Lock and Unlock signals run
+    swaylock and end it, so `loginctl lock-session` locks the screen as on
+    the other desktops."""
+    sfx = "" if release == "noble" else f"-{release}"
+    out = CACHE / f"base-sway{sfx}.qcow2"
+    if out.exists():
+        return out
+    base = ensure_base(release)
+    say("provisioning the Sway image: sway, swayidle, swaylock on the desktop base")
+    vm = VM(base, "sway-provision")
+    lock = "exec swayidle -w lock 'swaylock -f -c 1d2330' unlock 'pkill -USR1 -x swaylock'"
+    try:
+        if not vm.wait_ssh(600):
+            raise SystemExit("the Sway provisioning VM did not come up")
+        steps = [
+            f"for i in 1 2 3; do {APT} update -q && {APT} install -y sway swayidle swaylock > /tmp/sway.log 2>&1 && break; sleep 30; done; tail -3 /tmp/sway.log",
+            "test -e /usr/share/wayland-sessions/sway.desktop && grep -q 'config.d' /etc/sway/config",
+            f"sudo tee /etc/sway/config.d/60-fractile-test-lock.conf >/dev/null <<'EOF'\n{lock}\nEOF\ncat /etc/sway/config.d/60-fractile-test-lock.conf",
+        ]
+        for c in steps:
+            p = vm.ssh(c, timeout=3600)
+            if p.returncode != 0:
+                raise SystemExit(f"Sway provisioning step failed: {c} -> {p.returncode}: {(p.stdout + p.stderr).strip()[-600:]}")
+        vm.stop()
+    finally:
+        if vm.p.poll() is None:
+            vm.p.kill()
+    subprocess.run(["mv", str(vm.disk), str(out)], check=True)
+    say("Sway image ready")
     return out
 
 
@@ -421,9 +458,11 @@ def wait_restore_done(vm: VM, timeout=420, not_run: str | None = None) -> dict:
     return st
 
 
-def compare(before: list[dict], after: list[dict], tol=4) -> tuple[bool, list[str]]:
+def compare(before: list[dict], after: list[dict], tol=4, position_only=()) -> tuple[bool, list[str]]:
     """Per app: same number of windows, and each recorded frame matched by a
-    distinct window within `tol` px."""
+    distinct window within `tol` px. For apps in `position_only` only the
+    position is compared (the app sets its own size later, see
+    SELF_SIZING)."""
     notes, ok = [], True
     apps = sorted({b["app"] for b in before})
     for app in apps:
@@ -435,7 +474,8 @@ def compare(before: list[dict], after: list[dict], tol=4) -> tuple[bool, list[st
             continue
         free = list(have)
         for fr in want:
-            hit = next((h for h in free if h and fr and all(abs(h[k] - fr[k]) <= tol for k in ("x", "y", "w", "h"))), None)
+            keys = ("x", "y") if app.removesuffix(".desktop") in position_only else ("x", "y", "w", "h")
+            hit = next((h for h in free if h and fr and all(abs(h[k] - fr[k]) <= tol for k in keys)), None)
             if hit is None:
                 ok = False
                 notes.append(f"{app}: no window at {fr}; have {free}")
@@ -443,6 +483,28 @@ def compare(before: list[dict], after: list[dict], tol=4) -> tuple[bool, list[st
                 free.remove(hit)
     extra = [a for a in after if a["app"] not in apps and a["app"]]
     return ok, notes + ([f"other windows: {[a['app'] for a in extra]}"] if extra else [])
+
+
+# Apps that change their own window size after Fractile placed it, per
+# session. gnome-terminal on Sway goes back to its default 80x24 whenever its
+# own focus changes (in or out), long after the placement (reproduced by
+# hand: place a terminal, focus another window, it is 573x260 again). For
+# these the layout check compares the position, and the restore report must
+# show the window placed at the recorded frame.
+SELF_SIZING = {"sway": ("org.gnome.Terminal",)}
+
+
+def placed_as_reported(vm: VM, apps: tuple, tol=4) -> tuple[bool, list[str]]:
+    """The last restore report: each item of these apps placed at its recorded
+    frame (observed vs requested)."""
+    if not apps:
+        return True, []
+    rep = json.loads(vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile --json restore-status").stdout or "{}")
+    items = [i for i in (((rep.get("last_report") or {}).get("report") or {}).get("items") or [])
+             if any(i.get("label", "").split(" #")[0] == a for a in apps)]
+    bad = [f"{i['label']} placed {i.get('observed')} for {i.get('requested')}" for i in items
+           if not (i.get("observed") and i.get("requested") and all(abs(i["observed"][k] - i["requested"][k]) <= tol for k in ("x", "y", "w", "h")))]
+    return bool(items) and not bad, ([f"{', '.join(apps)}: {len(items)} placed at the recorded frame by the restore, then resized by the app itself"] if items and not bad else bad or [f"no restore report items for {apps}"])
 
 
 def gdm_and_session(vm: VM, session: str) -> None:
@@ -463,6 +525,8 @@ def gdm_and_session(vm: VM, session: str) -> None:
 
 def base_for(session: str) -> Path:
     rel = SESSION_RELEASE[session]
+    if session == "sway":
+        return ensure_sway_base(rel)
     return ensure_plasma_base(rel) if session.startswith("plasma") else ensure_base(rel)
 
 
@@ -478,7 +542,7 @@ def run(session: str, deb: str) -> None:
         gdm_and_session(vm, session)
         vm.scp(deb, "/tmp/fractile.deb")
         vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
-        rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {PLASMA_VERSIONS if plasma else 'gnome-shell --version'}; uname -r").stdout.strip().replace("\n", "; ")
+        rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {PLASMA_VERSIONS if plasma else 'sway --version' if session == 'sway' else 'gnome-shell --version'}; uname -r").stdout.strip().replace("\n", "; ")
         inst = vm.ssh(
             # The VM's user-mode network has no IPv6, and archive.ubuntu.com
             # resolves to IPv6 first: IPv4 only, and the whole install retried
@@ -501,7 +565,7 @@ def run(session: str, deb: str) -> None:
         up = wait_for(lambda: vm.ssh("test -S /run/user/$(id -u)/fractile/fractile.sock").returncode == 0, 60)
         setup = vm.vmctl("setup")
         check("V02", f"started from the app menu in a real {session} login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
-              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and setup.get("extension") == ("n/a" if session == "plasma-x11" else 0),
+              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and setup.get("extension") == ("n/a" if session in ("plasma-x11", "sway") else 0),
               f"session {s1.get('session_type')}, service socket {bool(up)}; {json.dumps(setup)[:400]}")
 
         # One real log-out and log-in (loads the extension on Wayland).
@@ -510,9 +574,18 @@ def run(session: str, deb: str) -> None:
         relog = wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()), 180, 3)
         s2 = wait_session(vm, stype)
         st2 = s2.get("status") or {}
-        check("V03", "after a real log-out and the next login, the systemd user unit started the service and it controls windows",
-              bool(relog) and s2.get("unit_active") == "active" and bool(st2.get("window_control")),
-              f"logout {lo}; new shell {bool(relog)}; unit {s2.get('unit_active')}/{s2.get('unit_enabled')}; adapter {st2.get('adapter')} window_control {st2.get('window_control')} session {s2.get('session_type')}")
+        # How the service was started at this login: the systemd unit, or (in a
+        # session that never reaches graphical-session.target, such as
+        # Ubuntu's plain Sway session) the packaged compositor configuration.
+        gst = vm.ssh("systemctl --user is-active graphical-session.target").stdout.strip()
+        how = vm.ssh("grep -a 'compositor start' ~/.local/state/fractile/fractile.log | tail -1").stdout.strip()
+        by_compositor = "starting the service from the compositor configuration" in how
+        started = s2.get("unit_active") == "active" or (session == "sway" and by_compositor)
+        check("V03", "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway without "
+                     "graphical-session.target the packaged Sway configuration) and it controls windows",
+              bool(relog) and started and bool(st2.get("window_control")),
+              f"logout {lo}; new shell {bool(relog)}; unit {s2.get('unit_active')}/{s2.get('unit_enabled')}; graphical-session.target {gst}; "
+              f"{how[-160:]}; adapter {st2.get('adapter')} window_control {st2.get('window_control')} session {s2.get('session_type')}")
         if not st2.get("window_control"):
             vm.screenshot(f"{session}-00-no-control")
             return
@@ -529,7 +602,9 @@ def run(session: str, deb: str) -> None:
             power_cut(vm, session, stype, before)
             return
 
-        # Real reboot.
+        # Real reboot. "Where they were" is the layout at the reboot: an app
+        # may change its own window after it was placed (see SELF_SIZING).
+        at_reboot = [w for w in (vm.vmctl("state").get("windows") or []) if w.get("app") in apps] or before
         boot0 = s2.get("boot_id")
         vm.ssh("sudo systemctl reboot", timeout=20)
         vm.wait_down()
@@ -544,7 +619,18 @@ def run(session: str, deb: str) -> None:
         pressed = bool(asked) and vm.key("ret")
         after = wait_restore_done(vm)
         shot = vm.screenshot(f"{session}-02-after-reboot")
-        ok, notes = compare(before, after.get("windows") or [])
+        selfsz = SELF_SIZING.get(session, ())
+        ok, notes = compare(at_reboot, after.get("windows") or [], position_only=selfsz)
+        rep_ok, rep_notes = placed_as_reported(vm, selfsz)
+        ok &= rep_ok
+        notes += rep_notes
+        if len(at_reboot) != 15:
+            ok = False
+            notes.append(f"{len(at_reboot)} windows open at the reboot, expected 15")
+        moved = [f"{b['app']} {b['frame']} at the reboot vs {a.get('frame')} when placed" for b in at_reboot for a in before
+                 if a["id"] == b["id"] and a.get("frame") != b.get("frame")] if at_reboot is not before else []
+        if moved:
+            notes.append("changed by the app after placement: " + "; ".join(moved))
         runs = (after.get("restore") or {}).get("recent_runs") or [{}]
         check("V05", "after a real reboot and the next login, Fractile asks first (the default); Enter on the prompt restores all 15 windows of the 10 apps where they were, with no duplicates",
               ok and s3.get("boot_id") != boot0 and runs[0].get("state") == "completed" and pressed,
@@ -554,6 +640,7 @@ def run(session: str, deb: str) -> None:
         vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set session.confirm_before_restore false", check_rc=True)
 
         # Real log-out and timed re-login.
+        at_logout = [w for w in (vm.vmctl("state").get("windows") or []) if w.get("app") in apps] or before
         shell_before = vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()
         lo = vm.vmctl("logout")
         relog = wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()), 180, 3)
@@ -561,7 +648,13 @@ def run(session: str, deb: str) -> None:
         after2 = wait_restore_done(vm, not_run=runs[0].get("run_id"))
         shot = vm.screenshot(f"{session}-03-after-logout")
         decision = vm.ssh("grep -a -E 'starting pid|login session|login restore|snapshot|capture|previous session|stopping|SIGTERM|signal' ~/.local/state/fractile/fractile.log | tail -14").stdout.strip()
-        ok2, notes2 = compare(before, after2.get("windows") or [])
+        ok2, notes2 = compare(at_logout, after2.get("windows") or [], position_only=selfsz)
+        rep_ok2, rep_notes2 = placed_as_reported(vm, selfsz)
+        ok2 &= rep_ok2
+        notes2 += rep_notes2
+        if len(at_logout) != 15:
+            ok2 = False
+            notes2.append(f"{len(at_logout)} windows open at the log-out, expected 15")
         runs2 = (after2.get("restore") or {}).get("recent_runs") or [{}]
         check("V06", "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
               ok2 and bool(relog) and runs2[0].get("state") == "completed" and runs2[0].get("source") == "login",
@@ -573,6 +666,10 @@ def run(session: str, deb: str) -> None:
         vm.ssh(f"sudo loginctl lock-session {sid}")
         locked = wait_for(lambda: (vm.call("status").get("result") or {}).get("locked") or None, 30)
         hint = vm.ssh(f"loginctl show-session {sid} -p LockedHint --value").stdout.strip()
+        # Sway's locker (swaylock through swayidle) does not set LockedHint:
+        # there the screen is locked while swaylock runs.
+        locker = vm.ssh("pgrep -u tester -x swaylock").stdout.strip() if session == "sway" else ""
+        really_locked = bool(locker) if session == "sway" else hint == "yes"
         shot_l = vm.screenshot(f"{session}-04-locked")
         snaps = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile --json list-snapshots").stdout
         snap_id = (json.loads(snaps or "[]") or [{}])[0].get("id", "")
@@ -580,8 +677,33 @@ def run(session: str, deb: str) -> None:
         vm.ssh(f"sudo loginctl unlock-session {sid}")
         unlocked = wait_for(lambda: (not (vm.call("status").get("result") or {}).get("locked")) or None, 30)
         check("V07", "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
-              bool(locked) and hint == "yes" and rr.returncode != 0 and "locked" in (rr.stdout + rr.stderr).lower() and bool(unlocked),
-              f"session {sid}; LockedHint {hint}; status locked {bool(locked)}; restore exit {rr.returncode}: {(rr.stdout + rr.stderr).strip()[:160]}; unlocked {bool(unlocked)}; {shot_l}")
+              bool(locked) and really_locked and rr.returncode != 0 and "locked" in (rr.stdout + rr.stderr).lower() and bool(unlocked),
+              f"session {sid}; LockedHint {hint}{'; swaylock pid ' + locker if session == 'sway' else ''}; status locked {bool(locked)}; restore exit {rr.returncode}: {(rr.stdout + rr.stderr).strip()[:160]}; unlocked {bool(unlocked)}; {shot_l}")
+        if session == "sway":
+            # swaybar's tray (its own StatusNotifierWatcher): the icon, and a
+            # click on it opens the panel for the focused window. Qt reports
+            # NeedsAttention for the timeout of a message it shows (the
+            # restore notification, 6 s), then Active again.
+            seen = []
+
+            def tray_active():
+                t = vm.vmctl("tray")
+                seen.append((t.get("status") or "?").strip("(<'>,)"))
+                return t if t.get("registered") and "Active" in (t.get("status") or "") else None
+            tr = wait_for(tray_active, 20, 1) or vm.vmctl("tray")
+            shot_t = vm.screenshot(f"{session}-05-tray")
+            wins = vm.call("list_windows").get("result") or []
+            if wins:
+                vm.call("activate_window", {"window": wins[0]["id"]})
+                time.sleep(0.8)
+            act = vm.vmctl("tray-activate")
+            panel = wait_for(lambda: next((w for w in (vm.call("list_windows", {"all": True}).get("result") or [])
+                                           if (w.get("title") or "").startswith("Fractile panel")), None), 15, 1)
+            shot_p = vm.screenshot(f"{session}-06-tray-panel")
+            check("V08", "Sway: Fractile's icon is in swaybar's tray (StatusNotifierWatcher), active; a click on it (StatusNotifierItem.Activate) opens the panel",
+                  bool(tr.get("registered")) and "Active" in (tr.get("status") or "") and bool(act.get("activated")) and bool(panel),
+                  f"{json.dumps(tr)[:240]}; status seen {' > '.join(dict.fromkeys(seen))}; {act}; panel {panel and panel.get('frame')}; {shot_t}; {shot_p}")
+            vm.key("esc")
         hold("end")
         logs = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile logs --redacted --lines 400 2>&1 | grep -iE 'warn|error|restore' | tail -40").stdout
         (EVID / "vm").mkdir(parents=True, exist_ok=True)

@@ -53,9 +53,11 @@ Description: grid window placement and workspace session restore
  unsaved content inside applications, and only reopens apps you approve.
  .
  Window control: X11; GNOME Shell Wayland through the bundled GNOME Shell
- extension; KDE Plasma (Wayland and X11) through the bundled KWin script.
- Other Wayland compositors are not supported.
+ extension; KDE Plasma (Wayland and X11) through the bundled KWin script;
+ Sway and Hyprland through their IPC sockets. Other Wayland compositors are
+ not supported.
 CTRL
+echo /etc/sway/config.d/60-fractile.conf > "$stage/DEBIAN/conffiles"
 # Login start is per user and opt-in; tell admins how, never enable it here.
 cat >"$stage/DEBIAN/postinst" <<'POST'
 #!/bin/sh

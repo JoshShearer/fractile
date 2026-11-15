@@ -28,17 +28,58 @@ use std::time::Duration;
 
 const USAGE: &str = "fractiled - Fractile session service
 
-USAGE: fractiled [--autostart] [--replace] [--backend x11|gnome|kwin|hyprland|sway|cosmic] [--verbose]
+USAGE: fractiled [--autostart] [--compositor-start] [--replace] [--backend x11|gnome|kwin|hyprland|sway|cosmic] [--verbose]
        fractiled --check     print environment and capability detection, then exit
        fractiled --version
 
 Most users never run this directly: it is started by the systemd user unit
-(fractile.service) or the XDG autostart entry, and controlled with `fractile`.";
+(fractile.service) or the XDG autostart entry, and controlled with `fractile`.
+--compositor-start is for a compositor's startup configuration (Sway's
+config.d, Hyprland's exec-once): it starts the service only when login start
+is on for this user and the systemd unit is not going to run it.";
 
 pub fn request_shutdown(d: &Daemon) {
     d.shutdown.store(true, Ordering::SeqCst);
     // Wake the accept loop.
     let _ = std::os::unix::net::UnixStream::connect(paths::socket_path());
+}
+
+fn systemctl_user_is_active(unit: &str) -> bool {
+    std::process::Command::new("systemctl")
+        .args(["--user", "is-active", "--quiet", unit])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// `fractiled --compositor-start`: run from a compositor's own startup
+/// configuration (the packaged /etc/sway/config.d/60-fractile.conf, or an
+/// `exec-once` line in hyprland.conf). Those sessions often never reach
+/// graphical-session.target (Ubuntu's and Arch's plain "Sway" session), so the
+/// enabled systemd unit would never start. Starts the service only when the
+/// user's own login-start toggle is on, and leaves it to the unit when a
+/// session manager (uwsm, systemd-based sessions) brings the target up.
+fn compositor_start_wanted() -> bool {
+    let log = Logger::new(paths::log_file(), 64, "info", false);
+    let st = autostart::status();
+    if st["enabled"].as_bool() != Some(true) {
+        info!(log, "compositor start: login start is off for this user ({} mode), not starting", st["mode"].as_str().unwrap_or("?"));
+        return false;
+    }
+    if st["mode"] == "systemd" {
+        // A session manager may still be bringing the target up.
+        for _ in 0..10 {
+            if systemctl_user_is_active("graphical-session.target") || systemctl_user_is_active(autostart::UNIT) {
+                info!(log, "compositor start: graphical-session.target is active, the systemd unit runs the service");
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+        info!(log, "compositor start: this session did not reach graphical-session.target, starting the service from the compositor configuration");
+    }
+    true
 }
 
 fn take_lock() -> std::io::Result<Option<std::fs::File>> {
@@ -131,6 +172,10 @@ fn main() {
         caps.tiling_manager = backend::detect_tiling(&env);
         let v = serde_json::json!({"environment": env, "backend": env.choose(forced), "capabilities": caps, "outputs": a.get_outputs().ok()});
         println!("{}", serde_json::to_string_pretty(&v).unwrap());
+        return;
+    }
+
+    if has("--compositor-start") && !compositor_start_wanted() {
         return;
     }
 

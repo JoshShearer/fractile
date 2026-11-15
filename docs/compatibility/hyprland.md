@@ -61,9 +61,12 @@ and log-in, and Hyprland versions other than 0.56.2 and 0.57.2.
    the unit with `fractile autostart on`.
    Started without uwsm, nothing starts `graphical-session.target`. Start the
    service from the Hyprland configuration instead, for example
-   `hl.on("hyprland.start", function() hl.exec_cmd("fractiled --autostart") end)`
+   `hl.on("hyprland.start", function() hl.exec_cmd("fractiled --autostart --compositor-start") end)`
    (the form shown in Hyprland's generated `hyprland.lua`; not run by the test
-   suite).
+   suite). With `--compositor-start` it starts only when login start is on
+   for this user, and leaves the start to the systemd unit when uwsm brings
+   `graphical-session.target` up (the same flag the Sway package snippet
+   uses; see sway.md).
 3. `fractile status` should show `Window control: available` and adapter
    `hyprland`.
 
@@ -106,7 +109,13 @@ newest running Hyprland instance in `$XDG_RUNTIME_DIR/hypr`. The UI needs
   Fractile first moves the window to the workspace that monitor shows.
 - **Not available:** the drag preview overlay (Hyprland has no IPC to draw
   one; the panel shows the selection), minimize and keep-above (Hyprland has
-  neither). Session lock state comes from logind's `LockedHint`.
+  neither).
+- **Lock screen.** Session lock state comes from logind's `LockedHint` and,
+  since hyprlock, swaylock, gtklock and waylock do not set it, from one of
+  them running for this user. (Verified for swaylock on a real Sway login;
+  not run on Hyprland.)
+- **Starting apps.** Apps are reopened from their desktop entry's `Exec`
+  line, also when it is marked `DBusActivatable`, as on Sway (see sway.md).
 - **Log-out.** When Hyprland exits, its event socket closes; the service saves
   the layout last seen and exits.
 
