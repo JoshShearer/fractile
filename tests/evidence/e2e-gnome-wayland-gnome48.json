@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-14T19:49:17+0000",
+  "when": "2026-11-15T19:09:48+0000",
   "environment": "headless GNOME Shell 48.8 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:1379262469 gnome:1379262468"
+      "detail": "gnome:1074492352 gnome:1074492351"
     },
     {
       "id": "W03",
@@ -31,7 +31,7 @@
       "id": "W04",
       "name": "grid placements land on the requested rectangle (GTK4, client-side decorations)",
       "ok": true,
-      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px; 20x20:7,3,12,15 err=0px; 20x20:17,17,19,19 err=0px"
     },
     {
       "id": "W05",
@@ -50,6 +50,12 @@
       "name": "undo restores the previous geometry",
       "ok": true,
       "detail": ""
+    },
+    {
+      "id": "W06b",
+      "name": "alternating 20x20 placements return to exactly the same rectangle every time (no drift)",
+      "ok": true,
+      "detail": "[{'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}]"
     },
     {
       "id": "W08",
@@ -73,7 +79,7 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1735 ms"
+      "detail": "1733 ms"
     },
     {
       "id": "W30",
@@ -97,7 +103,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:1379262469"
+      "detail": "active gnome:1074492352"
     },
     {
       "id": "W15",
@@ -133,7 +139,7 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot f804b0f6-e69f-4d5e-ba16-5f92667d6878 (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot 5cf8dbca-64de-445d-b5fa-bdf13081b06d (4 windows)"
     },
     {
       "id": "W23",
@@ -145,7 +151,7 @@
       "id": "W24",
       "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
       "ok": true,
-      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:1379262474 closed while being placed']"
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:1074492357 closed while being placed']"
     },
     {
       "id": "W18",
