@@ -17,6 +17,9 @@ desktops only. See PLATFORM_MATRIX.md.
 - **Lock state on Sway and Hyprland** comes from a running locker of the
   user (swaylock, gtklock, waylock, and hyprlock on Hyprland). swaylock does
   not set logind's LockedHint. A restore is refused while one runs.
+- **Mixed-scale outputs on Sway and Hyprland** in the nested suites (S25,
+  H25): a second output at scale 1.5 next to one at scale 1 is listed at its
+  logical size, and a grid cell on it is placed with 0 px error.
 - **Real Hyprland login suite** (`tests/vm/vm-e2e.sh hyprland`, Arch Linux
   with Hyprland 0.57.2 in a QEMU/KVM VM, built from the official cloud
   image): install with `pacman -U`, start at login, restore after

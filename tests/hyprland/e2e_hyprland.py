@@ -407,6 +407,30 @@ def run_all(h: Hypr, e: Env):
         detail = f"second output {other['name']} {other['rect']}; window {e.frame(g)} hypr monitor={hc.get('monitor')} ws={hc.get('workspace')}"
         e.cli_json("move-output", "next", "--window", g)
     check("H17", "a second monitor is listed, and a window moves onto it", two and moved, detail)
+
+    # The second monitor as a HiDPI one: 1920x1200 at scale 1.5 (1280x800
+    # logical; Hyprland only takes scales that divide the mode evenly).
+    # Fractile lists its logical size, and a grid cell on it is placed in
+    # logical coordinates, inside that monitor.
+    scaled, placed15, d15 = False, False, "no second monitor"
+    if two:
+        h.dispatch('(function() hl.monitor({ output = "FR-2", mode = "1920x1200@60", position = "1600x0", scale = 1.5 }) end)')
+        sc = e.wait_for(lambda: next((x for x in e.cli_json("list-outputs") if x["name"] == "FR-2" and abs(x.get("scale", 1) - 1.5) < 0.01 and x["rect"]["w"] == 1280), None), 5.0, 0.2)
+        if sc:
+            scaled = sc["rect"]["h"] == 800 and sc["rect"]["x"] == 1600
+            e.cli_json("move-output", "next", "--window", g)
+            e.wait_for(lambda: next((w.get("output_id") for w in e.windows(True) if w["id"] == g), None) == sc["stable_id"], 4.0, 0.1)
+            out15 = e.cli_json("place", "--grid", "2x2", "--cells", "1,1,1,1", "--window", g)
+            req = out15["requested"]
+            fr = e.wait_for(lambda: (lambda f: f if rect_eq(f, req, 2) else None)(e.frame(g)), 4.0, 0.1) or e.frame(g)
+            wa = sc["work_area"]
+            placed15 = bool(out15["within_tolerance"]) and rect_eq(fr, req, 2) and inside(fr, wa) and abs(req["x"] + req["w"] - (wa["x"] + wa["w"])) <= 2 and abs(req["y"] + req["h"] - (wa["y"] + wa["h"])) <= 2
+            hc = h.client(g) or {}
+            d15 = f"output {sc['rect']} scale {sc.get('scale')}; requested {req} frame {fr}; err {out15['max_error_px']}px; hypr monitor={hc.get('monitor')}"
+            e.cli_json("move-output", "next", "--window", g)
+        else:
+            d15 = f"outputs {[(x['name'], x['rect'], x.get('scale')) for x in e.cli_json('list-outputs')]}"
+    check("H25", "a second monitor at scale 1.5 is listed at its logical size, and a grid cell on it (bottom-right of 2x2) is placed there exactly", scaled and placed15, d15)
     h.ctl("output", "remove", "FR-2")
 
     # Orderly exit removes the binds; a crash leaves them, and the next

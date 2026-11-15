@@ -430,6 +430,28 @@ def run_all(s: Sway, e: Env):
         detail = f"second output {other['name']} {other['rect']}; window {e.frame(g)} output {next((w.get('output_id') for w in e.windows(True) if w['id'] == g), None)}"
         e.cli_json("move-output", "next", "--window", g)
     check("S17", "a second output is listed, and a window moves onto it", two and moved, detail)
+
+    # The second output at scale 1.5 (a HiDPI monitor next to a normal one):
+    # Fractile lists its logical size, and a grid cell on it is placed in
+    # logical coordinates, inside that output.
+    scaled, placed15, d15 = False, False, "no second output"
+    if two:
+        s.cmd(f"output {other['name']} scale 1.5")
+        sc = e.wait_for(lambda: next((x for x in e.cli_json("list-outputs") if x["name"] == other["name"] and abs(x.get("scale", 1) - 1.5) < 0.01), None), 5.0, 0.2)
+        if sc:
+            # 1280x1024 at 1.5 is 853x683 logical (Sway rounds to whole pixels).
+            scaled = abs(sc["rect"]["w"] - 1280 / 1.5) <= 1 and abs(sc["rect"]["h"] - 1024 / 1.5) <= 1 and sc["rect"]["x"] == 1600
+            e.cli_json("move-output", "next", "--window", g)
+            e.wait_for(lambda: next((w.get("output_id") for w in e.windows(True) if w["id"] == g), None) == sc["stable_id"], 4.0, 0.1)
+            out15 = e.cli_json("place", "--grid", "2x2", "--cells", "1,1,1,1", "--window", g)
+            req = out15["requested"]
+            fr = e.wait_for(lambda: (lambda f: f if rect_eq(f, req, 2) else None)(e.frame(g)), 4.0, 0.1) or e.frame(g)
+            wa = sc["work_area"]
+            placed15 = bool(out15["within_tolerance"]) and rect_eq(fr, req, 2) and inside(fr, wa) and abs(req["x"] + req["w"] - (wa["x"] + wa["w"])) <= 2 and abs(req["y"] + req["h"] - (wa["y"] + wa["h"])) <= 2
+            d15 = f"output {sc['rect']} scale {sc.get('scale')}; requested {req} frame {fr}; err {out15['max_error_px']}px"
+            e.cli_json("move-output", "next", "--window", g)
+        s.cmd(f"output {other['name']} scale 1")
+    check("S25", "a second output at scale 1.5 is listed at its logical size, and a grid cell on it (bottom-right of 2x2) is placed there exactly", scaled and placed15, d15)
     if new:
         s.cmd(f"output {new[0]} unplug")
 

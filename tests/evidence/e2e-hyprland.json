@@ -1,6 +1,6 @@
 {
   "suite": "e2e-hyprland",
-  "when": "2026-11-15T08:21:16+0000",
+  "when": "2026-11-15T08:23:36+0000",
   "environment": "Hyprland 0.57.2 built from branch v0.57.2 at commit 11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947 clean (VERSION: bump to 0.57.2). nested in kwin_wayland --virtual, archlinux container (render device: nvidia); keys pressed with wtype",
   "results": [
     {
@@ -136,6 +136,12 @@
       "detail": "second output FR-2 {'h': 1024, 'w': 1280, 'x': 1600, 'y': 0}; window {'h': 512, 'w': 640, 'x': 2026, 'y': 0} hypr monitor=1 ws={'address': '2', 'id': 2, 'type': 'normal', 'name': '2'}"
     },
     {
+      "id": "H25",
+      "name": "a second monitor at scale 1.5 is listed at its logical size, and a grid cell on it (bottom-right of 2x2) is placed there exactly",
+      "ok": true,
+      "detail": "output {'h': 800, 'w': 1280, 'x': 1600, 'y': 0} scale 1.5; requested {'h': 400, 'w': 640, 'x': 2240, 'y': 400} frame {'h': 400, 'w': 640, 'x': 2240, 'y': 400}; err 0px; hypr monitor=1"
+    },
+    {
       "id": "H18",
       "name": "on exit Fractile removes its Hyprland binds",
       "ok": true,
@@ -157,7 +163,7 @@
       "id": "H21",
       "name": "when Hyprland exits the service saves the last seen layout and exits",
       "ok": true,
-      "detail": " | 2026-11-15T08:21:15.826 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Hyprland IPC read: Connection reset by peer (os error 104) | 2026-11-15T08:21:15.897 Info fractiled stopped"
+      "detail": " | 2026-11-15T08:23:36.737 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Hyprland IPC read: Connection reset by peer (os error 104) | 2026-11-15T08:23:36.812 Info fractiled stopped"
     }
   ]
 }

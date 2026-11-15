@@ -9,7 +9,7 @@
 
 | Environment | Result | Evidence |
 |---|---|---|
-| Sway 1.12 (Arch package) nested inside `kwin_wayland --virtual` (wlroots' Wayland backend, pixman renderer), in an `archlinux:latest` container; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 26/26 | `tests/evidence/e2e-sway.json` (`tests/sway/e2e-sway-in-container.sh`) |
+| Sway 1.12 (Arch package) nested inside `kwin_wayland --virtual` (wlroots' Wayland backend, pixman renderer), in an `archlinux:latest` container; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 27/27 | `tests/evidence/e2e-sway.json` (`tests/sway/e2e-sway-in-container.sh`) |
 | Ubuntu 26.04.1 desktop with sway 1.11, swaybar, swayidle and swaylock in a QEMU/KVM VM; real GDM logins into the Sway session, `apt install` of the .deb, keys typed on the VM's keyboard | 9/9 | `tests/evidence/vm-ubuntu26.04-sway.json` (`tests/vm/vm-e2e.sh sway`) |
 
 The suite covers: detection and connection, and an unreachable socket
@@ -23,7 +23,9 @@ the user's bindings still run); a shortcut id and a window title full of Sway
 command syntax staying data; moving windows between workspaces; snapshot
 restore; the panel opened by its shortcut, floating, focused and driven with
 the keyboard; `swaymsg reload` (Fractile's bindings come back); a second
-output and moving a window onto it; bindings removed on exit; a killed
+output and moving a window onto it; that output at scale 1.5 next to one at
+scale 1 (its logical size listed, a grid cell on it placed exactly); bindings
+removed on exit; a killed
 service followed by a new one (found without `SWAYSOCK`); and the service
 saving and exiting when Sway exits.
 
@@ -37,7 +39,7 @@ refused while it runs, and Fractile's icon is in swaybar's tray and opens the
 panel. gnome-terminal is checked by position (see below).
 
 **Not tested:** a login from a TTY (`sway` started by hand), physical
-monitors, a scale other than 1, XWayland applications, tabbed or stacked
+monitors, a fractional scale on a real login, XWayland applications, tabbed or stacked
 containers, the scratchpad as "minimize" beyond unit tests, lockers other
 than swaylock, and Sway versions other than 1.11 and 1.12.
 
