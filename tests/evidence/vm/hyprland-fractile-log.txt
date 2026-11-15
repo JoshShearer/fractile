@@ -1,0 +1,4 @@
+2026-11-15T08:20:04.346 Warn tiling manager detected: hyprland
+2026-11-15T08:20:04.865 Info login restore decision=restore unclean=false snapshot=ebef5f23-7cf2-4fc9-bdec-7c32301e2745
+2026-11-15T08:20:06.399 Info restore bd23337e-a3f6-4a79-83ce-7a78f246aa31 started source=login targets=15
+2026-11-15T08:20:24.147 Info restore bd23337e-a3f6-4a79-83ce-7a78f246aa31 finished state=completed LAUNCHED_AND_PLACED=15 launches=15 17744ms

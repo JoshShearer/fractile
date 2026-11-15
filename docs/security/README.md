@@ -210,10 +210,14 @@ by the harness, never by Fractile.
    script does not verify the name owner. A same-uid attacker can already load
    KWin scripts through KWin's own D-Bus API, so this adds no capability.
 4. **The cap_sys_nice rule** is weaker than the executable check (see above).
-5. **No sandbox.** The service has no seccomp or landlock profile in 0.9.0. The
-   systemd user unit sets `NoNewPrivileges`, `LockPersonality`,
-   `RestrictRealtime`, `RestrictSUIDSGID`, `SystemCallArchitectures=native` and
-   `UMask=0077`. Under XDG autostart, none of these apply.
+5. **No sandbox.** The service has no seccomp or landlock profile in 0.9.0,
+   and the systemd user unit sets no hardening options. The apps Fractile
+   reopens are forked from the service, so anything the unit restricts, they
+   inherit: `NoNewPrivileges` stops `sudo` in a restored terminal, and
+   `RestrictSUIDSGID` made GNOME Disks abort on Arch (its bwrap image loader
+   failed). Earlier 0.9.0 builds set those options; they were removed for this
+   reason. `fractiled` sets its own umask to 077 under systemd and XDG
+   autostart alike, and launched apps get the session's umask back.
 
 ## Reporting
 

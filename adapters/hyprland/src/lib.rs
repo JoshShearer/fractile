@@ -544,14 +544,24 @@ impl Inner {
     }
 
     /// Polls the window until its frame reaches `target` or stops changing.
-    fn settle(&self, addr: &str, target: Rect, tol: i32) -> AResult<Rect> {
+    /// Wait until the window is stable. Once it is at the target it must
+    /// stay there for `hold`: a client that applies its own size late (a
+    /// minimum size larger than asked) moves off it again, and the caller
+    /// sees that.
+    fn settle(&self, addr: &str, target: Rect, tol: i32, hold: Duration) -> AResult<Rect> {
         let start = Instant::now();
         let mut last: Option<Rect> = None;
         let mut same = 0;
+        let mut reached: Option<Instant> = None;
         loop {
             let border = self.state.lock().unwrap().border;
             let r = frame_of(&self.client(addr)?, border);
             if r.max_edge_delta(&target) <= tol {
+                let t = *reached.get_or_insert_with(Instant::now);
+                if t.elapsed() >= hold {
+                    return Ok(r);
+                }
+            } else if reached.is_some() {
                 return Ok(r);
             }
             if last == Some(r) {
@@ -560,7 +570,10 @@ impl Inner {
                 same = 0;
             }
             last = Some(r);
-            if (same >= 3 && start.elapsed() > Duration::from_millis(200)) || start.elapsed() > Duration::from_millis(1500) {
+            if reached.is_none() && ((same >= 3 && start.elapsed() > Duration::from_millis(200)) || start.elapsed() > Duration::from_millis(1500)) {
+                return Ok(r);
+            }
+            if start.elapsed() > Duration::from_millis(2500) + hold {
                 return Ok(r);
             }
             std::thread::sleep(Duration::from_millis(40));
@@ -780,14 +793,24 @@ impl CompositorAdapter for HyprlandAdapter {
             self.inner.dispatch(&format!("hl.dsp.window.move({{ workspace = {ws}, follow = false, window = {sel} }})"))?;
         }
         let tol = 2;
+        let work = dest.and_then(|m| outs.iter().find(|(id, _)| *id == m)).map(|(_, o)| o.work_area);
+        // `goal` is the target until a dimension turns out to be held at the
+        // client's minimum size: still larger than asked after the same
+        // request twice (a just-mapped client can apply the size late). Then
+        // that dimension keeps the client's size; shrinking the request
+        // further only moves the window (Hyprland keeps the centre when a
+        // client grows back), as far as off the screen. The window keeps the
+        // target's top-left, moved back into the work area if it overflows.
+        let mut goal = target;
+        let (mut over_w, mut over_h, mut stuck_w, mut stuck_h) = (false, false, false, false);
         let mut corr = [0i32; 4];
         let mut observed = None;
         let mut attempts = 0;
-        for attempt in 1..=3 {
+        for attempt in 1..=5 {
             attempts = attempt;
             let b = self.inner.state.lock().unwrap().border;
-            let (cx, cy) = (target.x + b + corr[0], target.y + b + corr[1]);
-            let (cw, ch) = ((target.w - 2 * b + corr[2]).max(1), (target.h - 2 * b + corr[3]).max(1));
+            let (cx, cy) = (goal.x + b + corr[0], goal.y + b + corr[1]);
+            let (cw, ch) = ((goal.w - 2 * b + corr[2]).max(1), (goal.h - 2 * b + corr[3]).max(1));
             // One expression, so the window is floated, sized and moved in
             // one step. Resize keeps the window's centre, so it goes first.
             self.inner.dispatch(&format!(
@@ -795,15 +818,47 @@ impl CompositorAdapter for HyprlandAdapter {
                  hl.dispatch(hl.dsp.window.resize({{ x = {cw}, y = {ch}, window = {sel} }})) \
                  hl.dispatch(hl.dsp.window.move({{ x = {cx}, y = {cy}, window = {sel} }})) end)"
             ))?;
-            let obs = self.inner.settle(&addr, target, tol)?;
+            // A just-mapped (tiled) window can commit its own size late.
+            let hold = Duration::from_millis(if was_tiled || attempt > 1 { 600 } else { 250 });
+            let obs = self.inner.settle(&addr, goal, tol, hold)?;
             observed = Some(obs);
-            if obs.max_edge_delta(&target) <= tol {
+            if obs.max_edge_delta(&goal) <= tol {
                 break;
             }
-            corr[0] += target.x - obs.x;
-            corr[1] += target.y - obs.y;
-            corr[2] += target.w - obs.w;
-            corr[3] += target.h - obs.h;
+            let big_w = !stuck_w && obs.w > cw + 2 * b + tol && obs.w > target.w + tol;
+            let big_h = !stuck_h && obs.h > ch + 2 * b + tol && obs.h > target.h + tol;
+            let confirm_w = big_w && over_w;
+            let confirm_h = big_h && over_h;
+            let first_over = (big_w && !over_w) || (big_h && !over_h);
+            over_w |= big_w;
+            over_h |= big_h;
+            if confirm_w || confirm_h {
+                stuck_w |= confirm_w;
+                stuck_h |= confirm_h;
+                if confirm_w {
+                    goal.w = obs.w;
+                    corr[2] = 0;
+                }
+                if confirm_h {
+                    goal.h = obs.h;
+                    corr[3] = 0;
+                }
+                if let Some(wa) = work {
+                    goal.x = target.x.min(wa.x + wa.w - goal.w).max(wa.x);
+                    goal.y = target.y.min(wa.y + wa.h - goal.h).max(wa.y);
+                }
+                corr[0] = 0;
+                corr[1] = 0;
+                continue;
+            }
+            if first_over {
+                // ask again with the same numbers before deciding
+                continue;
+            }
+            corr[0] += goal.x - obs.x;
+            corr[1] += goal.y - obs.y;
+            corr[2] += goal.w - obs.w;
+            corr[3] += goal.h - obs.h;
         }
         let err = observed.map(|o| o.max_edge_delta(&target));
         Ok(PlacementOutcome {
@@ -813,7 +868,13 @@ impl CompositorAdapter for HyprlandAdapter {
             max_error_px: err,
             within_tolerance: err.map(|e| e <= tol).unwrap_or(false),
             attempts,
-            note: if was_tiled { Some("the window was tiled; Hyprland now floats it at the placed size".into()) } else { None },
+            note: if stuck_w || stuck_h {
+                Some("the window's minimum size is larger than the target; it keeps that size, inside the work area".into())
+            } else if was_tiled {
+                Some("the window was tiled; Hyprland now floats it at the placed size".into())
+            } else {
+                None
+            },
         })
     }
 

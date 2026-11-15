@@ -95,6 +95,11 @@ pub struct Daemon {
     /// The exit snapshot of this session has been taken (at the session
     /// manager's EndSession, or at shutdown); SIGTERM does not take another.
     pub exit_captured: AtomicBool,
+    /// Held while the exit snapshot is checked for and taken. The display
+    /// closing and SIGTERM arrive together when Hyprland exits, and each
+    /// passed the `exit_captured` check before the other set it, so two
+    /// Logout snapshots were saved.
+    pub exit_capture: Mutex<()>,
     /// A check whether Plasma is ending the session is running (see
     /// session::on_window_closed).
     pub ending_check_busy: AtomicBool,
@@ -148,6 +153,7 @@ impl Daemon {
             // slip in before the login flow has decided; login_flow clears it.
             login_restore_pending: AtomicBool::new(new_login),
             exit_captured: AtomicBool::new(false),
+            exit_capture: Mutex::new(()),
             ending_check_busy: AtomicBool::new(false),
             topology: Mutex::new(None),
             topology_memory: Mutex::new(None),

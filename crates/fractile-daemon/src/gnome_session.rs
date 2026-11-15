@@ -54,7 +54,10 @@ fn run(d: &Arc<Daemon>) -> zbus::Result<()> {
             "QueryEndSession" => respond("QueryEndSession"),
             "EndSession" => {
                 info!(d.log, "gnome-session: the session is ending; taking the logout snapshot now");
-                session::capture_before_exit(d, fractile_core::snapshot::SnapshotMode::Logout);
+                {
+                    let _one_at_a_time = d.exit_capture.lock().unwrap_or_else(|e| e.into_inner());
+                    session::capture_before_exit(d, fractile_core::snapshot::SnapshotMode::Logout);
+                }
                 respond("EndSession");
             }
             "CancelEndSession" => {

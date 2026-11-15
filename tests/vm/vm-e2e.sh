@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Real login / log-out / reboot test (SRS T10) in an Ubuntu 24.04 desktop VM.
-#   tests/vm/vm-e2e.sh wayland|x11|plasma-x11|plasma-wayland [path/to/fractile.deb]
-#     (plasma-wayland: Plasma 6 on Ubuntu 26.04; the others on Ubuntu 24.04)
+#   tests/vm/vm-e2e.sh wayland|x11|plasma-x11|plasma-wayland|sway [path/to/fractile.deb]
+#     (plasma-wayland and sway on Ubuntu 26.04; the others on Ubuntu 24.04)
+#   tests/vm/vm-e2e.sh hyprland path/to/fractile-*.pkg.tar.zst
+#     (Arch Linux: its cloud image, Hyprland, GDM; the Arch package)
 #   tests/vm/vm-e2e.sh provision [session]  (only build the cached base image)
 #   tests/vm/vm-e2e.sh soak [minutes]   (T27 soak in the VM, detached; default 1440)
 # Needs docker and read/write access to /dev/kvm; no root. The first run
@@ -9,12 +11,12 @@
 # the desktop into a cached base image (docker volume fractile-vm-cache,
 # about 8 GB). Each run then uses a throwaway copy-on-write disk.
 set -euo pipefail
-what=${1:?wayland, x11, plasma-x11, plasma-wayland, soak or provision}
+what=${1:?wayland, x11, plasma-x11, plasma-wayland, sway, hyprland, soak or provision}
 root=$(cd "$(dirname "$0")/../.." && pwd)
 if [[ $what != soak && $what != provision ]]; then
   deb=${2:-$(ls "$root"/packaging/build/fractile_*_amd64.deb | tail -1)}
   deb=$(realpath "$deb")
-  case $deb in "$root"/*) ;; *) echo "the .deb must be inside the repository" >&2; exit 2 ;; esac
+  case $deb in "$root"/*) ;; *) echo "the package must be inside the repository" >&2; exit 2 ;; esac
 fi
 [[ -r /dev/kvm && -w /dev/kvm ]] || { echo "no read/write access to /dev/kvm" >&2; exit 2; }
 tag=fractile-vm-test:latest

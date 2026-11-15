@@ -95,12 +95,15 @@ pub fn which(prog: &str) -> bool {
 ///
 /// A launch that fails at once is reported, not counted as a launch: the
 /// child is watched for `EARLY_EXIT` and a non-zero exit in that time is an
-/// error with the program's own message. If the failing program is the
-/// systemd-run wrapper (no user manager reachable on this session bus, for
-/// example), the app is started without the scope instead.
+/// error with the program's own message. If systemd-run itself could not
+/// create the scope (no user manager reachable on this session bus, for
+/// example), the app is started without the scope instead. `systemd-run
+/// --scope` execs the app once the scope exists, so an app that fails at once
+/// inside its scope is the app's failure and is not started a second time.
 pub fn spawn(plan: &LaunchPlan) -> Result<u32, String> {
     match spawn_checked(&plan.argv, plan.method) {
-        Err(e) if plan.argv.first().map(|p| Path::new(p).file_name().map(|f| f == "systemd-run").unwrap_or(false)).unwrap_or(false) => {
+        Err(e) if is_systemd_run(&plan.argv) && e.scope_not_created() => {
+            let e = e.to_string();
             let inner: Vec<String> = plan.argv.iter().skip_while(|a| *a != "--").skip(1).cloned().collect();
             if inner.is_empty() {
                 return Err(e);
@@ -109,15 +112,85 @@ pub fn spawn(plan: &LaunchPlan) -> Result<u32, String> {
                 .map_err(|e2| format!("{e}; without the systemd scope: {e2}"))
                 .inspect(|_| eprintln!("fractile: {e}; started {} without a systemd scope", plan.desktop_id))
         }
-        r => r,
+        r => r.map_err(|e| e.to_string()),
     }
+}
+
+fn is_systemd_run(argv: &[String]) -> bool {
+    argv.first().and_then(|p| Path::new(p).file_name()).map(|f| f == "systemd-run").unwrap_or(false)
+}
+
+#[derive(Debug)]
+enum LaunchError {
+    /// The program could not be started at all.
+    Start(String),
+    Early(EarlyExit),
+}
+
+impl LaunchError {
+    fn scope_not_created(&self) -> bool {
+        matches!(self, LaunchError::Early(e) if e.scope_not_created())
+    }
+}
+
+impl std::fmt::Display for LaunchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LaunchError::Start(s) => f.write_str(s),
+            LaunchError::Early(e) => e.fmt(f),
+        }
+    }
+}
+
+/// A launch that ended within `EARLY_EXIT`.
+#[derive(Debug)]
+struct EarlyExit {
+    prog: String,
+    status: std::process::ExitStatus,
+    /// The last line the program wrote to stderr.
+    message: String,
+}
+
+impl EarlyExit {
+    /// systemd-run reports its own failures ("Failed to start transient scope
+    /// unit: ...", "Failed to connect to bus: ...") and exits with a code. A
+    /// crash (a signal) or any other message comes from the app it exec'd.
+    /// "Failed to find executable" and "Failed to execute" are its messages
+    /// for an app that cannot be run at all, which a start without the scope
+    /// cannot fix either.
+    fn scope_not_created(&self) -> bool {
+        let m = &self.message;
+        self.status.code().is_some() && m.starts_with("Failed to ") && !m.starts_with("Failed to find executable") && !m.starts_with("Failed to execute")
+    }
+}
+
+impl std::fmt::Display for EarlyExit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} exited with {}", self.prog, self.status)?;
+        if !self.message.is_empty() {
+            write!(f, ": {}", self.message)?;
+        }
+        Ok(())
+    }
+}
+
+/// The umask the session gave Fractile, restored in every app it starts.
+/// `u32::MAX` means Fractile has not changed its own umask.
+static SESSION_UMASK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);
+
+/// Make the files Fractile creates private (umask 077) without passing that
+/// umask on to the apps it starts: they get the session's umask back.
+pub fn private_umask() {
+    // SAFETY: umask has no preconditions.
+    let old = unsafe { libc::umask(0o077) };
+    SESSION_UMASK.store(old as u32, std::sync::atomic::Ordering::SeqCst);
 }
 
 const EARLY_EXIT: std::time::Duration = std::time::Duration::from_millis(500);
 
-fn spawn_checked(argv: &[String], method: &str) -> Result<u32, String> {
+fn spawn_checked(argv: &[String], method: &str) -> Result<u32, LaunchError> {
     use std::io::Read;
-    let (prog, args) = argv.split_first().ok_or("empty argv")?;
+    let (prog, args) = argv.split_first().ok_or(LaunchError::Start("empty argv".into()))?;
     let mut cmd = Command::new(prog);
     cmd.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     // Don't leak Fractile's own environment markers into apps. Fractile's
@@ -126,14 +199,18 @@ fn spawn_checked(argv: &[String], method: &str) -> Result<u32, String> {
         cmd.env_remove("FRACTILE_RUNTIME_DIR").env_remove("FRACTILE_DATA_DIR").env_remove("FRACTILE_CONFIG").env_remove("FRACTILE_STATE_DIR");
     }
     cmd.env_remove("DESKTOP_STARTUP_ID");
-    // SAFETY: setsid is async-signal-safe and has no preconditions.
+    let umask = SESSION_UMASK.load(std::sync::atomic::Ordering::SeqCst);
+    // SAFETY: setsid and umask are async-signal-safe and have no preconditions.
     unsafe {
-        cmd.pre_exec(|| {
+        cmd.pre_exec(move || {
             libc::setsid();
+            if umask != u32::MAX {
+                libc::umask(umask as libc::mode_t);
+            }
             Ok(())
         });
     }
-    let mut child = cmd.spawn().map_err(|e| format!("failed to start {}: {e}", prog))?;
+    let mut child = cmd.spawn().map_err(|e| LaunchError::Start(format!("failed to start {}: {e}", prog)))?;
     let pid = child.id();
     let mut err_pipe = child.stderr.take();
     let start = std::time::Instant::now();
@@ -145,7 +222,7 @@ fn spawn_checked(argv: &[String], method: &str) -> Result<u32, String> {
                     let _ = p.take(4096).read_to_string(&mut msg);
                 }
                 let msg = msg.trim().lines().last().unwrap_or("").to_string();
-                return Err(format!("{prog} exited with {st}{}", if msg.is_empty() { String::new() } else { format!(": {msg}") }));
+                return Err(LaunchError::Early(EarlyExit { prog: prog.clone(), status: st, message: msg }));
             }
             Ok(Some(_)) => break, // a launcher (gio) that handed over and exited: fine
             Ok(None) => std::thread::sleep(std::time::Duration::from_millis(20)),
@@ -180,18 +257,14 @@ mod tests {
     #[test]
     fn a_failing_systemd_run_wrapper_falls_back_to_a_direct_start() {
         let d = std::env::temp_dir().join(format!("fractile-launch-{}", std::process::id()));
-        std::fs::create_dir_all(&d).unwrap();
-        let fake = d.join("systemd-run");
-        std::fs::write(&fake, "#!/bin/sh\necho 'Failed to start transient scope unit: no user manager' >&2\nexit 1\n").unwrap();
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let fake = fake_systemd_run(&d, "echo 'Failed to start transient scope unit: no user manager' >&2\nexit 1");
         let mark = d.join("started");
         let plan = LaunchPlan {
             desktop_id: "x.desktop".into(),
             argv: vec![fake.to_string_lossy().into(), "--user".into(), "--scope".into(), "--".into(), "touch".into(), mark.to_string_lossy().into()],
             method: "systemd-scope+exec",
         };
-        assert!(spawn(&plan).is_ok());
+        assert!(spawn_retry(&plan).is_ok());
         for _ in 0..50 {
             if mark.exists() {
                 break;
@@ -199,6 +272,81 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
         assert!(mark.exists(), "the app was not started without the scope");
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    /// A script written by one test thread can be "Text file busy" while
+    /// another thread's fork still holds its write descriptor.
+    fn spawn_retry(plan: &LaunchPlan) -> Result<u32, String> {
+        for _ in 0..50 {
+            match spawn(plan) {
+                Err(e) if e.contains("os error 26") => std::thread::sleep(std::time::Duration::from_millis(20)),
+                r => return r,
+            }
+        }
+        spawn(plan)
+    }
+
+    fn fake_systemd_run(d: &Path, body: &str) -> PathBuf {
+        std::fs::create_dir_all(d).unwrap();
+        let fake = d.join("systemd-run");
+        std::fs::write(&fake, format!("#!/bin/sh\n{body}\n")).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        fake
+    }
+
+    /// gnome-disks aborting at once inside its scope (Arch, Hyprland) was
+    /// read as systemd-run failing and started a second time without the
+    /// scope, where it aborted again.
+    #[test]
+    fn an_app_that_fails_inside_its_scope_is_not_started_again() {
+        let d = std::env::temp_dir().join(format!("fractile-launch-crash-{}", std::process::id()));
+        let count = d.join("count");
+        // Like systemd-run --scope: exec the command after the "--".
+        let fake = fake_systemd_run(&d, "while [ \"$1\" != -- ]; do shift; done; shift; exec \"$@\"");
+        let app = format!("echo x >> {}; echo 'Gtk:ERROR: assertion failed' >&2; kill -TERM $$", count.display());
+        let plan = LaunchPlan {
+            desktop_id: "x.desktop".into(),
+            argv: vec![fake.to_string_lossy().into(), "--user".into(), "--scope".into(), "--".into(), "sh".into(), "-c".into(), app],
+            method: "systemd-scope+exec",
+        };
+        let e = spawn_retry(&plan).unwrap_err();
+        assert!(e.contains("signal: 15") && e.contains("Gtk:ERROR"), "{e}");
+        assert!(!e.contains("without the systemd scope"), "{e}");
+        std::thread::sleep(std::time::Duration::from_millis(600));
+        assert_eq!(std::fs::read_to_string(&count).unwrap().lines().count(), 1, "the app was started twice");
+        // An app that cannot be found is not retried either.
+        let fake = fake_systemd_run(&d, "echo 'Failed to find executable nope: No such file or directory' >&2; exit 1");
+        let plan = LaunchPlan { desktop_id: "x.desktop".into(), argv: vec![fake.to_string_lossy().into(), "--scope".into(), "--".into(), "nope".into()], method: "systemd-scope+exec" };
+        let e = spawn_retry(&plan).unwrap_err();
+        assert!(!e.contains("without the systemd scope"), "{e}");
+        std::fs::remove_dir_all(d).unwrap();
+    }
+
+    /// Fractile keeps its own files private with umask 077; the apps it
+    /// starts get the session's umask.
+    #[test]
+    fn launched_apps_get_the_session_umask_back() {
+        let d = std::env::temp_dir().join(format!("fractile-launch-umask-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        // SAFETY: umask has no preconditions.
+        let before = unsafe { libc::umask(0o022) };
+        private_umask();
+        let out = d.join("umask");
+        let plan = LaunchPlan { desktop_id: "x.desktop".into(), argv: vec!["sh".into(), "-c".into(), format!("umask > {}", out.display())], method: "exec" };
+        spawn(&plan).unwrap();
+        for _ in 0..50 {
+            if std::fs::read_to_string(&out).map(|s| !s.is_empty()).unwrap_or(false) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        // SAFETY: as above.
+        let own = unsafe { libc::umask(before) };
+        SESSION_UMASK.store(u32::MAX, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(own, 0o077);
+        assert_eq!(std::fs::read_to_string(&out).unwrap().trim(), "0022");
         std::fs::remove_dir_all(d).unwrap();
     }
 

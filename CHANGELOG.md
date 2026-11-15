@@ -17,6 +17,12 @@ desktops only. See PLATFORM_MATRIX.md.
 - **Lock state on Sway and Hyprland** comes from a running locker of the
   user (swaylock, gtklock, waylock, and hyprlock on Hyprland). swaylock does
   not set logind's LockedHint. A restore is refused while one runs.
+- **Real Hyprland login suite** (`tests/vm/vm-e2e.sh hyprland`, Arch Linux
+  with Hyprland 0.57.2 in a QEMU/KVM VM, built from the official cloud
+  image): install with `pacman -U`, start at login, restore after
+  log-out/log-in and after reboot with approved app launches, hyprlock, the
+  waybar tray with its panel, and launched apps checked for restrictions
+  inherited from the service (V09). 10/10.
 - **Real Sway login suite** (`tests/vm/vm-e2e.sh sway`, Ubuntu 26.04 with
   Sway 1.11 in a QEMU/KVM VM): start at login, restore after log-out/log-in
   and after reboot with approved app launches, swaylock, and the swaybar
@@ -156,6 +162,33 @@ desktops only. See PLATFORM_MATRIX.md.
   first. A stand-in UI records what the service asks the UI to show.
 
 ### Fixed during validation
+
+- **Apps Fractile reopens no longer inherit the service's restrictions.**
+  The systemd user unit set NoNewPrivileges, seccomp filters
+  (RestrictSUIDSGID, LockPersonality, RestrictRealtime,
+  SystemCallArchitectures) and UMask=0077, and every app Fractile started
+  is forked from the service. On Arch, GNOME Disks aborted at once when
+  restored (its bwrap image loader exited under RestrictSUIDSGID), `sudo` in
+  a restored terminal refused to run, and apps created files with mode 0600.
+  The unit sets none of these now; `fractiled` sets its own umask to 077 and
+  gives launched apps the session's umask (VM check V09).
+- **One Logout snapshot per log-out.** When Hyprland exits, the display
+  closing and SIGTERM reach the service together; each found no exit
+  snapshot yet and both saved one. The check and the capture are now one
+  step (VM check V06 counts them).
+- **An app that fails at once inside its systemd scope is not started a
+  second time.** Fractile took any early exit of `systemd-run --scope` for
+  systemd-run failing and started the app again without a scope. It now
+  falls back only on systemd-run's own "Failed to ..." errors (not "Failed
+  to find executable" or "Failed to execute"); a crash is reported as the
+  app's launch failure with its last stderr line.
+- **Hyprland: a window whose minimum size is larger than the cell stays in
+  the work area.** Hyprland resizes around the window's centre, and a client
+  at its minimum size grows back from the centre, so the position correction
+  pushed GNOME Calculator to y = -133. A dimension the client holds at its
+  minimum after the same request twice is now kept, the window is moved to
+  stay inside the work area, and the result has to hold for 250 ms (600 ms
+  for a window that was tiled or needed more than one request) (H24).
 
 - **Sway and Hyprland start apps from their Exec line**, not by D-Bus
   activation. GNOME 50 apps activated over D-Bus in Ubuntu's Sway session

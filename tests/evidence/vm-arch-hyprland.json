@@ -1,0 +1,68 @@
+{
+  "suite": "vm-arch-hyprland",
+  "when": "2026-11-15T08:20:36+0000",
+  "environment": "Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, hyprland session (hyprlock via hypridle, waybar), Fractile fractile-0.9.0-1-x86_64.pkg.tar.zst installed with pacman -U",
+  "results": [
+    {
+      "id": "V00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V01",
+      "name": "pacman installs the Arch package (dependencies from the Arch repositories)",
+      "ok": true,
+      "detail": "Arch Linux; Hyprland 0.57.2 built from branch v0.57.2 at commit 11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947 clean (VERSION: bump to 0.57.2).; 7.3.4-arch1-2 :: (1/4) Reloading user manager configuration...\n(2/4) Arming ConditionNeedsUpdate...\n(3/4) Updating icon theme caches...\n(4/4) Updating the desktop file MIME type cache...\nfractile 0.9.0-1"
+    },
+    {
+      "id": "V02",
+      "name": "started from the app menu in a real hyprland login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
+      "ok": true,
+      "detail": "session wayland, service socket True; {\"extension\": \"n/a\", \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"policy\": \"last_clean\"}"
+    },
+    {
+      "id": "V03",
+      "name": "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway/Hyprland without graphical-session.target the compositor configuration: Sway's packaged snippet, Hyprland's documented start line) and it controls windows",
+      "ok": true,
+      "detail": "logout {'rc': 0, 'stdout': 'ok', 'stderr': '', 'hyprland_exited': True, 'portal_stopped_first': True}; new shell True; unit active/enabled; graphical-session.target active; 2026-11-15T08:17:28.853 Info compositor start: graphical-session.target is active, the systemd unit runs the service; adapter hyprland window_control True session wayland"
+    },
+    {
+      "id": "V04",
+      "name": "10 apps / 15 windows opened and placed on a 4x4 grid",
+      "ok": true,
+      "detail": "15 windows, 10 apps; tests/evidence/vm/hyprland-01-before-reboot.png; "
+    },
+    {
+      "id": "V05",
+      "name": "after a real reboot and the next login, Fractile asks first (the default); Enter on the prompt restores all 15 windows of the 10 apps where they were, with no duplicates",
+      "ok": true,
+      "detail": "boot id changed True; asked True, Enter pressed True (tests/evidence/vm/hyprland-02a-restore-prompt.png); last restore completed LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/hyprland-02-after-reboot.png"
+    },
+    {
+      "id": "V06",
+      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates; the log-out saved one Logout snapshot",
+      "ok": true,
+      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/hyprland-03-after-logout.png; log: 2026-11-15T08:17:28.594 Info login session 18 (from the user's graphical session (logind User.Display))\n2026-11-15T08:17:29.141 Info no snapshot from the previous session to restore\n2026-11-15T08:17:56.138 Info snapshot 38721d7c-5106-4507-8ab6-4b99311fd87f saved mode=Manual windows=15\n2026-11-15T08:17:56.769 Info Shutdown snapshot 393b1d78-7c0c-49b7-b4d2-b5d878ca1394 saved (15 windows)\n2026-11-15T08:17:56.855 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T08:18:13.120 Info fractiled 0.9.0 starting pid=569 autostart=true\n2026-11-15T08:18:13.133 Info login session 1 (from the user's graphical session (logind User.Display))\n2026-11-15T08:18:13.668 Info login restore decision=ask unclean=false snapshot=393b1d78-7c0c-49b7-b4d2-b5d878ca1394\n2026-11-15T08:19:56.268 Info signal 15: ending session\n2026-11-15T08:19:56.284 Warn exit capture failed (adapter disconnected: Hyprland IPC read: Connection reset by peer (os error 104)); saved the layout last seen at 2026-11-15T08:19:54.168818797+00:00 as Logout snapshot ebef5f23-7cf2-4fc9-bdec-7c32301e2745 (15 windows)\n2026-11-15T08:19:56.289 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T08:20:04.338 Info fractiled 0.9.0 starting pid=2460 autostart=true\n2026-11-15T08:20:04.342 Info login session 21 (from the user's graphical session (logind User.Display))\n2026-11-15T08:20:04.865 Info login restore decision=restore unclean=false snapshot=ebef5f23-7cf2-4fc9-bdec-7c32301e2745"
+    },
+    {
+      "id": "V09",
+      "name": "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the session's umask); fractiled's own umask is 0077",
+      "ok": true,
+      "detail": "10 app processes in Fractile's scopes, session umask 0022; not clean: []; fractiled Umask: 0077 NoNewPrivs: 0 Seccomp: 0 "
+    },
+    {
+      "id": "V07",
+      "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
+      "ok": true,
+      "detail": "session 21; LockedHint no; hyprlock pid 3656; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/hyprland-04-locked.png"
+    },
+    {
+      "id": "V08",
+      "name": "hyprland: Fractile's icon is in waybar's tray (StatusNotifierWatcher), active; a click on it (StatusNotifierItem.Activate) opens the panel",
+      "ok": true,
+      "detail": "{\"registered\": true, \"service\": \":1.94\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}; status seen NeedsAttention > Active; {'activated': True, 'stderr': ''}; panel {'h': 375, 'w': 456, 'x': 572, 'y': 427}; tests/evidence/vm/hyprland-05-tray.png; tests/evidence/vm/hyprland-06-tray-panel.png"
+    }
+  ],
+  "log": []
+}

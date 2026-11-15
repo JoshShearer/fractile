@@ -158,8 +158,8 @@ class Env:
             self.daemon.terminate()
             self.daemon.wait(10)
 
-    def window(self, tk, app, title):
-        self.procs.append(subprocess.Popen([sys.executable, str(TESTWIN), "--toolkit", tk, "--app-id", app, "--title", title], env=self.env,
+    def window(self, tk, app, title, *extra):
+        self.procs.append(subprocess.Popen([sys.executable, str(TESTWIN), "--toolkit", tk, "--app-id", app, "--title", title, *extra], env=self.env,
                                            stdout=subprocess.DEVNULL, stderr=open(self.base / f"win-{app}.log", "a")))
 
     def wait_for(self, fn, timeout=8.0, step=0.1):
@@ -236,6 +236,32 @@ def run_all(h: Hypr, e: Env):
     e.cli_json("snap", "right-half", "--window", g)
     e.cli_json("undo")
     check("H07", "undo restores the previous geometry", rect_eq(e.frame(g), before, 2))
+
+    # A cell smaller than the window's minimum size (GNOME Calculator in a
+    # real login): the client keeps its minimum, and the window keeps the
+    # cell's top-left inside the work area instead of being pushed off the
+    # screen by repeated corrections (Hyprland keeps the centre on a resize).
+    size_file = os.path.join(tempfile.gettempdir(), "fractile-h24-size")
+    e.window("gtk4", "org.fractile.TestMin", "Min window", "--min-size", "700x700", "--report-size", size_file)
+    minp = e.procs[-1]
+    mw = e.wait_for(lambda: next((w for w in e.windows() if w.get("title") == "Min window"), None), 15.0, 0.3)
+    if mw:
+        out = e.cli_json("place", "--grid", "4x4", "--cells", "0,2,0,2", "--window", mw["id"])
+        time.sleep(1.0)
+        try:
+            cw, ch = (int(v) for v in open(size_file).read().split("x"))
+        except (OSError, ValueError):
+            cw = ch = 0
+        fr, req = e.frame(mw["id"]) or {}, out["requested"]
+        in_wa = bool(fr) and inside(fr, wa)
+        want_y = min(req["y"], wa["y"] + wa["h"] - fr.get("h", 0))
+        check("H24", "a cell smaller than the window's minimum size: the window keeps its minimum, the cell's left edge, and the cell's top "
+                     "(moved up only as far as needed to stay inside the work area)",
+              cw >= 700 and ch >= 700 and in_wa and abs(fr["x"] - req["x"]) <= 2 and abs(fr["y"] - want_y) <= 2,
+              f"requested {req} frame {fr} client {cw}x{ch} work area {wa} attempts {out['attempts']} note {out.get('note')}")
+        minp.terminate()
+    else:
+        check("H24", "a cell smaller than the window's minimum size: the window keeps its minimum inside the work area", False, "no window")
 
     e.call("activate_window", {"window": q})
     check("H08", "activating a window focuses it", e.wait_for(lambda: e.call("active_window") == q, 3.0))
@@ -352,12 +378,17 @@ def run_all(h: Hypr, e: Env):
     h.ctl("reload")
     dropped = e.wait_for(lambda: not any(b.get("description") == "reload marker" for b in h.j("binds")), 5.0, 0.2)
     gone = marked and dropped and e.wait_for(lambda: len(h.ours()) == n_before, 5.0, 0.2)
+    # The panel of the check before closes and gives focus back to its
+    # window; wait for that before focusing the window the keys are for.
+    e.wait_for(lambda: not any(w.get("is_own") for w in e.windows(True)), 5.0, 0.2)
+    pre = e.cli_json("place", "--grid", "2x2", "--cells", "1,1,1,1", "--window", q)
     e.call("activate_window", {"window": q})
     e.wait_for(lambda: e.call("active_window") == q, 3.0)
-    e.cli_json("place", "--grid", "2x2", "--cells", "1,1,1,1", "--window", q)
     h.keys("ctrl", "alt", "1")
     placed = e.wait_for(lambda: rect_eq(e.frame(q), target, 3), 4.0, 0.05)
-    check("H16", "after `hyprctl reload` the shortcuts are bound again and still work", gone and placed, f"marker bind dropped by the reload: {marked and dropped}; Fractile binds {n_before} -> {len(h.ours())}")
+    check("H16", "after `hyprctl reload` the shortcuts are bound again and still work", gone and placed,
+          f"marker bind dropped by the reload: {marked and dropped}; Fractile binds {n_before} -> {len(h.ours())}"
+          + ("" if placed else f"; frame {e.frame(q)} target {target}; before the keys {pre.get('observed')} for {pre.get('requested')} ({pre.get('attempts')} attempts); log: {e.log_tail(8)}"))
 
     # Second monitor (a headless output) and moving a window to it.
     mk = h.ctl("output", "create", "headless", "FR-2")

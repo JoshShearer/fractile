@@ -61,15 +61,29 @@ def session_env() -> dict:
     p = subprocess.run(["systemctl", "--user", "show-environment"], env=env, capture_output=True, text=True)
     for line in p.stdout.splitlines():
         k, _, v = line.partition("=")
-        if k in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP", "DESKTOP_SESSION", "SWAYSOCK"):
+        if k in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP", "DESKTOP_SESSION", "SWAYSOCK",
+                 "HYPRLAND_INSTANCE_SIGNATURE"):
             env[k] = v
+    # Hyprland started without uwsm need not export its environment to the
+    # user manager; its own instance list names the instance and the Wayland
+    # socket.
+    if shutil.which("hyprctl") and subprocess.run(["pgrep", "-u", str(UID), "-x", "Hyprland"], capture_output=True).returncode == 0:
+        try:
+            inst = json.loads(subprocess.run(["hyprctl", "instances", "-j"], env=env, capture_output=True, text=True, timeout=10).stdout or "[]")
+        except (ValueError, subprocess.TimeoutExpired):
+            inst = []
+        if inst:
+            newest = max(inst, key=lambda i: i.get("time", 0))
+            env.update(HYPRLAND_INSTANCE_SIGNATURE=newest["instance"], WAYLAND_DISPLAY=newest.get("wl_socket") or env.get("WAYLAND_DISPLAY", ""),
+                       XDG_CURRENT_DESKTOP=env.get("XDG_CURRENT_DESKTOP") or "Hyprland", XDG_SESSION_TYPE="wayland")
     return env
 
 
 ENV = session_env()
 PLASMA = "KDE" in ENV.get("XDG_CURRENT_DESKTOP", "").split(":")
 SWAY = "sway" in ENV.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
-SHELL = "plasmashell" if PLASMA else "sway" if SWAY else "gnome-shell"
+HYPR = "hyprland" in ENV.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
+SHELL = "plasmashell" if PLASMA else "sway" if SWAY else "Hyprland" if HYPR else "gnome-shell"
 
 
 def run(*args, timeout=60) -> subprocess.CompletedProcess:
@@ -151,9 +165,9 @@ def cmd_setup() -> dict:
                                                           "org.kde.kwin.Scripting.isScriptLoaded", "string:fractile").stdout, 20.0)
         out["extension"] = 0 if (w.returncode == 0 and r.returncode == 0 and loaded) else 1
         out["extension_info"] = [f"kwriteconfig6 {w.returncode}", f"reconfigure {r.returncode} {r.stderr.strip()[-200:]}", f"script loaded {bool(loaded)}"]
-    elif PLASMA or SWAY:
+    elif PLASMA or SWAY or HYPR:
         # Plasma X11 needs no integration (the service talks to the X
-        # server), nor does Sway (its IPC socket).
+        # server), nor do Sway and Hyprland (their IPC sockets).
         out["extension"] = "n/a"
     else:
         # The extension: what the docs tell the user to do (or the Extensions app).
@@ -220,7 +234,7 @@ def launch(desktop_id: str, another: bool = False) -> int:
                         "--method", "org.freedesktop.Application.ActivateAction", f"'{aid}'", "[]", "{}"]
         elif aexec:
             launcher = [a for a in aexec.split() if not a.startswith("%")]
-    if SWAY:
+    if SWAY or HYPR:
         # Sway's launcher (wmenu-run) and `exec` bindings run the program
         # itself. D-Bus activation does not work there for these GNOME apps on
         # Ubuntu 26.04 (they exit without a window), so the Exec line, or for
@@ -228,6 +242,10 @@ def launch(desktop_id: str, another: bool = False) -> int:
         nw = new_window_action(path) if another else None
         exe = (nw[1] if nw and nw[1] else None) or next((ln.strip()[5:] for ln in open(path, encoding="utf-8") if ln.startswith("Exec=")), "")
         argv = [a for a in exe.split() if not a.startswith("%")]
+        if HYPR:
+            # Hyprland's launchers and binds run the program through its
+            # exec dispatcher (the Lua form of this configuration).
+            return run("hyprctl", "dispatch", f"hl.exec_cmd({json.dumps(' '.join(argv))})").returncode
         return run("swaymsg", "exec", " ".join(argv)).returncode
     # No pipes: the app inherits them, and waiting for EOF would wait for it.
     return subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", *launcher], env=ENV,
@@ -302,6 +320,13 @@ def cmd_logout() -> dict:
         p = run("swaymsg", "exit")
         gone = wait_for(lambda: run("pgrep", "-u", str(UID), "-x", "sway").returncode != 0, 30.0, 0.2)
         return {"rc": p.returncode, "stderr": p.stderr.strip(), "sway_exited": bool(gone), "portal_stopped_first": st.returncode == 0}
+    if HYPR:
+        # As on Sway, nothing ends the portal at log-out without uwsm; stop it
+        # first (see above). Then Hyprland's own exit dispatcher.
+        st = run("systemctl", "--user", "stop", "xdg-desktop-portal.service", "xdg-desktop-portal-hyprland.service", "xdg-desktop-portal-gtk.service")
+        p = run("hyprctl", "dispatch", "hl.dsp.exit()")
+        gone = wait_for(lambda: run("pgrep", "-u", str(UID), "-x", "Hyprland").returncode != 0, 30.0, 0.2)
+        return {"rc": p.returncode, "stdout": p.stdout.strip(), "stderr": p.stderr.strip(), "hyprland_exited": bool(gone), "portal_stopped_first": st.returncode == 0}
     p = run("gnome-session-quit", "--logout", "--no-prompt")
     return {"rc": p.returncode, "stderr": p.stderr.strip()}
 

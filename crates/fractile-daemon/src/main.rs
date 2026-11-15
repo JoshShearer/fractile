@@ -155,6 +155,10 @@ fn main() {
         eprintln!("fractiled: refusing to run as root. Fractile is a per-user service.");
         std::process::exit(2);
     }
+    // Fractile's own files are private (this used to be UMask= in the unit,
+    // which every app Fractile starts inherited). Launched apps get the
+    // session's umask back.
+    fractile_session::launch::private_umask();
     let forced = args.iter().position(|a| a == "--backend").and_then(|i| args.get(i + 1)).map(|s| s.as_str());
     let verbose = has("--verbose") || has("-v");
 

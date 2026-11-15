@@ -40,20 +40,28 @@ from pathlib import Path
 CACHE = Path("/cache")
 EVID = Path("/evidence")
 # Ubuntu release -> version. Plasma 6 needs 26.04: 24.04 ships Plasma 5.27.
-RELEASES = {"noble": "24.04", "resolute": "26.04"}
+RELEASES = {"noble": "24.04", "resolute": "26.04", "arch": "Arch Linux"}
 SSH_PORT = 2222
 QMP = "/tmp/qmp.sock"
 GUEST_TOOL = "/src/tests/vm/guest/vmctl.py"
 # session -> (GDM session name, logind session type, the shell process)
 SESSIONS = {"wayland": ("ubuntu", "wayland", "gnome-shell"), "x11": ("ubuntu-xorg", "x11", "gnome-shell"),
             "plasma-x11": ("plasma", "x11", "plasmashell"), "plasma-wayland": ("plasma", "wayland", "plasmashell"),
-            "sway": ("sway", "wayland", "sway")}
+            "sway": ("sway", "wayland", "sway"), "hyprland": ("hyprland", "wayland", "Hyprland")}
 # The Ubuntu release each session runs on.
-SESSION_RELEASE = {"wayland": "noble", "x11": "noble", "plasma-x11": "noble", "plasma-wayland": "resolute", "sway": "resolute"}
+SESSION_RELEASE = {"wayland": "noble", "x11": "noble", "plasma-x11": "noble", "plasma-wayland": "resolute", "sway": "resolute", "hyprland": "arch"}
 PLASMA_VERSIONS = "dpkg-query -W -f='${Package} ${Version}; ' plasma-workspace kwin-wayland kwin-x11 2>/dev/null"
 APT = ("sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 -o Acquire::http::Timeout=60")
 APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-editor gnome-calculator "
              "gnome-system-monitor gnome-characters gnome-clocks baobab gnome-disk-utility gnome-font-viewer")
+
+# Arch (Hyprland 0.56 or later; Ubuntu 26.04 has 0.53): the GNOME test apps,
+# GDM as the display manager (timed login, as on Ubuntu), Hyprland with
+# hyprlock, hypridle and waybar (its tray), software rendering through mesa.
+ARCH_PKGS = ("hyprland hyprlock hypridle waybar gdm mesa noto-fonts ttf-dejavu xdg-desktop-portal-hyprland "
+             "gnome-terminal gnome-text-editor gnome-calculator gnome-system-monitor gnome-characters gnome-clocks "
+             "baobab gnome-disk-utility gnome-font-viewer nautilus python python-gobject")
+ARCH_IMG = "https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2"
 
 HOLD = 0
 HOLD_AT = "login"
@@ -105,11 +113,90 @@ def ensure_cloud_image(release: str = "noble") -> Path:
     return img
 
 
+def ensure_arch_image() -> Path:
+    """Arch's official cloud image (arch-boxes), checked against its SHA256
+    file; the cached copy keeps the build date in its name."""
+    sums = urllib.request.urlopen(ARCH_IMG + ".SHA256", timeout=60).read().decode().split()
+    want = sums[0]
+    img = CACHE / f"arch-cloudimg-{want[:12]}.qcow2"
+    if img.exists():
+        return img
+    part = img.with_suffix(".part")
+    say(f"downloading {ARCH_IMG}")
+    h = hashlib.sha256()
+    with urllib.request.urlopen(ARCH_IMG, timeout=120) as r, open(part, "wb") as f:
+        while chunk := r.read(1 << 20):
+            h.update(chunk)
+            f.write(chunk)
+    if h.hexdigest() != want:
+        part.unlink()
+        raise SystemExit(f"checksum mismatch for the Arch cloud image: {h.hexdigest()} != {want}")
+    part.rename(img)
+    say(f"Arch cloud image verified (sha256 {want[:16]}...)")
+    return img
+
+
 def ssh_key() -> Path:
     k = CACHE / "id_ed25519"
     if not k.exists():
         subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(k)], check=True)
     return k
+
+
+def seed_arch(path: Path) -> Path:
+    pub = (ssh_key().with_suffix(".pub")).read_text().strip()
+    ud = f"""#cloud-config
+hostname: fractile-vm
+users:
+  - name: tester
+    gecos: Test User
+    groups: [wheel]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys: ["{pub}"]
+ssh_pwauth: false
+runcmd:
+  - pacman-key --init && pacman-key --populate archlinux
+  - for i in 1 2 3; do pacman -Syu --noconfirm --needed {ARCH_PKGS} > /var/log/fractile-pacman.log 2>&1 && touch /var/lib/fractile-apps-installed && break; sleep 30; done
+  - systemctl enable gdm.service
+  - systemctl set-default graphical.target
+  - test -e /var/lib/fractile-apps-installed && echo FRACTILE-PROVISION-OK > /dev/ttyS0 || (tail -20 /var/log/fractile-pacman.log > /dev/ttyS0; echo FRACTILE-PROVISION-FAILED > /dev/ttyS0)
+power_state:
+  mode: poweroff
+  timeout: 60
+"""
+    d = Path("/tmp/seed-arch")
+    d.mkdir(exist_ok=True)
+    (d / "user-data").write_text(ud)
+    (d / "meta-data").write_text("instance-id: fractile-vm-1\nlocal-hostname: fractile-vm\n")
+    subprocess.run(["cloud-localds", str(path), str(d / "user-data"), str(d / "meta-data")], check=True)
+    return path
+
+
+def ensure_arch_base() -> Path:
+    out = CACHE / "base-arch-hyprland.qcow2"
+    if out.exists():
+        return out
+    img = ensure_arch_image()
+    tmp = CACHE / "base-arch-hyprland.part.qcow2"
+    subprocess.run(["qemu-img", "convert", "-O", "qcow2", str(img), str(tmp)], check=True)
+    subprocess.run(["qemu-img", "resize", str(tmp), "24G"], check=True)
+    sd = seed_arch(Path("/tmp/seed-arch.img"))
+    say("provisioning the Arch image: Hyprland, GDM, hyprlock, hypridle, waybar and the test apps (cloud-init)")
+    serial = CACHE / "provision-arch-serial.log"
+    p = subprocess.Popen(qemu_cmd(tmp, sd, serial))
+    try:
+        p.wait(timeout=3600)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        raise SystemExit(f"provisioning did not finish in 60 min; see {serial}")
+    if "FRACTILE-PROVISION-OK" not in serial.read_text(errors="replace"):
+        tmp.unlink(missing_ok=True)
+        raise SystemExit(f"Arch provisioning failed (no success marker from cloud-init); see {serial}")
+    tmp.rename(out)
+    say("Arch Hyprland image ready")
+    return out
 
 
 def seed(path: Path) -> Path:
@@ -279,7 +366,7 @@ class VM:
         self.disk = Path(f"/tmp/{name}.qcow2")
         subprocess.run(["qemu-img", "create", "-q", "-f", "qcow2", "-b", str(base), "-F", "qcow2", str(self.disk)], check=True)
         self.serial = Path(f"/tmp/{name}-serial.log")
-        self.seed = seed(Path("/tmp/run-seed.img"))
+        self.seed = (seed_arch if "arch" in base.name else seed)(Path("/tmp/run-seed.img"))
         self.p = subprocess.Popen(qemu_cmd(self.disk, self.seed, self.serial))
         self.ssh_key = ssh_key()
 
@@ -520,13 +607,53 @@ def gdm_and_session(vm: VM, session: str) -> None:
     # GDM loop on it ("gdm-autologin started more than once"). A throwaway
     # password on this throwaway VM, used by nothing (login is timed).
     vm.ssh("echo tester:fractile-vm-test | sudo chpasswd", check_rc=True)
-    vm.ssh(f"printf '{conf}' | sudo tee /etc/gdm3/custom.conf >/dev/null && printf '{acct}' | sudo tee /var/lib/AccountsService/users/tester >/dev/null", check_rc=True)
+    gdm_conf = "/etc/gdm3/custom.conf"
+    if SESSION_RELEASE.get(session) == "arch":
+        # GDM 51 (Arch) refuses a timed login unless automatic login is on
+        # for the same user ("refusing auto login for user 'tester'
+        # (enabled=0, allowed=)"); with both, it logs in at boot and again
+        # after each log-out (checked by hand in the VM).
+        gdm_conf = "/etc/gdm/custom.conf"
+        conf = conf.replace("AutomaticLoginEnable=False", "AutomaticLoginEnable=True\\nAutomaticLogin=tester")
+    vm.ssh(f"sudo mkdir -p /var/lib/AccountsService/users && printf '{conf}' | sudo tee {gdm_conf} >/dev/null && printf '{acct}' | sudo tee /var/lib/AccountsService/users/tester >/dev/null", check_rc=True)
+
+
+HYPR_CONFIG = """-- What a Hyprland user without uwsm sets up (docs/compatibility/hyprland.md):
+-- the start line for Fractile, a bar with a tray, and the lock daemon.
+hl.monitor({ output = "", mode = "1600x1200@60", position = "0x0", scale = 1 })
+hl.config({ misc = { disable_hyprland_logo = true, disable_splash_rendering = true } })
+hl.on("hyprland.start", function()
+  hl.exec_cmd("waybar")
+  hl.exec_cmd("hypridle")
+  hl.exec_cmd("fractiled --autostart --compositor-start")
+end)
+"""
+# hypridle(1): the logind Lock and Unlock signals start hyprlock and end it,
+# so `loginctl lock-session` locks the screen as on the other desktops.
+HYPRIDLE_CONFIG = """general {
+    lock_cmd = pidof hyprlock || hyprlock
+    unlock_cmd = pkill -USR1 -x hyprlock
+}
+"""
+
+
+def hyprland_user_config(vm: VM) -> None:
+    vm.ssh("mkdir -p ~/.config/hypr", check_rc=True)
+    for name, text in (("hyprland.lua", HYPR_CONFIG), ("hypridle.conf", HYPRIDLE_CONFIG)):
+        p = subprocess.run(["ssh", "-q", "-i", str(vm.ssh_key), "-p", str(SSH_PORT), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                            "tester@127.0.0.1", f"cat > ~/.config/hypr/{name}"], input=text, text=True, capture_output=True, timeout=60)
+        if p.returncode != 0:
+            raise RuntimeError(f"writing ~/.config/hypr/{name}: {p.stderr.strip()}")
+    # hyprlock's own example configuration, if the package ships one
+    vm.ssh("test -e ~/.config/hypr/hyprlock.conf || cp /usr/share/hypr/hyprlock.conf ~/.config/hypr/ 2>/dev/null; true")
 
 
 def base_for(session: str) -> Path:
     rel = SESSION_RELEASE[session]
     if session == "sway":
         return ensure_sway_base(rel)
+    if session == "hyprland":
+        return ensure_arch_base()
     return ensure_plasma_base(rel) if session.startswith("plasma") else ensure_base(rel)
 
 
@@ -534,16 +661,27 @@ def run(session: str, deb: str) -> None:
     base = base_for(session)
     _xs, stype, shell = SESSIONS[session]
     plasma = session.startswith("plasma")
+    arch = SESSION_RELEASE[session] == "arch"
+    wlr = session in ("sway", "hyprland")  # IPC compositors: no extension, a locker process, a bar's tray
     ver = RELEASES[SESSION_RELEASE[session]]
     vm = VM(base, f"run-{session}")
     try:
         if not check("V00", "the VM boots and answers over ssh", vm.wait_ssh(600)):
             return
         gdm_and_session(vm, session)
-        vm.scp(deb, "/tmp/fractile.deb")
+        vm.scp(deb, "/tmp/fractile.pkg.tar.zst" if arch else "/tmp/fractile.deb")
         vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
-        rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {PLASMA_VERSIONS if plasma else 'sway --version' if session == 'sway' else 'gnome-shell --version'}; uname -r").stdout.strip().replace("\n", "; ")
-        inst = vm.ssh(
+        ver_cmd = PLASMA_VERSIONS if plasma else "sway --version" if session == "sway" else "Hyprland --version | head -1" if session == "hyprland" else "gnome-shell --version"
+        rel = vm.ssh(f". /etc/os-release; echo $PRETTY_NAME; {ver_cmd}; uname -r").stdout.strip().replace("\n", "; ")
+        if session == "hyprland":
+            hyprland_user_config(vm)
+        if arch:
+            inst = vm.ssh("for i in 1 2 3; do sudo pacman -U --noconfirm /tmp/fractile.pkg.tar.zst > /tmp/pacman.log 2>&1 && break; "
+                          "echo \"attempt $i failed\"; sleep 30; sudo pacman -Sy --noconfirm > /dev/null 2>&1; done; tail -4 /tmp/pacman.log; pacman -Q fractile", timeout=1800)
+            check("V01", "pacman installs the Arch package (dependencies from the Arch repositories)",
+                  inst.returncode == 0 and "fractile 0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
+        else:
+          inst = vm.ssh(
             # The VM's user-mode network has no IPv6, and archive.ubuntu.com
             # resolves to IPv6 first: IPv4 only, and the whole install retried
             # on a network failure (dependency resolution is unchanged).
@@ -551,8 +689,8 @@ def run(session: str, deb: str) -> None:
             "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb > /tmp/apt.log 2>&1 && break; "
             "echo \"attempt $i failed\"; sleep 30; sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; "
             "tail -4 /tmp/apt.log; dpkg-query -W fractile", timeout=1800)
-        check("V01", f"apt installs the .deb on Ubuntu {ver} desktop (dependencies from the Ubuntu archive)",
-              inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
+          check("V01", f"apt installs the .deb on Ubuntu {ver} desktop (dependencies from the Ubuntu archive)",
+                inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
 
         # First automatic login with the configured session type.
         vm.ssh("sudo systemctl reboot", timeout=20)
@@ -565,11 +703,15 @@ def run(session: str, deb: str) -> None:
         up = wait_for(lambda: vm.ssh("test -S /run/user/$(id -u)/fractile/fractile.sock").returncode == 0, 60)
         setup = vm.vmctl("setup")
         check("V02", f"started from the app menu in a real {session} login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
-              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and setup.get("extension") == ("n/a" if session in ("plasma-x11", "sway") else 0),
+              bool(up) and setup.get("unit_enabled") == "enabled" and setup.get("policy") == "last_clean" and setup.get("extension") == ("n/a" if session in ("plasma-x11", "sway", "hyprland") else 0),
               f"session {s1.get('session_type')}, service socket {bool(up)}; {json.dumps(setup)[:400]}")
 
         # One real log-out and log-in (loads the extension on Wayland).
         shell_before = vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()
+        # One log-out saves one Logout snapshot (the display closing and
+        # SIGTERM arrive together on Hyprland and once both saved one).
+        count_saved = lambda: int((vm.ssh("grep -a -c -E 'Logout snapshot [0-9a-f-]+ saved|as Logout snapshot' ~/.local/state/fractile/fractile.log").stdout.strip() or "0").splitlines()[-1])
+        saved0 = count_saved()
         lo = vm.vmctl("logout")
         relog = wait_for(lambda: (lambda pid: pid and pid != shell_before)(vm.ssh(f"pgrep -u tester -x {shell}").stdout.strip()), 180, 3)
         s2 = wait_session(vm, stype)
@@ -580,9 +722,9 @@ def run(session: str, deb: str) -> None:
         gst = vm.ssh("systemctl --user is-active graphical-session.target").stdout.strip()
         how = vm.ssh("grep -a 'compositor start' ~/.local/state/fractile/fractile.log | tail -1").stdout.strip()
         by_compositor = "starting the service from the compositor configuration" in how
-        started = s2.get("unit_active") == "active" or (session == "sway" and by_compositor)
-        check("V03", "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway without "
-                     "graphical-session.target the packaged Sway configuration) and it controls windows",
+        started = s2.get("unit_active") == "active" or (wlr and by_compositor)
+        check("V03", "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway/Hyprland without "
+                     "graphical-session.target the compositor configuration: Sway's packaged snippet, Hyprland's documented start line) and it controls windows",
               bool(relog) and started and bool(st2.get("window_control")),
               f"logout {lo}; new shell {bool(relog)}; unit {s2.get('unit_active')}/{s2.get('unit_enabled')}; graphical-session.target {gst}; "
               f"{how[-160:]}; adapter {st2.get('adapter')} window_control {st2.get('window_control')} session {s2.get('session_type')}")
@@ -655,10 +797,31 @@ def run(session: str, deb: str) -> None:
         if len(at_logout) != 15:
             ok2 = False
             notes2.append(f"{len(at_logout)} windows open at the log-out, expected 15")
+        saved = count_saved() - saved0
+        if saved != 1:
+            ok2 = False
+            notes2.append(f"{saved} Logout snapshots saved at the log-out, expected 1")
         runs2 = (after2.get("restore") or {}).get("recent_runs") or [{}]
-        check("V06", "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
+        check("V06", "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates; the log-out saved one Logout snapshot",
               ok2 and bool(relog) and runs2[0].get("state") == "completed" and runs2[0].get("source") == "login",
               f"logout {lo.get('rc')}; new login {bool(relog)}; last restore {runs2[0].get('state')} source {runs2[0].get('source')} {runs2[0].get('summary')}; {'; '.join(notes2)[:600]}; {shot}; log: {decision[-2500:]}")
+        # The apps Fractile reopened must not inherit anything from the
+        # service: no-new-privileges stops sudo in a restored terminal, and a
+        # seccomp filter made GNOME Disks abort on Arch. Fractile's own
+        # umask is 077; the apps get the session's. The first process in each
+        # of Fractile's scopes is the app it started (apps it started through
+        # D-Bus activation run under the bus instead and are not checked).
+        probe = vm.ssh(r"""for c in /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/app-fractile-*.scope; do
+          p=$(head -1 $c/cgroup.procs 2>/dev/null); [ -n "$p" ] && echo "app $(cat /proc/$p/comm) $(grep -E '^(NoNewPrivs|Seccomp|Umask):' /proc/$p/status | tr -s '\t\n' '  ')"; done
+        p=$(pgrep -u tester -x fractiled | head -1); echo "fractiled $(grep -E '^(NoNewPrivs|Seccomp|Umask):' /proc/$p/status | tr -s '\t\n' '  ')"
+        echo "session $(umask)" """).stdout.strip().splitlines()
+        apps_p = [l for l in probe if l.startswith("app ")]
+        sess_umask = next((l.split()[1] for l in probe if l.startswith("session ")), "?")
+        bad = [l for l in apps_p if "NoNewPrivs: 1" in l or "Seccomp: 0" not in l or f"Umask: {sess_umask}" not in l]
+        own = next((l for l in probe if l.startswith("fractiled ")), "")
+        check("V09", "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the session's umask); fractiled's own umask is 0077",
+              len(apps_p) >= 3 and not bad and "Umask: 0077" in own,
+              f"{len(apps_p)} app processes in Fractile's scopes, session umask {sess_umask}; not clean: {bad[:4]}; {own}")
         # real lock screen: logind asks the session's own locker (GNOME Shell's
         # shield, KDE's kscreenlocker) to lock; the locker sets LockedHint
         # the user's graphical session (older sessions from earlier log-outs can linger as "closing")
@@ -668,8 +831,9 @@ def run(session: str, deb: str) -> None:
         hint = vm.ssh(f"loginctl show-session {sid} -p LockedHint --value").stdout.strip()
         # Sway's locker (swaylock through swayidle) does not set LockedHint:
         # there the screen is locked while swaylock runs.
-        locker = vm.ssh("pgrep -u tester -x swaylock").stdout.strip() if session == "sway" else ""
-        really_locked = bool(locker) if session == "sway" else hint == "yes"
+        locker_name = {"sway": "swaylock", "hyprland": "hyprlock"}.get(session, "")
+        locker = vm.ssh(f"pgrep -u tester -x {locker_name}").stdout.strip() if wlr else ""
+        really_locked = bool(locker) if wlr else hint == "yes"
         shot_l = vm.screenshot(f"{session}-04-locked")
         snaps = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile --json list-snapshots").stdout
         snap_id = (json.loads(snaps or "[]") or [{}])[0].get("id", "")
@@ -678,9 +842,9 @@ def run(session: str, deb: str) -> None:
         unlocked = wait_for(lambda: (not (vm.call("status").get("result") or {}).get("locked")) or None, 30)
         check("V07", "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
               bool(locked) and really_locked and rr.returncode != 0 and "locked" in (rr.stdout + rr.stderr).lower() and bool(unlocked),
-              f"session {sid}; LockedHint {hint}{'; swaylock pid ' + locker if session == 'sway' else ''}; status locked {bool(locked)}; restore exit {rr.returncode}: {(rr.stdout + rr.stderr).strip()[:160]}; unlocked {bool(unlocked)}; {shot_l}")
-        if session == "sway":
-            # swaybar's tray (its own StatusNotifierWatcher): the icon, and a
+              f"session {sid}; LockedHint {hint}{f'; {locker_name} pid ' + locker if wlr else ''}; status locked {bool(locked)}; restore exit {rr.returncode}: {(rr.stdout + rr.stderr).strip()[:160]}; unlocked {bool(unlocked)}; {shot_l}")
+        if wlr:
+            # swaybar's tray (waybar's on Hyprland) (its own StatusNotifierWatcher): the icon, and a
             # click on it opens the panel for the focused window. Qt reports
             # NeedsAttention for the timeout of a message it shows (the
             # restore notification, 6 s), then Active again.
@@ -700,7 +864,8 @@ def run(session: str, deb: str) -> None:
             panel = wait_for(lambda: next((w for w in (vm.call("list_windows", {"all": True}).get("result") or [])
                                            if (w.get("title") or "").startswith("Fractile panel")), None), 15, 1)
             shot_p = vm.screenshot(f"{session}-06-tray-panel")
-            check("V08", "Sway: Fractile's icon is in swaybar's tray (StatusNotifierWatcher), active; a click on it (StatusNotifierItem.Activate) opens the panel",
+            bar = "swaybar" if session == "sway" else "waybar"
+            check("V08", f"{session}: Fractile's icon is in {bar}'s tray (StatusNotifierWatcher), active; a click on it (StatusNotifierItem.Activate) opens the panel",
                   bool(tr.get("registered")) and "Active" in (tr.get("status") or "") and bool(act.get("activated")) and bool(panel),
                   f"{json.dumps(tr)[:240]}; status seen {' > '.join(dict.fromkeys(seen))}; {act}; panel {panel and panel.get('frame')}; {shot_t}; {shot_p}")
             vm.key("esc")
@@ -1430,9 +1595,12 @@ def main() -> int:
         traceback.print_exc()
         check("VXX", "run crashed", False, repr(ex))
     ver = RELEASES[SESSION_RELEASE[a.session]] if a.session else "24.04"
-    suite = f"vm-ubuntu{ver}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "") + ("-upgrade" if a.upgrade_from else "")
+    distro = "vm-arch" if SESSION_RELEASE.get(a.session) == "arch" else f"vm-ubuntu{ver}"
+    suite = f"{distro}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "") + ("-upgrade" if a.upgrade_from else "")
     ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-          "environment": f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
+          "environment": ("Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, "
+                          f"hyprland session (hyprlock via hypridle, waybar), Fractile {Path(a.deb).name} installed with pacman -U")
+          if SESSION_RELEASE.get(a.session) == "arch" else f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}
     out = EVID / f"{suite}.json"
     out.write_text(json.dumps(ev, indent=2) + "\n")

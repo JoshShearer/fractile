@@ -16,7 +16,8 @@ the Lua configuration is not covered by this adapter.
 | Environment | Result | Evidence |
 |---|---|---|
 | Omarchy 4.5 (Arch), Hyprland 0.56.2 started by uwsm from SDDM: a real login on a laptop, 1920x1200 at scale 1.5, the user's own Omarchy configuration (261 binds); Arch package from `makepkg` installed with `pacman -U`, service started by hand | works (manual): detection, the scaled monitor as 1280x800 with the bar left out of the work area, all 12 windows placeable, the panel shortcut moved to Ctrl+Alt+G because Omarchy binds Super+Alt+G (conflict reported, Omarchy's bind untouched), the UI, and grid placement from the panel (done and judged by the user) | this page; no automated suite on that machine |
-| Hyprland 0.57.2 (Arch package) nested inside `kwin_wayland --virtual`, in an `archlinux:latest` container with the host's NVIDIA render node; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 25/25 | `tests/evidence/e2e-hyprland.json` (`tests/hyprland/e2e-hyprland-in-container.sh`) |
+| Hyprland 0.57.2 (Arch package) nested inside `kwin_wayland --virtual`, in an `archlinux:latest` container with the host's NVIDIA render node; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 26/26 | `tests/evidence/e2e-hyprland.json` (`tests/hyprland/e2e-hyprland-in-container.sh`) |
+| A real Hyprland 0.57.2 login on Arch Linux in a QEMU/KVM VM (llvmpipe, 1600x1200): GDM 51 timed logins into Arch's Hyprland session (no uwsm), waybar, hyprlock through hypridle, `pacman -U` of the Arch package; the Hyprland configuration starts waybar, hypridle and `fractiled --autostart --compositor-start` with `hl.on("hyprland.start", ...)` | 10/10 on the last two runs (2026-11-15): install, set-up, start at login, 15 windows of 10 apps placed on a 4x4 grid, restored after a real reboot (prompt answered with Enter) and after a real log-out (`hl.dsp.exit()`) and log-in, hyprlock, the waybar tray and its panel, launched apps without the service's restrictions | `tests/evidence/vm-arch-hyprland.json` (`tests/vm/vm-e2e.sh hyprland`) |
 
 The suite covers: detection and connection, and an unreachable instance
 reported with the reason; window, output and workspace
@@ -32,7 +33,7 @@ a killed service's binds replaced by the next one (found without
 `HYPRLAND_INSTANCE_SIGNATURE`); and the service saving and exiting when
 Hyprland exits.
 
-This is a real Hyprland with real clients, but **not** a real Hyprland login:
+The nested suite is a real Hyprland with real clients, but **not** a real Hyprland login:
 it runs as a window of a headless KWin (Hyprland cannot start without a DRM
 or Wayland backend), with no bar, no portal for Hyprland, no uwsm and no
 display manager.
@@ -47,10 +48,20 @@ mise's shims first on the session's PATH and the UI's `#!/usr/bin/env
 python3` took mise's Python, which has no PyQt6. The packaged UI now runs on
 `/usr/bin/python3`.
 
-**Not tested:** the automated suite on a real login, autostart through uwsm
-and the log-out snapshot on a real log-out, multiple physical monitors, XWayland applications, window
-groups, special (scratchpad) workspaces, session restore across a real log-out
-and log-in, and Hyprland versions other than 0.56.2 and 0.57.2.
+The VM run found three bugs, fixed: GNOME Calculator (whose minimum size is
+larger than its cell) was pushed above the screen; GNOME Disks aborted when
+Fractile reopened it, because the systemd unit's RestrictSUIDSGID was
+inherited by every app Fractile starts; and when Hyprland exited, the display
+closing and SIGTERM each saved a Logout snapshot. In Arch's Hyprland session
+(started by GDM, without uwsm) `graphical-session.target` became active, so
+the systemd unit started the service and the `--compositor-start` line
+stepped aside.
+
+**Not tested:** autostart through uwsm, the nested suite's shortcut and
+panel checks on a real login (the VM suite covers the tray, not the
+shortcuts), multiple physical monitors, XWayland applications, window
+groups, special (scratchpad) workspaces, a hardware GPU on a real login
+(the VM uses llvmpipe), and Hyprland versions other than 0.56.2 and 0.57.2.
 
 ## Setting it up
 
@@ -62,8 +73,8 @@ and log-in, and Hyprland versions other than 0.56.2 and 0.57.2.
    Started without uwsm, nothing starts `graphical-session.target`. Start the
    service from the Hyprland configuration instead, for example
    `hl.on("hyprland.start", function() hl.exec_cmd("fractiled --autostart --compositor-start") end)`
-   (the form shown in Hyprland's generated `hyprland.lua`; not run by the test
-   suite). With `--compositor-start` it starts only when login start is on
+   (the form shown in Hyprland's generated `hyprland.lua`; the VM suite's
+   configuration uses it). With `--compositor-start` it starts only when login start is on
    for this user, and leaves the start to the systemd unit when uwsm brings
    `graphical-session.target` up (the same flag the Sway package snippet
    uses; see sway.md).
@@ -112,8 +123,8 @@ newest running Hyprland instance in `$XDG_RUNTIME_DIR/hypr`. The UI needs
   neither).
 - **Lock screen.** Session lock state comes from logind's `LockedHint` and,
   since hyprlock, swaylock, gtklock and waylock do not set it, from one of
-  them running for this user. (Verified for swaylock on a real Sway login;
-  not run on Hyprland.)
+  them running for this user. (Verified for swaylock on a real Sway login
+  and hyprlock on a real Hyprland login.)
 - **Starting apps.** Apps are reopened from their desktop entry's `Exec`
   line, also when it is marked `DBusActivatable`, as on Sway (see sway.md).
 - **Log-out.** When Hyprland exits, its event socket closes; the service saves

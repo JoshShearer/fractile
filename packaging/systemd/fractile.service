@@ -19,12 +19,12 @@ RestartSec=3
 KillMode=process
 # Time for the logout snapshot.
 TimeoutStopSec=15
-NoNewPrivileges=yes
-LockPersonality=yes
-RestrictRealtime=yes
-RestrictSUIDSGID=yes
-SystemCallArchitectures=native
-UMask=0077
+# No NoNewPrivileges, seccomp filters (RestrictSUIDSGID, LockPersonality,
+# RestrictRealtime, SystemCallArchitectures) or UMask here: the apps Fractile
+# reopens are forked from this process and would inherit them. sudo in a
+# restored terminal would refuse to run, and RestrictSUIDSGID made GNOME
+# Disks abort (its bwrap image loader failed). fractiled sets its own umask
+# to 077 and gives launched apps the session's umask.
 
 [Install]
 WantedBy=graphical-session.target plasma-workspace.target
