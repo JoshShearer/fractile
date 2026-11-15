@@ -7,7 +7,7 @@ Status as of 0.9.0.
 
 | ID | Risk | Sev | Likelihood | Mitigation | Status |
 |---|---|---|---|---|---|
-| R1 | COSMIC has no API to move or resize other clients' windows | H | certain | Report BLOCKED BY PLATFORM with the reason; upstream proposal in docs/compatibility/cosmic.md; never imitate | open: needs upstream; proposal not filed yet |
+| R1 | COSMIC has no API to move or resize other clients' windows | H | certain | Report BLOCKED BY PLATFORM with the reason; upstream proposal in docs/compatibility/cosmic.md; never imitate | open: needs upstream; proposal filed as pop-os/cosmic-protocols#97 (2026-11-14) |
 | R2 | GNOME Shell extension API changes between releases (45-48 declared, 46 tested) | H | likely per release | adapter API version negotiation; refused integrations reported with a fix (W23); test on each new GNOME before raising shell-version | open: 45, 47, 48 not tested |
 | R3 | KWin scripting API changes across Plasma releases | M | likely | same negotiation; heartbeat liveness; script kept minimal | open: only 6.8.2 tested |
 | R4 | Apps refuse exact geometry (minimum sizes, size increments, CSD shadows) | M | certain | read-back verification, bounded re-apply, learned minimum sizes, explicit "constrained" note | mitigated (M06) |
