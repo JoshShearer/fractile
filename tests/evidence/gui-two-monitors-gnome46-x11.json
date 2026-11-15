@@ -1,0 +1,43 @@
+{
+  "suite": "gui-two-monitors",
+  "when": "2026-11-15T02:15:04+0000",
+  "environment": "Xvfb split into two RandR monitors 1600x1200+1280x1024, gnome-shell, PyQt6 UI",
+  "results": [
+    {
+      "id": "G22a",
+      "name": "two monitors are seen",
+      "ok": true,
+      "detail": "[('conn-TEST-0-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}), ('conn-TEST-1-1280x1024', {'h': 1024, 'w': 1280, 'x': 1600, 'y': 0})]"
+    },
+    {
+      "id": "G22b",
+      "name": "test window is up",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "G22",
+      "name": "one panel per monitor, each on its own monitor",
+      "ok": true,
+      "detail": "[('conn-TEST-0-1600x1200', 679, 489), ('conn-TEST-1-1280x1024', 2119, 401)]"
+    },
+    {
+      "id": "G23",
+      "name": "dragging on the other monitor's panel places the window on that monitor exactly",
+      "ok": true,
+      "detail": "want {'h': 661, 'w': 640, 'x': 1813, 'y': 197} got {'h': 661, 'w': 640, 'x': 1813, 'y': 197}"
+    },
+    {
+      "id": "G25",
+      "name": "pressing the same placement shortcut repeatedly cycles the window across monitors",
+      "ok": true,
+      "detail": "conn-TEST-0-1600x1200 -> conn-TEST-1-1280x1024 -> conn-TEST-0-1600x1200"
+    },
+    {
+      "id": "G24",
+      "name": "UI logged no Python errors",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

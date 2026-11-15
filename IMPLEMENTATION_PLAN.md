@@ -30,7 +30,8 @@ workstream from SRS section 14.
 7. **Settings UI checks on Wayland** (DV-25/26): `tests/gui/settings_x11.py`
    covers X11. Run the same probe on GNOME Wayland and KWin, and extend it to
    edit, duplicate, remove, import and export (DV-14).
-8. **Upstream COSMIC proposal** (R1): file the `set_geometry` request proposal
-   from docs/compatibility/cosmic.md with the cosmic-protocols maintainers.
+8. **Upstream COSMIC proposal** (R1): done, filed as pop-os/cosmic-protocols#97
+   (2026-11-14). Next: follow the discussion; build a COSMIC adapter if it lands.
 9. **24-hour soak** (T27) on a real session.
-10. Package-to-package **upgrade** test (PK-06).
+10. Package-to-package **upgrade** test (PK-06): done, 0.8.0 -> 0.8.5 -> 0.9.0 in
+   the GNOME 46 Wayland VM (`FRACTILE_VM_UPGRADE_FROM`).

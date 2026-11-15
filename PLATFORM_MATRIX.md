@@ -1,6 +1,6 @@
 # Platform matrix
 
-Fractile 0.9.0, adapter API 1, IPC protocol 1. Verified 2026-11-11. The tester is
+Fractile 0.9.0, adapter API 1, IPC protocol 1. Verified 2026-11-11, updated 2026-11-14. The tester is
 the automated suites in `tests/`, run by the Claude Code agent on the
 maintainer's workstation. Logs and JSON evidence are in `tests/evidence/`.
 
@@ -34,9 +34,9 @@ Host UI stack: Python 3.12.3, Qt 6.4.2 / PyQt6 6.6.1 (Ubuntu packages). Rust 1.9
 | Window list / active window | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM | VERIFIED | VERIFIED (S02, S08) | NOT IMPLEMENTED (reported unsupported) |
 | Move / resize to grid | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM | VERIFIED (the placed window becomes floating) | VERIFIED (the placed window becomes floating; S04-S07) | NOT IMPLEMENTED |
 | Global shortcuts | VERIFIED (XGrabKey) | VERIFIED (extension grab) | VERIFIED (KGlobalAccel) | VERIFIED (XGrabKey) | BLOCKED BY PLATFORM | VERIFIED (runtime Hyprland binds; re-added after a config reload) | VERIFIED (runtime `bindsym`; re-added after a config reload; keys the Sway configuration binds are reported as conflicts; S10, S11, S16) | NOT IMPLEMENTED |
-| Panel UI + keyboard/mouse | VERIFIED | VERIFIED (keyboard; drag not run) | PARTIAL (shown and focused; placement from the panel not run) | NOT TESTED | BLOCKED BY PLATFORM | VERIFIED (keyboard; drag not run) | VERIFIED (keyboard; drag not run; S14, S22) | NOT IMPLEMENTED |
-| Live preview overlay | VERIFIED | NOT TESTED | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM | NOT IMPLEMENTED (Hyprland has no IPC to draw one) | NOT IMPLEMENTED (Sway has no IPC to draw one) | NOT IMPLEMENTED |
-| Multi-monitor | NOT TESTED | VERIFIED (sizes; mixed DPI scale 2 + 1; disconnect and reconnect through DisplayConfig, E9/E8) | NOT TESTED | NOT TESTED | BLOCKED BY PLATFORM | PARTIAL (a second headless output added at runtime; a window moved onto it; scale 1 only) | PARTIAL (a second output added at runtime; a window moved onto it; scale 1 only; S17) | NOT IMPLEMENTED |
+| Panel UI + keyboard/mouse | VERIFIED | VERIFIED (keyboard and drag, Esc, grid keys, Shift, Alt; PW01-PW09 on 45/47/48; real GNOME 46 login in E10) | VERIFIED (real Plasma 6.6 login in E13: shortcut, drag, keys, tray, P suite 38/38) | VERIFIED (real Plasma 5.27 X11 login in E10: P suite 38/38) | BLOCKED BY PLATFORM | VERIFIED (keyboard; drag not run) | VERIFIED (keyboard; drag not run; S14, S22) | NOT IMPLEMENTED |
+| Live preview overlay | VERIFIED | VERIFIED (the extension draws it at the exact target, takes no input, gone after the drop; PW02, PW02b) | VERIFIED (the UI draws it, the KWin script places it on the exact target; P07 in E13, KM04 on two outputs) | VERIFIED (override-redirect window at the exact target; P07 in E10) | BLOCKED BY PLATFORM | NOT IMPLEMENTED (Hyprland has no IPC to draw one) | NOT IMPLEMENTED (Sway has no IPC to draw one) | NOT IMPLEMENTED |
+| Multi-monitor | VERIFIED (GNOME Shell 46 X11 with two RandR monitors: G22, G23, G25; and by hand on two physical monitors) | VERIFIED (sizes; mixed DPI scale 2 + 1; disconnect and reconnect through DisplayConfig, E9/E8; a panel per monitor and a drag on the second, PM02-PM04) | VERIFIED (two virtual outputs: a panel per output, exact drag and preview on the second, shortcut cycles a, b, a; KM00-KM06) | VERIFIED (kwin_x11 5.27, two RandR monitors: G22, G23, G25) | BLOCKED BY PLATFORM | PARTIAL (a second headless output added at runtime; a window moved onto it; scale 1 only) | PARTIAL (a second output added at runtime; a window moved onto it; scale 1 only; S17) | NOT IMPLEMENTED |
 | Workspaces | NOT TESTED (EWMH desktops implemented) | VERIFIED | VERIFIED | NOT TESTED | BLOCKED BY PLATFORM | VERIFIED | VERIFIED (S12) | NOT IMPLEMENTED |
 | Snapshot save | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM (no geometry to read back for restore) | VERIFIED | VERIFIED (S13, S21) | NOT IMPLEMENTED |
 | Snapshot restore (same session) | VERIFIED | VERIFIED | VERIFIED | VERIFIED | BLOCKED BY PLATFORM | VERIFIED | VERIFIED (S13) | NOT IMPLEMENTED |
@@ -45,11 +45,11 @@ Host UI stack: Python 3.12.3, Qt 6.4.2 / PyQt6 6.6.1 (Ubuntu packages). Rust 1.9
 | App launch on restore (approved) | VERIFIED | VERIFIED (E10: 10 apps reopened at login, V05/V06) | VERIFIED (E13: apps reopened at login, V05/V06) | VERIFIED | BLOCKED BY PLATFORM | NOT TESTED | NOT TESTED | NOT IMPLEMENTED |
 | Session lock handling | NOT TESTED | VERIFIED (logind LockedHint) | NOT TESTED | NOT TESTED | n/a | NOT TESTED | NOT TESTED | n/a |
 | Integration missing / mismatched reported | n/a | VERIFIED (W16, W23) | VERIFIED (K00, K14) | n/a | VERIFIED (`--check` reports unsupported with the reason) | VERIFIED (H23) | VERIFIED (S23) | VERIFIED (X24) |
-| Tray icon | NOT TESTED | VERIFIED (with the AppIndicator extension; stock GNOME has no tray) | NOT TESTED | NOT TESTED | n/a | NOT TESTED | NOT TESTED | n/a |
+| Tray icon | NOT TESTED | VERIFIED (with the AppIndicator extension; stock GNOME has no tray) | VERIFIED (Plasma's StatusNotifierWatcher, click shows the panel; P18, P19 in E13) | VERIFIED (P18, P19 in E10, Plasma 5.27 X11) | n/a | NOT TESTED | NOT TESTED | n/a |
 
-**Divvy-equivalent (SRS 16):** not claimed on any platform. GNOME X11 is the
-closest; its open items are DV-12/13/17 multi-monitor rows (tested on GNOME
-Wayland only), the tray (DV-19), and the PARTIAL rows in REQUIREMENTS.md.
+**Divvy-equivalent (SRS 16):** see REQUIREMENTS.md: DV-01..28 are VERIFIED on
+X11, GNOME Wayland and KDE Plasma Wayland, but each column combines several
+versions and setups, so the label is not claimed for a precise platform yet.
 
 **Session restore supported (SRS 16):** not claimed on any platform. GNOME
 on Ubuntu 24.04 (Wayland and X11) and Plasma 5.27 X11 have passed a real reboot

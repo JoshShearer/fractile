@@ -284,11 +284,11 @@ def run_all(e: Env) -> None:
     wa = o["work_area"]
 
     ok_all, detail = True, []
-    for grid, cells in [("6x6", "0,0,2,5"), ("4x4", "1,1,2,3"), ("3x2", "2,0,2,1"), ("10x10", "0,0,9,9")]:
+    for grid, cells in [("6x6", "0,0,2,5"), ("4x4", "1,1,2,3"), ("3x2", "2,0,2,1"), ("10x10", "0,0,9,9"), ("20x20", "7,3,12,15"), ("20x20", "17,17,19,19")]:
         out = e.cli_json("place", "--grid", grid, "--cells", cells, "--window", g)
         ok = out["within_tolerance"] and rect_eq(out["requested"], e.frame(g), 2)
         ok_all &= ok
-        detail.append(f"{grid}:{cells} err={out['max_error_px']}px")
+        detail.append(f"{grid}:{cells} err={out['max_error_px']}px" + ("" if ok else f" requested {out['requested']} observed {out.get('observed')} now {e.frame(g)}"))
     check("W04", "grid placements land on the requested rectangle (GTK4, client-side decorations)", ok_all, "; ".join(detail))
     out = e.cli_json("place", "--grid", "6x6", "--cells", "3,0,5,2", "--window", q)
     check("W05", "grid placement on a Qt Wayland window", out["within_tolerance"] and rect_eq(out["requested"], e.frame(q), 2), f"err={out['max_error_px']}px")
@@ -298,6 +298,14 @@ def run_all(e: Env) -> None:
     e.cli_json("snap", "right-half", "--window", g)
     e.cli_json("undo")
     check("W07", "undo restores the previous geometry", rect_eq(e.frame(g), before, 2))
+    # T02: the same 20x20 placement repeated does not drift
+    frames = []
+    for i in range(10):
+        e.cli_json("place", "--grid", "20x20", "--cells", "7,3,12,15" if i % 2 == 0 else "8,4,13,16", "--window", g)
+        if i % 2 == 0:
+            frames.append(e.frame(g))
+    check("W06b", "alternating 20x20 placements return to exactly the same rectangle every time (no drift)",
+          all(f == frames[0] for f in frames), f"{frames}")
 
     # maximized window: placement unmaximizes first
     c = e.client()

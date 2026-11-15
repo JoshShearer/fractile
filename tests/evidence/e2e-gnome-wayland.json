@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-11T10:44:42-0600",
+  "when": "2026-11-14T20:13:34-0600",
   "environment": "headless GNOME Shell 46.0 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:3066320939 gnome:3066320938"
+      "detail": "gnome:3616147944 gnome:3616147943"
     },
     {
       "id": "W03",
@@ -31,7 +31,7 @@
       "id": "W04",
       "name": "grid placements land on the requested rectangle (GTK4, client-side decorations)",
       "ok": true,
-      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px; 20x20:7,3,12,15 err=0px; 20x20:17,17,19,19 err=0px"
     },
     {
       "id": "W05",
@@ -52,6 +52,12 @@
       "detail": ""
     },
     {
+      "id": "W06b",
+      "name": "alternating 20x20 placements return to exactly the same rectangle every time (no drift)",
+      "ok": true,
+      "detail": "[{'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}]"
+    },
+    {
       "id": "W08",
       "name": "placing a maximized window unmaximizes it and lands exactly",
       "ok": true,
@@ -61,7 +67,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "972 ms incl. key injection"
+      "detail": "1022 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -73,13 +79,19 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1769 ms"
+      "detail": "1753 ms"
+    },
+    {
+      "id": "W30",
+      "name": "10px margins and a 10px gap: halves sit inside the work area with the gap between them",
+      "ok": true,
+      "detail": "work area {'h': 1168, 'w': 1600, 'x': 0, 'y': 32}; left {'h': 1148, 'w': 785, 'x': 10, 'y': 42}; right {'h': 1148, 'w': 785, 'x': 805, 'y': 42}"
     },
     {
       "id": "W12",
       "name": "shortcut starts the Wayland UI; the panel is shown, focused and inside the work area",
       "ok": true,
-      "detail": "1.0s incl. UI start; panel {'h': 386, 'w': 427, 'x': 800, 'y': 32} own=True"
+      "detail": "1.0s incl. UI start; panel {'h': 396, 'w': 570, 'x': 515, 'y': 418} own=True"
     },
     {
       "id": "W13",
@@ -91,7 +103,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:3066320939"
+      "detail": "active gnome:3616147944"
     },
     {
       "id": "W15",
@@ -127,7 +139,7 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot d1b8f713-e91a-4ff9-b347-3493a9fd79a7 (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot b368f358-283c-4695-9e61-fd0fecc1e63d (4 windows)"
     },
     {
       "id": "W23",
@@ -139,7 +151,7 @@
       "id": "W24",
       "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
       "ok": true,
-      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:3066320944 closed while being placed']"
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:3616147949 closed while being placed']"
     },
     {
       "id": "W18",
