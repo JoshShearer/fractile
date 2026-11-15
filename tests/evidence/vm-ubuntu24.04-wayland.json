@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu24.04-wayland",
-  "when": "2026-11-15T02:53:54+0000",
+  "when": "2026-11-15T18:36:06+0000",
   "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -23,9 +23,9 @@
     },
     {
       "id": "V03",
-      "name": "after a real log-out and the next login, the systemd user unit started the service and it controls windows",
+      "name": "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway/Hyprland without graphical-session.target the compositor configuration: Sway's packaged snippet, Hyprland's documented start line) and it controls windows",
       "ok": true,
-      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; adapter gnome window_control True session wayland"
+      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; graphical-session.target active; ; adapter gnome window_control True session wayland"
     },
     {
       "id": "V04",
@@ -41,15 +41,21 @@
     },
     {
       "id": "V06",
-      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
+      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates; the log-out saved one Logout snapshot",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/wayland-03-after-logout.png; log: 2026-11-15T02:50:32.211 Info snapshot b18a86de-407f-4da3-a701-0cd25bdb45c8 saved mode=Manual windows=15\n2026-11-15T02:50:32.649 Info Shutdown snapshot be7cf92e-a497-41f7-9972-def48fd4db10 saved (15 windows)\n2026-11-15T02:50:32.669 Info signal 15: ending session\n2026-11-15T02:50:32.669 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T02:52:52.114 Info fractiled 0.9.0 starting pid=2469 autostart=true\n2026-11-15T02:52:52.128 Info login session 5 (from the user's graphical session (logind User.Display))\n2026-11-15T02:52:52.663 Info login restore decision=ask unclean=false snapshot=be7cf92e-a497-41f7-9972-def48fd4db10\n2026-11-15T02:53:21.255 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-15T02:53:21.269 Info Logout snapshot 711caf45-cff8-409a-b649-20844a1a336a saved (15 windows)\n2026-11-15T02:53:21.356 Info signal 15: ending session\n2026-11-15T02:53:21.356 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T02:53:30.180 Info fractiled 0.9.0 starting pid=5149 autostart=true\n2026-11-15T02:53:30.185 Info login session 20 (from the user's graphical session (logind User.Display))\n2026-11-15T02:53:30.713 Info login restore decision=restore unclean=false snapshot=711caf45-cff8-409a-b649-20844a1a336a"
+      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/wayland-03-after-logout.png; log: 2026-11-15T18:32:42.421 Info snapshot 99caefee-d89a-4066-9f4a-33042b44b9b0 saved mode=Manual windows=15\n2026-11-15T18:32:43.130 Info Shutdown snapshot 2059ea8b-8bbc-4784-82da-64d86fcc1bf0 saved (15 windows)\n2026-11-15T18:32:43.208 Info signal 15: ending session\n2026-11-15T18:32:43.208 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T18:35:02.651 Info fractiled 0.9.0 starting pid=2397 autostart=true\n2026-11-15T18:35:02.668 Info login session 4 (from the user's graphical session (logind User.Display))\n2026-11-15T18:35:03.193 Info login restore decision=ask unclean=false snapshot=2059ea8b-8bbc-4784-82da-64d86fcc1bf0\n2026-11-15T18:35:32.581 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-15T18:35:32.593 Info Logout snapshot 1c5f0199-8a9e-46f3-93f1-b3644228fa09 saved (15 windows)\n2026-11-15T18:35:32.661 Info signal 15: ending session\n2026-11-15T18:35:32.661 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T18:35:41.403 Info fractiled 0.9.0 starting pid=5203 autostart=true\n2026-11-15T18:35:41.410 Info login session 22 (from the user's graphical session (logind User.Display))\n2026-11-15T18:35:41.937 Info login restore decision=restore unclean=false snapshot=1c5f0199-8a9e-46f3-93f1-b3644228fa09"
+    },
+    {
+      "id": "V09",
+      "name": "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the umask of the user's systemd manager); fractiled's own umask is 0077",
+      "ok": true,
+      "detail": "10 test-app processes running (wherever they were started), 4 processes still leading Fractile's scopes, session umask 0002; not clean: []; fractiled Umask: 0077 NoNewPrivs: 0 Seccomp: 0 ; the login restore started 10 apps in scopes and 0 another way ()"
     },
     {
       "id": "V07",
       "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
       "ok": true,
-      "detail": "session 20; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/wayland-04-locked.png"
+      "detail": "session 22; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/wayland-04-locked.png"
     }
   ],
   "log": []

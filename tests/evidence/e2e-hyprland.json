@@ -1,6 +1,6 @@
 {
   "suite": "e2e-hyprland",
-  "when": "2026-11-15T08:23:36+0000",
+  "when": "2026-11-15T18:09:17+0000",
   "environment": "Hyprland 0.57.2 built from branch v0.57.2 at commit 11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947 clean (VERSION: bump to 0.57.2). nested in kwin_wayland --virtual, archlinux container (render device: nvidia); keys pressed with wtype",
   "results": [
     {
@@ -62,6 +62,12 @@
       "name": "a cell smaller than the window's minimum size: the window keeps its minimum, the cell's left edge, and the cell's top (moved up only as far as needed to stay inside the work area)",
       "ok": true,
       "detail": "requested {'h': 300, 'w': 400, 'x': 0, 'y': 600} frame {'h': 702, 'w': 702, 'x': 0, 'y': 498} client 700x700 work area {'h': 1200, 'w': 1600, 'x': 0, 'y': 0} attempts 4 note constrained by the window: min width 702, min height 702"
+    },
+    {
+      "id": "H26",
+      "name": "a window larger for a moment after mapping (it drops its minimum size 1.2 s later) ends in the cell; no minimum size is learned from it",
+      "ok": false,
+      "detail": "requested {'h': 300, 'w': 400, 'x': 400, 'y': 300} frame {'h': 602, 'w': 602, 'x': 400, 'y': 300} attempts 4 note constrained by the window: min width 602, min height 602; next {'h': 300, 'w': 400, 'x': 800, 'y': 600} frame {'h': 602, 'w': 602, 'x': 800, 'y': 598} note constrained by the window: min width 602, min height 602"
     },
     {
       "id": "H08",
@@ -163,7 +169,7 @@
       "id": "H21",
       "name": "when Hyprland exits the service saves the last seen layout and exits",
       "ok": true,
-      "detail": " | 2026-11-15T08:23:36.737 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Hyprland IPC read: Connection reset by peer (os error 104) | 2026-11-15T08:23:36.812 Info fractiled stopped"
+      "detail": " | 2026-11-15T18:09:17.613 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Hyprland IPC read: Connection reset by peer (os error 104) | 2026-11-15T18:09:17.689 Info fractiled stopped"
     }
   ]
 }

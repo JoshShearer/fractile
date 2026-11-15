@@ -166,6 +166,18 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **A size limit is no longer learned from a window that is still
+  starting.** When a placement came back larger than asked, Fractile
+  recorded that size as the window's minimum at once. GNOME Clocks, cold
+  started by a Sway login restore, committed 320 px for a 295 px cell for a
+  moment; Fractile learned 320, moved it 25 px up to keep it on the screen
+  and reported 0 px error against the adjusted target. Fractile now asks
+  again with the same target after 700 ms and learns only a size the window
+  still holds (S26, H26).
+- **Learned size limits are dropped when a window closes.** They were kept
+  by window id until the service exited, and Hyprland reuses window ids
+  (memory addresses): a new window inherited the minimum size of a closed
+  one (H26).
 - **Apps Fractile reopens no longer inherit the service's restrictions.**
   The systemd user unit set NoNewPrivileges, seccomp filters
   (RestrictSUIDSGID, LockPersonality, RestrictRealtime,

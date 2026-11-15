@@ -1,4 +1,35 @@
-2026-11-15T08:28:07.388 Warn tiling manager detected: sway
-2026-11-15T08:28:07.897 Info login restore decision=restore unclean=false snapshot=f9dac36b-b8ed-4760-ba79-323766227d6e
-2026-11-15T08:28:09.423 Info restore 05687d0b-7357-4b04-a6cb-25273903f605 started source=login targets=15
-2026-11-15T08:28:33.306 Info restore 05687d0b-7357-4b04-a6cb-25273903f605 finished state=completed LAUNCHED_AND_PLACED=15 launches=15 23880ms
+2026-11-15T18:21:17.030 Warn tiling manager detected: sway
+2026-11-15T18:21:17.537 Info login restore decision=restore unclean=false snapshot=15e2ddcc-4af6-4061-b1f9-51e4d015ce1e
+2026-11-15T18:21:19.058 Info restore eefc519e-ad81-4640-ab5a-aa73d51db31e started source=login targets=15
+2026-11-15T18:21:19.060 Info launch org.gnome.Calculator.desktop via systemd-scope+gio argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Calculator-5957150.scope", "--", "gio", "launch", "/usr/share/applications/org.gnome.Calculator.desktop"]
+2026-11-15T18:21:19.105 Info launch org.gnome.Characters.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Characters-5957224.scope", "--", "/usr/bin/gnome-characters"]
+2026-11-15T18:21:19.614 Info launch org.gnome.DiskUtility.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.DiskUtility-5957650.scope", "--", "gnome-disks"]
+2026-11-15T18:21:21.348 Info place sway:5 app=org.gnome.calculator requested=Rect { x: 0, y: 23, w: 400, h: 294 } observed=Some(Rect { x: 0, y: 23, w: 400, h: 294 }) err=Some(0) 1156ms
+2026-11-15T18:21:22.318 Info place sway:6 app=org.gnome.characters requested=Rect { x: 400, y: 23, w: 400, h: 294 } observed=Some(Rect { x: 400, y: 23, w: 400, h: 294 }) err=Some(0) 905ms
+2026-11-15T18:21:23.249 Info place sway:7 app=org.gnome.diskutility requested=Rect { x: 800, y: 23, w: 400, h: 294 } observed=Some(Rect { x: 800, y: 23, w: 400, h: 294 }) err=Some(0) 865ms
+2026-11-15T18:21:23.251 Info launch org.gnome.Nautilus.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Nautilus-5957142.scope", "--", "nautilus", "--new-window"]
+2026-11-15T18:21:23.762 Info launch org.gnome.SystemMonitor.desktop via systemd-scope+gio argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.SystemMonitor-5957753.scope", "--", "gio", "launch", "/usr/share/applications/org.gnome.SystemMonitor.desktop"]
+2026-11-15T18:21:23.806 Info launch org.gnome.Terminal.desktop via systemd-scope+gio argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Terminal-5957856.scope", "--", "gio", "launch", "/usr/share/applications/org.gnome.Terminal.desktop"]
+2026-11-15T18:21:25.212 Info place sway:8 app=org.gnome.nautilus requested=Rect { x: 1200, y: 23, w: 400, h: 294 } observed=Some(Rect { x: 1200, y: 23, w: 400, h: 294 }) err=Some(0) 1186ms
+2026-11-15T18:21:26.319 Info place sway:10 app=org.gnome.systemmonitor requested=Rect { x: 800, y: 317, w: 400, h: 294 } observed=Some(Rect { x: 800, y: 317, w: 400, h: 294 }) err=Some(0) 1039ms
+2026-11-15T18:21:27.458 Info place sway:9 app=org.gnome.terminal requested=Rect { x: 1196, y: 317, w: 404, h: 296 } observed=Some(Rect { x: 1196, y: 317, w: 404, h: 296 }) err=Some(0) 1074ms
+2026-11-15T18:21:27.460 Info launch org.gnome.Nautilus.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Nautilus-5957383.scope", "--", "nautilus", "--new-window"]
+2026-11-15T18:21:27.565 Info launch org.gnome.TextEditor.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.TextEditor-5957171.scope", "--", "gnome-text-editor"]
+2026-11-15T18:21:29.196 Info place sway:11 app=org.gnome.nautilus requested=Rect { x: 0, y: 317, w: 400, h: 294 } observed=Some(Rect { x: 0, y: 317, w: 400, h: 294 }) err=Some(0) 1050ms
+2026-11-15T18:21:29.198 Info launch org.gnome.Terminal.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Terminal-5957564.scope", "--", "gnome-terminal", "--window"]
+2026-11-15T18:21:30.537 Info place sway:13 app=org.gnome.terminal requested=Rect { x: 0, y: 611, w: 405, h: 296 } observed=Some(Rect { x: 0, y: 611, w: 404, h: 296 }) err=Some(1) 1091ms
+2026-11-15T18:21:31.521 Info place sway:12 app=org.gnome.texteditor requested=Rect { x: 1200, y: 611, w: 400, h: 294 } observed=Some(Rect { x: 1200, y: 611, w: 400, h: 294 }) err=Some(0) 917ms
+2026-11-15T18:21:31.523 Info launch org.gnome.Nautilus.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Nautilus-5957456.scope", "--", "nautilus", "--new-window"]
+2026-11-15T18:21:31.628 Info launch org.gnome.baobab.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.baobab-5957138.scope", "--", "baobab"]
+2026-11-15T18:21:33.250 Info place sway:14 app=org.gnome.nautilus requested=Rect { x: 400, y: 317, w: 400, h: 294 } observed=Some(Rect { x: 400, y: 317, w: 400, h: 294 }) err=Some(0) 1047ms
+2026-11-15T18:21:33.252 Info launch org.gnome.Terminal.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Terminal-5957691.scope", "--", "gnome-terminal", "--window"]
+2026-11-15T18:21:33.363 Info launch org.gnome.clocks.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.clocks-5957721.scope", "--", "gnome-clocks"]
+2026-11-15T18:21:35.264 Info place sway:16 app=org.gnome.terminal requested=Rect { x: 400, y: 611, w: 404, h: 296 } observed=Some(Rect { x: 400, y: 611, w: 405, h: 296 }) err=Some(1) 1323ms
+2026-11-15T18:21:36.375 Info place sway:15 app=org.gnome.baobab requested=Rect { x: 0, y: 905, w: 400, h: 295 } observed=Some(Rect { x: 0, y: 905, w: 400, h: 295 }) err=Some(0) 1043ms
+2026-11-15T18:21:36.379 Info launch org.gnome.font-viewer.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.font\\x2dviewer-5957257.scope", "--", "gnome-font-viewer"]
+2026-11-15T18:21:38.656 Info place sway:17 app=org.gnome.clocks requested=Rect { x: 400, y: 905, w: 400, h: 295 } observed=Some(Rect { x: 400, y: 905, w: 400, h: 295 }) err=Some(0) 1638ms
+2026-11-15T18:21:38.658 Info launch org.gnome.Terminal.desktop via systemd-scope+exec argv=["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit=app-fractile-org.gnome.Terminal-5957846.scope", "--", "gnome-terminal", "--window"]
+2026-11-15T18:21:40.010 Info place sway:19 app=org.gnome.terminal requested=Rect { x: 800, y: 611, w: 573, h: 260 } observed=Some(Rect { x: 800, y: 611, w: 572, h: 260 }) err=Some(1) 1106ms
+2026-11-15T18:21:41.007 Info place sway:18 app=org.gnome.font-viewer requested=Rect { x: 800, y: 905, w: 400, h: 295 } observed=Some(Rect { x: 800, y: 905, w: 400, h: 295 }) err=Some(0) 929ms
+2026-11-15T18:21:41.737 Info place sway:13 app=org.gnome.terminal requested=Rect { x: 0, y: 611, w: 405, h: 296 } observed=Some(Rect { x: 0, y: 611, w: 405, h: 296 }) err=Some(0) 562ms
+2026-11-15T18:21:42.630 Info restore eefc519e-ad81-4640-ab5a-aa73d51db31e finished state=completed LAUNCHED_AND_PLACED=15 launches=15 23570ms

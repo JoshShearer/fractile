@@ -347,6 +347,18 @@ impl Daemon {
             out = self.adapter().move_resize(wid, c.rect).map_err(|e| err("adapter", e.to_string()))?;
             out.attempts += attempts;
         }
+        // A client that is still starting can commit a larger size for a
+        // moment and shrink to the request later (GNOME Clocks on Sway, at a
+        // cold start in a login restore: 320 px for a 295 px cell, while it
+        // takes 295 px every other time). One such observation must not
+        // become a learned minimum: ask once more with the same target after
+        // a pause, and learn only a size the window still holds then.
+        if !out.within_tolerance && !transient(&out) && out.observed.is_some_and(|ob| ob.w > c.rect.w + tol || ob.h > c.rect.h + tol) {
+            std::thread::sleep(std::time::Duration::from_millis(700));
+            let attempts = out.attempts;
+            out = self.adapter().move_resize(wid, c.rect).map_err(|e| err("adapter", e.to_string()))?;
+            out.attempts += attempts;
+        }
         let learnable = !transient(&out);
         // A learned minimum the window has now undercut was wrong: drop it.
         if learnable {
@@ -870,6 +882,9 @@ impl Daemon {
         match &ev {
             AdapterEvent::Hotkey { binding_id, timestamp } => self.handle_hotkey(binding_id, *timestamp),
             AdapterEvent::WindowCreated { id } => {
+                // Window ids can be reused (Hyprland's are memory addresses):
+                // a size limit learned for an earlier window is not this one's.
+                self.learned_limits.lock().unwrap().remove(id);
                 if let Some(job) = self.restore.lock().unwrap().as_ref() {
                     let _ = job.new_windows.send(id.clone());
                     return;
@@ -884,6 +899,7 @@ impl Daemon {
             }
             AdapterEvent::WindowClosed { id } => {
                 self.undo.lock().unwrap().retain(|u| &u.window_id != id);
+                self.learned_limits.lock().unwrap().remove(id);
                 crate::session::on_window_closed(self);
                 self.broadcast("windows_changed", json!({}));
             }

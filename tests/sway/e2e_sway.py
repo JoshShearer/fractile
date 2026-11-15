@@ -291,6 +291,26 @@ def run_all(s: Sway, e: Env):
     else:
         check("S24", "a cell smaller than the window's minimum size: the client keeps its minimum; the frame is not shrunk below the request", False, "no window")
 
+    # A client that is larger for a moment after it maps and then accepts
+    # the cell (GNOME Clocks at a cold start in a Sway login restore). One
+    # such observation must not become a learned minimum size: the window
+    # ends in the cell, and a later placement is not constrained either.
+    e.window("gtk4", "org.fractile.TestLate", "Late window", "--min-size", "600x600", "--min-size-for", "1200")
+    latep = e.procs[-1]
+    lw = e.wait_for(lambda: next((w for w in e.windows() if w.get("title") == "Late window"), None), 15.0, 0.1)
+    if lw:
+        out = e.cli_json("place", "--grid", "4x4", "--cells", "1,1,1,1", "--window", lw["id"])
+        req = out["requested"]
+        got = e.wait_for(lambda: (lambda f: f if rect_eq(f, req, 2) else None)(e.frame(lw["id"])), 4.0, 0.1) or e.frame(lw["id"])
+        again = e.cli_json("place", "--grid", "4x4", "--cells", "2,2,2,2", "--window", lw["id"])
+        got2 = e.wait_for(lambda: (lambda f: f if rect_eq(f, again["requested"], 2) else None)(e.frame(lw["id"])), 4.0, 0.1) or e.frame(lw["id"])
+        check("S26", "a window larger for a moment after mapping (it drops its minimum size 1.2 s later) ends in the cell; no minimum size is learned from it",
+              rect_eq(got, req, 2) and rect_eq(got2, again["requested"], 2) and "constrained" not in (out.get("note") or "") and "constrained" not in (again.get("note") or ""),
+              f"requested {req} frame {got} attempts {out['attempts']} note {out.get('note')}; next {again['requested']} frame {got2} note {again.get('note')}")
+        latep.terminate()
+    else:
+        check("S26", "a window larger for a moment after mapping ends in the cell", False, "no window")
+
     e.call("activate_window", {"window": q})
     check("S08", "activating a window focuses it", e.wait_for(lambda: e.call("active_window") == q, 3.0))
 

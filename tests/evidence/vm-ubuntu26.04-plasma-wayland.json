@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu26.04-plasma-wayland",
-  "when": "2026-11-15T03:19:16+0000",
+  "when": "2026-11-15T18:48:03+0000",
   "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -23,9 +23,9 @@
     },
     {
       "id": "V03",
-      "name": "after a real log-out and the next login, the systemd user unit started the service and it controls windows",
+      "name": "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway/Hyprland without graphical-session.target the compositor configuration: Sway's packaged snippet, Hyprland's documented start line) and it controls windows",
       "ok": true,
-      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; adapter kwin window_control True session wayland"
+      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; graphical-session.target active; ; adapter kwin window_control True session wayland"
     },
     {
       "id": "V04",
@@ -41,15 +41,21 @@
     },
     {
       "id": "V06",
-      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
+      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates; the log-out saved one Logout snapshot",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login ALREADY_PRESENT=9 LAUNCHED_AND_PLACED=6; ; tests/evidence/vm/plasma-wayland-03-after-logout.png; log: 2026-11-15T03:17:09.657 Info no snapshot from the previous session to restore\n2026-11-15T03:17:41.776 Info snapshot a014a0c9-18d2-498a-b7db-4a9ce2807102 saved mode=Manual windows=15\n2026-11-15T03:17:42.254 Info Shutdown snapshot 8ec7e343-2270-4e96-aac2-0cfa68c75ee8 saved (15 windows)\n2026-11-15T03:17:43.062 Info signal 15: ending session\n2026-11-15T03:17:43.062 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:18:05.247 Info fractiled 0.9.0 starting pid=2929 autostart=true\n2026-11-15T03:18:05.257 Info login session 6 (from XDG_SESSION_ID)\n2026-11-15T03:18:05.852 Info login restore decision=ask unclean=false snapshot=8ec7e343-2270-4e96-aac2-0cfa68c75ee8\n2026-11-15T03:18:38.132 Warn Plasma is ending the session (its windows are closing); saved the layout last seen at 2026-11-15T03:18:36.009298151+00:00 as Logout snapshot 1b8fd7d2-9ca0-4e08-9a09-0bb58dabc50c (15 windows)\n2026-11-15T03:18:38.192 Info signal 15: ending session\n2026-11-15T03:18:38.192 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:18:48.898 Info fractiled 0.9.0 starting pid=6963 autostart=true\n2026-11-15T03:18:48.910 Info login session 22 (from XDG_SESSION_ID)\n2026-11-15T03:18:49.443 Info login restore decision=restore unclean=false snapshot=1b8fd7d2-9ca0-4e08-9a09-0bb58dabc50c"
+      "detail": "logout 0; new login True; last restore completed source login ALREADY_PRESENT=9 LAUNCHED_AND_PLACED=6; ; tests/evidence/vm/plasma-wayland-03-after-logout.png; log: 2026-11-15T18:45:53.956 Info no snapshot from the previous session to restore\n2026-11-15T18:46:26.600 Info snapshot 54a720bd-8a39-4644-97e1-c2a70adca67b saved mode=Manual windows=15\n2026-11-15T18:46:27.769 Info Shutdown snapshot c3bbe5c6-adef-4e31-b8d4-24c2374607db saved (15 windows)\n2026-11-15T18:46:27.789 Info signal 15: ending session\n2026-11-15T18:46:27.789 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T18:46:50.439 Info fractiled 0.9.0 starting pid=2931 autostart=true\n2026-11-15T18:46:50.460 Info login session 6 (from XDG_SESSION_ID)\n2026-11-15T18:46:51.066 Info login restore decision=ask unclean=false snapshot=c3bbe5c6-adef-4e31-b8d4-24c2374607db\n2026-11-15T18:47:23.255 Warn Plasma is ending the session (its windows are closing); saved the layout last seen at 2026-11-15T18:47:21.086226198+00:00 as Logout snapshot 5ef96a59-cffc-4d56-bf85-1ab103ae47a9 (15 windows)\n2026-11-15T18:47:23.357 Info signal 15: ending session\n2026-11-15T18:47:23.357 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T18:47:34.667 Info fractiled 0.9.0 starting pid=7106 autostart=true\n2026-11-15T18:47:34.696 Info login session 23 (from XDG_SESSION_ID)\n2026-11-15T18:47:35.268 Info login restore decision=restore unclean=false snapshot=5ef96a59-cffc-4d56-bf85-1ab103ae47a9"
+    },
+    {
+      "id": "V09",
+      "name": "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the umask of the user's systemd manager); fractiled's own umask is 0077",
+      "ok": true,
+      "detail": "10 test-app processes running (wherever they were started), 0 processes still leading Fractile's scopes, session umask 0002; not clean: []; fractiled Umask: 0077 NoNewPrivs: 0 Seccomp: 0 ; the login restore started 2 apps in scopes and 0 another way ()"
     },
     {
       "id": "V07",
       "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
       "ok": true,
-      "detail": "session 22; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/plasma-wayland-04-locked.png"
+      "detail": "session 23; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/plasma-wayland-04-locked.png"
     }
   ],
   "log": []

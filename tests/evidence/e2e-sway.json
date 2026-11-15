@@ -1,6 +1,6 @@
 {
   "suite": "e2e-sway",
-  "when": "2026-11-15T08:22:50+0000",
+  "when": "2026-11-15T18:06:59+0000",
   "environment": "sway version 1.12 nested in kwin_wayland --virtual (wlroots Wayland backend, pixman renderer), archlinux container; keys pressed with wtype",
   "results": [
     {
@@ -62,6 +62,12 @@
       "name": "a cell smaller than the window's minimum size: the client keeps its minimum; the frame is not shrunk below the request (it contains the client where Sway grows it, else it stays at the request), in at most 4 attempts",
       "ok": true,
       "detail": "requested {'h': 292, 'w': 400, 'x': 0, 'y': 30} frame {'h': 292, 'w': 400, 'x': 0, 'y': 30} window_rect {'x': 2, 'y': 2, 'width': 396, 'height': 288} client 700x700 attempts 2 Sway kept the container at the request; the client draws past it (not visible over Sway IPC)"
+    },
+    {
+      "id": "S26",
+      "name": "a window larger for a moment after mapping (it drops its minimum size 1.2 s later) ends in the cell; no minimum size is learned from it",
+      "ok": true,
+      "detail": "requested {'h': 293, 'w': 400, 'x': 400, 'y': 322} frame {'h': 293, 'w': 400, 'x': 400, 'y': 322} attempts 2 note the window was tiled; Sway now floats it at the placed size; next {'h': 292, 'w': 400, 'x': 800, 'y': 615} frame {'h': 292, 'w': 400, 'x': 800, 'y': 615} note None"
     },
     {
       "id": "S08",
@@ -163,7 +169,7 @@
       "id": "S21",
       "name": "when Sway exits the service saves the last seen layout and exits",
       "ok": true,
-      "detail": "ing | 2026-11-15T08:22:49.853 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Sway IPC socket: No such file or directory (os error 2) | 2026-11-15T08:22:50.025 Info fractiled stopped"
+      "detail": "ing | 2026-11-15T18:06:59.105 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Sway IPC socket: No such file or directory (os error 2) | 2026-11-15T18:06:59.118 Info fractiled stopped"
     }
   ]
 }

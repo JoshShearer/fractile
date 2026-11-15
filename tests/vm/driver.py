@@ -808,20 +808,31 @@ def run(session: str, deb: str) -> None:
         # The apps Fractile reopened must not inherit anything from the
         # service: no-new-privileges stops sudo in a restored terminal, and a
         # seccomp filter made GNOME Disks abort on Arch. Fractile's own
-        # umask is 077; the apps get the session's. The first process in each
-        # of Fractile's scopes is the app it started (apps it started through
-        # D-Bus activation run under the bus instead and are not checked).
+        # umask is 077; the apps get the session's. Every running test-app
+        # process is checked wherever it runs (Fractile's scopes, or the bus
+        # and the desktop's own session restore for D-Bus-activated apps),
+        # and so is the first process still in each of Fractile's scopes.
         probe = vm.ssh(r"""for c in /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/app.slice/app-fractile-*.scope; do
-          p=$(head -1 $c/cgroup.procs 2>/dev/null); [ -n "$p" ] && echo "app $(cat /proc/$p/comm) $(grep -E '^(NoNewPrivs|Seccomp|Umask):' /proc/$p/status | tr -s '\t\n' '  ')"; done
+          p=$(head -1 $c/cgroup.procs 2>/dev/null); [ -n "$p" ] && echo "scope $(cat /proc/$p/comm) $(grep -E '^(NoNewPrivs|Seccomp|Umask):' /proc/$p/status | tr -s '\t\n' '  ')"; done
+        for n in gnome-terminal- gnome-text-edit gnome-calculato gnome-system-mo gnome-character gnome-clocks baobab gnome-disks gnome-font-view nautilus; do
+          for p in $(pgrep -u tester -x $n); do echo "app $(cat /proc/$p/comm) $(grep -E '^(NoNewPrivs|Seccomp|Umask):' /proc/$p/status | tr -s '\t\n' '  ')"; done; done
         p=$(pgrep -u tester -x fractiled | head -1); echo "fractiled $(grep -E '^(NoNewPrivs|Seccomp|Umask):' /proc/$p/status | tr -s '\t\n' '  ')"
-        echo "session $(umask)" """).stdout.strip().splitlines()
+        echo "session $(grep -E '^Umask:' /proc/$(pgrep -u tester -x systemd | head -1)/status | cut -f2)" """).stdout.strip().splitlines()
+        # How the last login restore started its apps: an app started in a
+        # scope is Fractile's child; one activated over D-Bus (Plasma, GNOME)
+        # is started by the bus and inherits nothing from the service.
+        launch_log = vm.ssh("awk '/login restore decision/{n=NR} {l[NR]=$0} END{for(i=n;i<=NR;i++) print l[i]}' ~/.local/state/fractile/fractile.log | grep -a -o ' launch [^ ]* via [a-z+-]*'").stdout.split("\n")
+        scoped = sorted({l.split()[1] for l in launch_log if "via systemd-scope" in l})
+        bus = sorted({l.split()[1] for l in launch_log if l.strip() and "via systemd-scope" not in l})
+        scopes_p = [l for l in probe if l.startswith("scope ")]
         apps_p = [l for l in probe if l.startswith("app ")]
         sess_umask = next((l.split()[1] for l in probe if l.startswith("session ")), "?")
-        bad = [l for l in apps_p if "NoNewPrivs: 1" in l or "Seccomp: 0" not in l or f"Umask: {sess_umask}" not in l]
+        bad = [l for l in apps_p + scopes_p if "NoNewPrivs: 1" in l or "Seccomp: 0" not in l or f"Umask: {sess_umask}" not in l]
         own = next((l for l in probe if l.startswith("fractiled ")), "")
-        check("V09", "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the session's umask); fractiled's own umask is 0077",
-              len(apps_p) >= 3 and not bad and "Umask: 0077" in own,
-              f"{len(apps_p)} app processes in Fractile's scopes, session umask {sess_umask}; not clean: {bad[:4]}; {own}")
+        check("V09", "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the umask of the user's systemd manager); fractiled's own umask is 0077",
+              len(apps_p) >= 10 and not bad and "Umask: 0077" in own,
+              f"{len(apps_p)} test-app processes running (wherever they were started), {len(scopes_p)} processes still leading Fractile's scopes, session umask {sess_umask}; not clean: {bad[:4]}; {own}; "
+              f"the login restore started {len(scoped)} apps in scopes and {len(bus)} another way ({', '.join(bus)[:200]})")
         # real lock screen: logind asks the session's own locker (GNOME Shell's
         # shield, KDE's kscreenlocker) to lock; the locker sets LockedHint
         # the user's graphical session (older sessions from earlier log-outs can linger as "closing")
@@ -870,7 +881,7 @@ def run(session: str, deb: str) -> None:
                   f"{json.dumps(tr)[:240]}; status seen {' > '.join(dict.fromkeys(seen))}; {act}; panel {panel and panel.get('frame')}; {shot_t}; {shot_p}")
             vm.key("esc")
         hold("end")
-        logs = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile logs --redacted --lines 400 2>&1 | grep -iE 'warn|error|restore' | tail -40").stdout
+        logs = vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile logs --redacted --lines 2000 2>&1 | grep -iE 'warn|error|restore| place | launch ' | tail -200").stdout
         (EVID / "vm").mkdir(parents=True, exist_ok=True)
         (EVID / "vm" / f"{session}-fractile-log.txt").write_text(logs)
     finally:

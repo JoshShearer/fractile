@@ -9,7 +9,7 @@
 
 | Environment | Result | Evidence |
 |---|---|---|
-| Sway 1.12 (Arch package) nested inside `kwin_wayland --virtual` (wlroots' Wayland backend, pixman renderer), in an `archlinux:latest` container; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 27/27 | `tests/evidence/e2e-sway.json` (`tests/sway/e2e-sway-in-container.sh`) |
+| Sway 1.12 (Arch package) nested inside `kwin_wayland --virtual` (wlroots' Wayland backend, pixman renderer), in an `archlinux:latest` container; native Wayland GTK4 and Qt windows, the real Fractile UI; keys pressed with `wtype` | 28/28 | `tests/evidence/e2e-sway.json` (`tests/sway/e2e-sway-in-container.sh`) |
 | Ubuntu 26.04.1 desktop with sway 1.11, swaybar, swayidle and swaylock in a QEMU/KVM VM; real GDM logins into the Sway session, `apt install` of the .deb, keys typed on the VM's keyboard | 9/9 | `tests/evidence/vm-ubuntu26.04-sway.json` (`tests/vm/vm-e2e.sh sway`) |
 
 The suite covers: detection and connection, and an unreachable socket

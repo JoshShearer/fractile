@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu24.04-x11",
-  "when": "2026-11-15T03:02:32+0000",
+  "when": "2026-11-15T18:44:49+0000",
   "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering), GDM timed login, x11 session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -19,13 +19,13 @@
       "id": "V02",
       "name": "started from the app menu in a real x11 login, Fractile is set up as the wizard does: autostart on, restore last session, launch approval for the test apps",
       "ok": true,
-      "detail": "session x11, service socket True; {\"extension\": 0, \"extension_info\": [\"  Version: 0.9.0\", \"  Enabled: Yes\", \"  State: ACTIVE\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"policy\": \"last_clean\"}"
+      "detail": "session x11, service socket True; {\"extension\": 0, \"extension_info\": [\"  Version: 0.9.0\", \"  Enabled: Yes\", \"  State: INITIALIZED\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"policy\": \"last_clean\"}"
     },
     {
       "id": "V03",
-      "name": "after a real log-out and the next login, the systemd user unit started the service and it controls windows",
+      "name": "after a real log-out and the next login, the service started by itself (the systemd user unit, or on Sway/Hyprland without graphical-session.target the compositor configuration: Sway's packaged snippet, Hyprland's documented start line) and it controls windows",
       "ok": true,
-      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; adapter x11 window_control True session x11"
+      "detail": "logout {'rc': 0, 'stderr': ''}; new shell True; unit active/enabled; graphical-session.target active; ; adapter x11 window_control True session x11"
     },
     {
       "id": "V04",
@@ -41,15 +41,21 @@
     },
     {
       "id": "V06",
-      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates",
+      "name": "with asking turned off, after a real log-out and the next login the same 15 windows are restored automatically, no duplicates; the log-out saved one Logout snapshot",
       "ok": true,
-      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/x11-03-after-logout.png; log: 2026-11-15T02:59:19.927 Info Shutdown snapshot 5a4d98c2-460c-4db9-9236-de5f7de0d6cc saved (15 windows)\n2026-11-15T02:59:19.956 Info signal 15: ending session\n2026-11-15T02:59:19.956 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T02:59:19.969 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:01:40.830 Info fractiled 0.9.0 starting pid=2477 autostart=true\n2026-11-15T03:01:40.841 Info login session 5 (from the user's graphical session (logind User.Display))\n2026-11-15T03:01:41.370 Info login restore decision=ask unclean=false snapshot=5a4d98c2-460c-4db9-9236-de5f7de0d6cc\n2026-11-15T03:02:04.486 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-15T03:02:04.520 Info Logout snapshot 05e71b76-c8d1-487f-816c-3b517504377a saved (15 windows)\n2026-11-15T03:02:04.620 Info signal 15: ending session\n2026-11-15T03:02:04.620 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T03:02:13.526 Info fractiled 0.9.0 starting pid=5215 autostart=true\n2026-11-15T03:02:13.537 Info login session 19 (from the user's graphical session (logind User.Display))\n2026-11-15T03:02:14.064 Info login restore decision=restore unclean=false snapshot=05e71b76-c8d1-487f-816c-3b517504377a"
+      "detail": "logout 0; new login True; last restore completed source login LAUNCHED_AND_PLACED=15; ; tests/evidence/vm/x11-03-after-logout.png; log: 2026-11-15T18:41:28.231 Info Shutdown snapshot d883ec85-9a53-426e-825d-f25c2ef5daa3 saved (15 windows)\n2026-11-15T18:41:28.316 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T18:41:28.525 Info signal 15: ending session\n2026-11-15T18:41:28.525 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T18:43:48.535 Info fractiled 0.9.0 starting pid=2553 autostart=true\n2026-11-15T18:43:48.554 Info login session 5 (from the user's graphical session (logind User.Display))\n2026-11-15T18:43:49.088 Info login restore decision=ask unclean=false snapshot=d883ec85-9a53-426e-825d-f25c2ef5daa3\n2026-11-15T18:44:14.987 Info gnome-session: the session is ending; taking the logout snapshot now\n2026-11-15T18:44:15.017 Info Logout snapshot e888368c-6608-4133-be80-ac75ab954d03 saved (15 windows)\n2026-11-15T18:44:15.091 Info signal 15: ending session\n2026-11-15T18:44:15.091 Info Logout: this session's exit snapshot was already taken (at the session manager's end of session, or at shutdown)\n2026-11-15T18:44:23.831 Info fractiled 0.9.0 starting pid=5380 autostart=true\n2026-11-15T18:44:23.834 Info login session 21 (from the user's graphical session (logind User.Display))\n2026-11-15T18:44:24.363 Info login restore decision=restore unclean=false snapshot=e888368c-6608-4133-be80-ac75ab954d03"
+    },
+    {
+      "id": "V09",
+      "name": "the apps Fractile reopened run without restrictions from the service (no-new-privileges 0, no seccomp filter, the umask of the user's systemd manager); fractiled's own umask is 0077",
+      "ok": true,
+      "detail": "10 test-app processes running (wherever they were started), 4 processes still leading Fractile's scopes, session umask 0002; not clean: []; fractiled Umask: 0077 NoNewPrivs: 0 Seccomp: 0 ; the login restore started 10 apps in scopes and 0 another way ()"
     },
     {
       "id": "V07",
       "name": "the desktop's real lock screen (loginctl lock-session): Fractile reports the session locked and refuses a restore; after unlocking it works again",
       "ok": true,
-      "detail": "session 19; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/x11-04-locked.png"
+      "detail": "session 21; LockedHint yes; status locked True; restore exit 1: fractile: the session is locked; restore runs only while it is unlocked; unlocked True; tests/evidence/vm/x11-04-locked.png"
     }
   ],
   "log": []

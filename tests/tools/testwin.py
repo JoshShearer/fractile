@@ -17,6 +17,7 @@ p.add_argument("--role", default=None)
 p.add_argument("--windows", type=int, default=1)
 p.add_argument("--size", default="640x420")
 p.add_argument("--min-size", default=None, help="WxH minimum size hint")
+p.add_argument("--min-size-for", type=int, default=0, help="gtk4: drop the --min-size hint this many ms after map (a client still starting, larger for a moment)")
 p.add_argument("--report-size", default=None, help="GTK4: write the window's own size (WxH) to this file every 200 ms")
 p.add_argument("--fight", action="store_true", help="re-apply own size 300ms after map (app overwrites geometry)")
 p.add_argument("--dialog", action="store_true", help="gtk4: also open a transient dialog for the first window")
@@ -41,6 +42,8 @@ if a.toolkit == "gtk4":
             if a.min_size:
                 mw, mh = (int(v) for v in a.min_size.split("x"))
                 w.get_child().set_size_request(mw, mh)
+                if a.min_size_for:
+                    GLib.timeout_add(a.min_size_for, lambda c=w.get_child(): (c.set_size_request(-1, -1), False)[1])
             w.present()
             if a.report_size and i == 0:
                 def report(w=w):
