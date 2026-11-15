@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu24.04-plasma-x11-panel",
-  "when": "2026-11-14T21:25:01+0000",
+  "when": "2026-11-15T04:09:46+0000",
   "environment": "Ubuntu 24.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 5.27), GDM timed login, plasma-x11 session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -49,19 +49,19 @@
       "id": "P07",
       "name": "during the drag a preview window shows the exact target, the panel keeps keyboard focus, and the window has not moved yet",
       "ok": true,
-      "detail": "preview {'x': 0, 'y': 0, 'w': 800, 'h': 1156} want {'h': 1156, 'w': 800, 'x': 0, 'y': 0}; active x11:0x3800006 (panel x11:0x3800006); window then {'h': 578, 'w': 800, 'x': 400, 'y': 289}; tests/evidence/vm/panel-plasma-x11-06-drag-preview.png"
+      "detail": "preview {'x': 0, 'y': 0, 'w': 800, 'h': 1156} want {'h': 1156, 'w': 800, 'x': 0, 'y': 0}; active x11:0xa00006 (panel x11:0xa00006); window then {'h': 578, 'w': 800, 'x': 400, 'y': 289}; tests/evidence/vm/panel-plasma-x11-06-drag-preview.png"
     },
     {
       "id": "P08",
       "name": "the panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active x11:0x3a00004"
+      "detail": "active x11:0x3e00004"
     },
     {
       "id": "P09",
       "name": "Esc closes the panel without moving the window and focus returns to it",
       "ok": true,
-      "detail": "{'h': 1156, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1156, 'w': 800, 'x': 0, 'y': 0}; active x11:0x3a00004"
+      "detail": "{'h': 1156, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1156, 'w': 800, 'x': 0, 'y': 0}; active x11:0x3e00004"
     },
     {
       "id": "P10",
@@ -103,7 +103,7 @@
       "id": "P16",
       "name": "starting Fractile again from the app menu opens the panel for the focused window",
       "ok": true,
-      "detail": "panel True target x11:0x3a00004 (editor x11:0x3a00004)"
+      "detail": "panel True target x11:0x3e00004 (editor x11:0x3e00004)"
     },
     {
       "id": "P17",
@@ -121,7 +121,7 @@
       "id": "P19",
       "name": "a left click on the tray icon (StatusNotifierItem.Activate, what the tray sends) shows the panel for the focused window",
       "ok": true,
-      "detail": "{'activated': True, 'stderr': ''}; panel True target x11:0x3a00004 (editor x11:0x3a00004)"
+      "detail": "{'activated': True, 'stderr': ''}; panel True target x11:0x3e00004 (editor x11:0x3e00004)"
     },
     {
       "id": "P-S01",
@@ -161,7 +161,7 @@
     },
     {
       "id": "P-S05",
-      "name": "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",
+      "name": "a combination another X client or the desktop holds is reported as taken, in plain words",
       "ok": true,
       "detail": "\u26a0 conflict: another application already uses this key combination (value Ctrl+Alt+Delete)"
     },
@@ -193,7 +193,7 @@
       "id": "P-S10",
       "name": "after Apply the service saved and registered it; the table says active",
       "ok": true,
-      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-6bd9733c', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-3cbe3305', 'name': 'Probe left half', 'scope': 'global'}] status=active"
     },
     {
       "id": "P-S13",
@@ -205,7 +205,7 @@
       "id": "P-S18",
       "name": "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
       "ok": true,
-      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-965a3c51', 'name': 'Probe left half (copy)', 'scope': 'global'}"
+      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-44747dc5', 'name': 'Probe left half (copy)', 'scope': 'global'}"
     },
     {
       "id": "P-S19",

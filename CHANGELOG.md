@@ -7,6 +7,18 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Added
 
+- **GNOME holds its own shortcuts while the shortcut editor listens.** The
+  extension filters Mutter's and GNOME Shell's keybindings and grabbed
+  accelerators (filter-keybinding), so a desktop combination reaches the
+  editor instead of running its action; no keyboard grab, released when the
+  editor stops listening, the service goes away or after 120 s. This is the
+  GNOME counterpart of the KDE hold.
+- **Real lock screens in the VM suite** (V07): GNOME Wayland and Xorg, Plasma
+  X11 and Wayland. The desktop's own locker sets LockedHint; Fractile reports
+  the session locked, refuses a restore and works again after unlocking.
+- **Tray and Settings in real GNOME logins** (VM panel run, Ubuntu's
+  AppIndicator extension), and an X11 workspace check (X37) under GNOME Shell
+  46 and kwin_x11.
 - **Titles are never stored for Chromium-family browsers**
   (`session.titles_never_stored_for`, Chrome, Chromium, Brave, Edge and
   Vivaldi by default). Their incognito windows carry no marker Fractile can
@@ -130,6 +142,14 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- In a real GNOME login, Ctrl+Alt+Delete pressed in the shortcut editor ran
+  GNOME's log-out action and never reached the editor (found by the GNOME VM
+  panel run; fixed by the GNOME shortcut hold).
+- On Plasma with GNOME apps installed, the shortcut editor named a GNOME
+  setting for a KDE shortcut. GNOME's keybinding settings are now read only in
+  GNOME sessions.
+- A grab refused because a GNOME setting holds the combination now names the
+  setting instead of the bare grab error.
 - **Panel-local shortcuts sometimes did nothing under KWin.** Ctrl+Left and
   the other panel shortcuts hid the panel and then asked the service to act
   on "the active window". Right after the panel hid, KWin sometimes reported

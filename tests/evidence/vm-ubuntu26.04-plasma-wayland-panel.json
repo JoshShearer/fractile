@@ -1,6 +1,6 @@
 {
   "suite": "vm-ubuntu26.04-plasma-wayland-panel",
-  "when": "2026-11-14T21:28:34+0000",
+  "when": "2026-11-15T04:02:36+0000",
   "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
   "results": [
     {
@@ -25,7 +25,7 @@
       "id": "P03",
       "name": "a second service started by hand says it is already running and leaves the running one alone (one instance)",
       "ok": true,
-      "detail": "fractiled: already running\nrc=0; service pid 5982 -> 5982"
+      "detail": "fractiled: already running\nrc=0; service pid 5798 -> 5798"
     },
     {
       "id": "P04",
@@ -49,19 +49,19 @@
       "id": "P07",
       "name": "during the drag a preview window shows the exact target, the panel keeps keyboard focus, and the window has not moved yet",
       "ok": true,
-      "detail": "preview {'h': 1154, 'w': 800, 'x': 0, 'y': 0} want {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:cb280405-4cff-4123-91ad-b7d1646a8269 (panel kwin:cb280405-4cff-4123-91ad-b7d1646a8269); window then {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-06-drag-preview.png"
+      "detail": "preview {'h': 1154, 'w': 800, 'x': 0, 'y': 0} want {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:ee18a48f-34cc-4026-9769-6b270211f174 (panel kwin:ee18a48f-34cc-4026-9769-6b270211f174); window then {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-06-drag-preview.png"
     },
     {
       "id": "P08",
       "name": "the panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active kwin:28538cdc-4756-4322-8a04-2727fb245b34"
+      "detail": "active kwin:f5bb96a4-10e1-442f-be25-706163b42da8"
     },
     {
       "id": "P09",
       "name": "Esc closes the panel without moving the window and focus returns to it",
       "ok": true,
-      "detail": "{'h': 1154, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:28538cdc-4756-4322-8a04-2727fb245b34"
+      "detail": "{'h': 1154, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:f5bb96a4-10e1-442f-be25-706163b42da8"
     },
     {
       "id": "P10",
@@ -103,7 +103,7 @@
       "id": "P16",
       "name": "starting Fractile again from the app menu opens the panel for the focused window",
       "ok": true,
-      "detail": "panel True target kwin:28538cdc-4756-4322-8a04-2727fb245b34 (editor kwin:28538cdc-4756-4322-8a04-2727fb245b34)"
+      "detail": "panel True target kwin:f5bb96a4-10e1-442f-be25-706163b42da8 (editor kwin:f5bb96a4-10e1-442f-be25-706163b42da8)"
     },
     {
       "id": "P17",
@@ -115,13 +115,13 @@
       "id": "P18",
       "name": "with the tray icon on, Fractile's icon is registered in the desktop's tray (StatusNotifierWatcher) and active",
       "ok": true,
-      "detail": "{\"registered\": true, \"service\": \":1.146\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}; tests/evidence/vm/panel-plasma-wayland-18-tray.png"
+      "detail": "{\"registered\": true, \"service\": \":1.148\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}; tests/evidence/vm/panel-plasma-wayland-18-tray.png"
     },
     {
       "id": "P19",
       "name": "a left click on the tray icon (StatusNotifierItem.Activate, what the tray sends) shows the panel for the focused window",
       "ok": true,
-      "detail": "{'activated': True, 'stderr': ''}; panel True target kwin:28538cdc-4756-4322-8a04-2727fb245b34 (editor kwin:28538cdc-4756-4322-8a04-2727fb245b34)"
+      "detail": "{'activated': True, 'stderr': ''}; panel True target kwin:f5bb96a4-10e1-442f-be25-706163b42da8 (editor kwin:f5bb96a4-10e1-442f-be25-706163b42da8)"
     },
     {
       "id": "P-S01",
@@ -160,6 +160,12 @@
       "detail": "\u26a0 already used by Fractile shortcut 'Show/hide panel'"
     },
     {
+      "id": "P-S05b",
+      "name": "a window manager keybinding (Super+Up) reaches the editor while it listens and is reported as taken",
+      "ok": true,
+      "detail": "\u26a0 conflict: Super+Up is already used by the KDE shortcut \u201cQuick Tile Window to the Top\u201d (KWin), set in System Settings > Keyboard > Shortcuts (value Super+Up)"
+    },
+    {
       "id": "P-S05",
       "name": "a combination the desktop's own settings assign (log out) is reported as taken, with where it is set",
       "ok": true,
@@ -193,7 +199,7 @@
       "id": "P-S10",
       "name": "after Apply the service saved and registered it; the table says active",
       "ok": true,
-      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-9b6ec152', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-1d2e2980', 'name': 'Probe left half', 'scope': 'global'}] status=active"
     },
     {
       "id": "P-S13",
@@ -205,7 +211,7 @@
       "id": "P-S18",
       "name": "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
       "ok": true,
-      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-aa08d91e', 'name': 'Probe left half (copy)', 'scope': 'global'}"
+      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-9fd7ed80', 'name': 'Probe left half (copy)', 'scope': 'global'}"
     },
     {
       "id": "P-S19",
