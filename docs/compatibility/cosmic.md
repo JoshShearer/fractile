@@ -111,8 +111,9 @@ would be an out-of-process Wayland client using the manager for placement and
 the info protocol for the window list and events, with the same capability
 reporting and placement verification.
 
-This proposal has **not been filed upstream yet**. That is an action for the
-maintainers (see [IMPLEMENTATION_PLAN.md](../../IMPLEMENTATION_PLAN.md)).
+Filed upstream on 2026-11-14 as
+[pop-os/cosmic-protocols#97](https://github.com/pop-os/cosmic-protocols/issues/97)
+(related: #72, a user question about scripting window moves on COSMIC).
 
 ## What COSMIC users can use today
 
