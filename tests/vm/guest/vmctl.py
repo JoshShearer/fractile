@@ -359,7 +359,10 @@ def tray_item():
               "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierWatcher", "RegisteredStatusNotifierItems").stdout
     import re
     for item in re.findall(r"'([^']+)'", out):
+        # KDE's watcher lists "<bus name>/<path>", the AppIndicator extension
+        # (Ubuntu GNOME) "<bus name>@<path>", Qt registers a bare bus name
         svc, _, path = item.partition("/")
+        svc = svc.rstrip("@")
         path = "/" + path if path else "/StatusNotifierItem"
         title = _gdbus("--dest", svc, "--object-path", path, "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierItem", "Title")
         ident = _gdbus("--dest", svc, "--object-path", path, "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierItem", "Id")
@@ -391,7 +394,8 @@ def cmd_settings_probe() -> dict:
     env = dict(ENV, PYTHONPATH="/usr/lib/fractile", PYTHONDONTWRITEBYTECODE="1",
                FRACTILE_TEST_KEYS_CMD="sudo -n python3 /home/tester/t/tests/tools/uinput_keys.py",
                QT_QPA_PLATFORM="wayland" if ENV.get("XDG_SESSION_TYPE") == "wayland" else "xcb")
-    if PLASMA and ENV.get("XDG_SESSION_TYPE") != "wayland":
+    if ENV.get("XDG_SESSION_TYPE") != "wayland":
+        # a combination the desktop itself binds (log out on GNOME and KDE)
         env["FRACTILE_PROBE_X11_HELD"] = "ctrl+alt+delete"
     os.makedirs("/tmp/shots", exist_ok=True)
     p = subprocess.run(["python3", "/home/tester/t/tests/gui/settings_probe.py", "/tmp/shots"], env=env, capture_output=True, text=True, timeout=600)

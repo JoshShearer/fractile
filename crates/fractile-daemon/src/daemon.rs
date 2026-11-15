@@ -667,7 +667,11 @@ impl Daemon {
                     json!({"free": true, "verified": true, "reason": "registered successfully (desktop bindings checked where readable)"})
                 }
             }
-            Err(e) => json!({"free": false, "verified": true, "reason": e.to_string()}),
+            // name the desktop setting when one holds it: more useful than the grab error
+            Err(e) => match desktop {
+                Some(d) => json!({"free": false, "verified": true, "reason": format!("assigned in desktop settings: {d}")}),
+                None => json!({"free": false, "verified": true, "reason": e.to_string()}),
+            },
         }
     }
 

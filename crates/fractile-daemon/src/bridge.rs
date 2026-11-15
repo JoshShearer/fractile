@@ -477,7 +477,20 @@ impl CompositorAdapter for BridgeAdapter {
     }
 
     fn block_desktop_shortcuts(&self, on: bool) -> bool {
-        self.hotkeys.lock().unwrap().clone().is_some_and(|h| h.block_all(on))
+        // KDE: KGlobalAccel's own block. GNOME: the extension filters GNOME's
+        // keybindings (hold_shortcuts); an older extension without the
+        // operation answers with an error, which means "not held".
+        if let Some(h) = self.hotkeys.lock().unwrap().clone() {
+            return h.block_all(on);
+        }
+        if self.kind != "gnome" || !self.is_attached() {
+            return false;
+        }
+        let held = self
+            .call_t("hold_shortcuts", json!({"on": on}), Duration::from_secs(1))
+            .ok()
+            .and_then(|v| v.get("held").and_then(|b| b.as_bool()));
+        held == Some(on)
     }
 
     fn set_own_windows(&self, ids: &[String]) {

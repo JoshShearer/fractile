@@ -161,6 +161,13 @@ def drive_dialog(state: dict) -> None:
     check("S04", "a combination Fractile already uses is reported by name (the panel shortcut)",
           msg.startswith("⚠") and "Show/hide panel" in msg and ed.value == "Ctrl+Alt+G", msg)
     if WAYLAND:
+        # Super+Up is a window manager keybinding (maximize on GNOME, quick
+        # tile on KDE). It only reaches the editor because the service holds
+        # the desktop's keybindings while the editor listens; without that the
+        # window manager takes it and the editor never hears about it.
+        msg = capture(ed, "super+up")
+        check("S05b", "a window manager keybinding (Super+Up) reaches the editor while it listens and is reported as taken",
+              msg.startswith("⚠") and (ed.value or "").lower() in ("super+up", "meta+up"), f"{msg} (value {ed.value})")
         # Ctrl+Alt+Delete is GNOME's log-out shortcut (media-keys) on every
         # GNOME version and distribution (Ctrl+Alt+T for the terminal is an
         # Ubuntu addition). The service reads the desktop's bindings.
@@ -177,8 +184,12 @@ def drive_dialog(state: dict) -> None:
         held = os.environ.get("FRACTILE_PROBE_X11_HELD", "ctrl+alt+shift+k")
         want = "+".join(p.capitalize() if len(p) > 1 else p.upper() for p in held.split("+"))
         msg = capture(ed, held)
-        check("S05", "a combination another X client holds is reported as taken, in plain words (live grab test by the service)",
-              msg.startswith("⚠") and "another application already uses" in msg and (ed.value or "").lower() == want.lower(), f"{msg} (value {ed.value})")
+        # The service names the desktop's own binding when it can read it
+        # (GNOME's settings, KDE's KGlobalAccel), else the live grab test
+        # says another application holds it.
+        told = "another application already uses" in msg or "assigned in desktop settings" in msg or "KDE shortcut" in msg
+        check("S05", "a combination another X client or the desktop holds is reported as taken, in plain words",
+              msg.startswith("⚠") and told and (ed.value or "").lower() == want.lower(), f"{msg} (value {ed.value})")
     msg = capture(ed, "ctrl+alt+shift+F9")
     check("S06", "a free combination is reported as available", msg.startswith("✓") and ed.value == "Ctrl+Alt+Shift+F9", msg)
     # Panel scope: navigation keys are reserved.

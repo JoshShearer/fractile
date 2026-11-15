@@ -24,6 +24,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 const PROTOCOL = 1;
 const ADAPTER_API = 1;
 const RETRY_SECONDS = 3;
+const HOLD_SECONDS = 120; // the longest the shortcut editor may hold GNOME's keybindings
 const REJECTED_RETRY_SECONDS = 30;
 const SETTLE_TIMEOUT_MS = 1500;
 // A new window is offered once Mutter shows it, or after this long anyway.
@@ -169,6 +170,8 @@ export default class FractileExtension extends Extension {
         this._settleSources = new Set();
         this._overlay = null;
         this._overlayLabel = null;
+        this._holdId = 0;
+        this._holdTimeoutId = 0;
 
         this._connectSignals();
         this._refreshOutputs();
@@ -195,6 +198,7 @@ export default class FractileExtension extends Extension {
         for (const w of [...this._unshown.keys()])
             this._dropUnshown(w);
         this._ungrabAll();
+        this._releaseHold();
         this._destroyOverlay();
         this._closeConnection();
         this._outputs = [];
@@ -271,6 +275,7 @@ export default class FractileExtension extends Extension {
     _lost(seconds = RETRY_SECONDS) {
         this._closeConnection();
         this._ungrabAll();
+        this._releaseHold();
         this._overlay?.hide();
         this._scheduleRetry(seconds);
     }
@@ -385,6 +390,7 @@ export default class FractileExtension extends Extension {
                 subscribe_events: full,
                 register_hotkey: {level: 'partial', note: 'Shortcuts are grabbed by GNOME Shell; a combination GNOME already uses cannot be grabbed.'},
                 show_overlay: {level: 'full', note: 'The placement preview is drawn by GNOME Shell; Fractile windows are positioned through this extension.'},
+                hold_shortcuts: {level: 'full', note: 'While the shortcut editor listens, GNOME keybindings are held so the pressed combination reaches it.'},
                 get_permissions: full,
             },
         };
@@ -868,6 +874,40 @@ export default class FractileExtension extends Extension {
     _ungrabAll() {
         for (const id of [...this._grabs.keys()])
             this._ungrab(id);
+    }
+
+    /** While Fractile's shortcut editor listens: GNOME's own keybindings
+     * (Mutter's and GNOME Shell's, and accelerators such as the log-out key
+     * of gnome-settings-daemon) are filtered, so the pressed combination
+     * reaches the editor instead of running its desktop action. No keyboard
+     * grab is taken. Released when the editor stops listening, when the
+     * service goes away, on disable, and after HOLD_SECONDS at the latest. */
+    _op_hold_shortcuts({on}) {
+        if (on) {
+            if (!this._holdId)
+                this._holdId = global.window_manager.connect('filter-keybinding', () => true);
+            if (this._holdTimeoutId)
+                GLib.source_remove(this._holdTimeoutId);
+            this._holdTimeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, HOLD_SECONDS, () => {
+                this._holdTimeoutId = 0;
+                this._releaseHold();
+                return GLib.SOURCE_REMOVE;
+            });
+        } else {
+            this._releaseHold();
+        }
+        return {held: this._holdId !== 0};
+    }
+
+    _releaseHold() {
+        if (this._holdTimeoutId) {
+            GLib.source_remove(this._holdTimeoutId);
+            this._holdTimeoutId = 0;
+        }
+        if (this._holdId) {
+            global.window_manager.disconnect(this._holdId);
+            this._holdId = 0;
+        }
     }
 
     // ------------------------------------------------------------ events
