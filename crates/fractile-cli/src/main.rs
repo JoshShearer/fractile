@@ -317,6 +317,9 @@ fn main() {
                 } else if integ["connected"].as_bool() == Some(false) {
                     println!("Window control:   NOT AVAILABLE: compositor integration not connected");
                     println!("                  {}", sv(&integ["hint"]));
+                } else if v["restore_without_geometry"].as_bool() == Some(true) {
+                    println!("Window control:   NOT AVAILABLE on this desktop: windows cannot be moved or resized (run 'fractile diagnose')");
+                    println!("                  Session restore reopens apps and restores workspaces and window states, not positions or sizes");
                 } else {
                     println!("Window control:   NOT AVAILABLE on this desktop (run 'fractile diagnose')");
                 }

@@ -134,7 +134,16 @@ fn make_adapter(env: &backend::Environment, forced: Option<&str>, log: &Logger) 
                 Arc::new(backend::StubAdapter::sway(e))
             }
         },
-        backend::Backend::Cosmic => Arc::new(backend::StubAdapter::cosmic()),
+        backend::Backend::Cosmic => match fractile_adapter_cosmic::CosmicAdapter::connect() {
+            Ok(a) => {
+                log.log(logging::Level::Info, &format!("COSMIC adapter connected (window list, workspaces and states; no geometry): {}", a.version()));
+                Arc::new(a)
+            }
+            Err(e) => {
+                log.log(logging::Level::Error, &format!("COSMIC adapter failed: {e}"));
+                Arc::new(backend::StubAdapter::cosmic(e))
+            }
+        },
         _ => Arc::new(backend::StubAdapter::unsupported(env)),
     }
 }

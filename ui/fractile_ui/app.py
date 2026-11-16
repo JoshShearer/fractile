@@ -230,9 +230,10 @@ class FractileApp:
                 st = data.get("state")
                 rep = data.get("report") or {}
                 n = len(rep.get("items") or [])
-                ok = sum(1 for i in rep.get("items") or [] if i.get("status") in ("ALREADY_PRESENT", "LAUNCHED_AND_PLACED", "PLACED_ONLY"))
+                ok = sum(1 for i in rep.get("items") or [] if i.get("status") in ("ALREADY_PRESENT", "LAUNCHED_AND_PLACED", "PLACED_ONLY", "RESTORED_WITHOUT_GEOMETRY"))
                 if st != "completed" or not (self.dashboard_win and self.dashboard_win.isVisible()):
-                    self.notify("Restore " + str(st), f"{ok} of {n} windows restored.")
+                    nogeo = any(i.get("status") == "RESTORED_WITHOUT_GEOMETRY" for i in rep.get("items") or [])
+                    self.notify("Restore " + str(st), f"{ok} of {n} windows restored." + (" Positions and sizes were not restored: this desktop has no way to set them." if nogeo else ""))
         elif ev in ("snapshots_changed", "layouts_changed"):
             if self.dashboard_win:
                 self.dashboard_win.reload()

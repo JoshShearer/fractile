@@ -42,6 +42,23 @@ class FirstRunWizard(QWizard):
                    "apps with their own session restore, like browsers, reopen their own tabs.")
         t.setWordWrap(True)
         v.addWidget(t)
+        st = self.app.status or {}
+        if st.get("window_control") is False:
+            if st.get("restore_without_geometry"):
+                msg = ("On this desktop Fractile cannot move or resize windows, so the panel and snapping will not work "
+                       "here. Session restore still reopens your apps and puts windows back on their workspace, "
+                       "maximized or full screen, but not at their position or size. The next page says why.")
+            else:
+                msg = ("On this desktop Fractile cannot move or resize windows, so neither the panel nor session restore "
+                       "will work here. The next page says why.")
+            w = QLabel(msg)
+            w.setWordWrap(True)
+            # A bold font, not a style sheet: a style sheet here drops the
+            # theme's text colour (black on the dark theme).
+            f = w.font()
+            f.setBold(True)
+            w.setFont(f)
+            v.addWidget(w)
         return p
 
     def _desktop(self):

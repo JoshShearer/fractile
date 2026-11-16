@@ -12,15 +12,17 @@ Platform columns:
 - **KW**: KWin 6.8.2 Wayland, virtual backend, in an Arch container
 - Plasma X11 (kwin_x11 5.27.11) is covered in CA-06, and other GNOME Shell
   versions in [PLATFORM_MATRIX.md](PLATFORM_MATRIX.md)
-- **COSMIC**: cosmic-comp on Pop!_OS 24.04
+- **COSMIC**: cosmic-comp 1.11.0 in a real COSMIC login on Arch Linux in a VM (E16); the Pop!_OS 24.04 host's cosmic-comp checked from its protocol list
 
 Test ids (X.., G.., W.., M.., D.., S.., Y.., A.., K.., P.., SEC..) are the checks recorded in
 `tests/evidence/*.json`. See [TEST_EVIDENCE.md](TEST_EVIDENCE.md). "NOT TESTED"
 on a platform means the code is shared with a platform where the check passed,
 but no check ran on this one.
 
-No platform is labeled **Divvy-equivalent** in the SRS section 16 sense: on no
-platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
+DV-01..28 are VERIFIED on X11, GW and KW. Each of these columns combines
+several versions and setups (nested, headless, containers and real logins in
+VMs), so no precise platform/version is labeled **Divvy-equivalent** in the
+SRS section 16 sense yet. On COSMIC every DV item is BLOCKED BY PLATFORM.
 
 ## Divvy parity (SRS 1)
 
@@ -81,6 +83,14 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | RS-20 | Private windows excluded | VERIFIED (X11) for Firefox 159; BLOCKED BY PLATFORM for Chromium-family browsers (see below). Firefox 159: a real private window ("... Mozilla Firefox Private Browsing") is left out of the snapshot while the two normal windows are recorded (A01e). Google Chrome 157 and the rest of the Chromium family: BLOCKED BY PLATFORM (the browser exposes no marker). A diff of every X11 property of a normal and an incognito window (`tests/tools/chrome_window_props.py`) differs only in the title, the requested position, the minimum-size hint (it follows the toolbar layout, so it is not a signal) and per-window counters; class, role, icon and window type are identical. So the window cannot be told apart and is still recorded (geometry only). To make sure nothing from it is stored, titles are never stored for Chromium-family browsers (`session.titles_never_stored_for`, on by default): with real Chrome 157 in the GNOME 46 X11 container, all three recorded windows have no title and "Secret" (the incognito window's page title) is not anywhere in the exported snapshot (A01f), and restore still places both normal windows from the one launch (A01b). Residual limitation: the incognito window's position is recorded; documented in the user guide | `e2e-x11-apps.json`, `e2e-x11-apps-gnome46-x11.json`, `chrome-window-props-gnome46-x11.json` |
 | RS-21 | No snapshot of a half-restored desktop | VERIFIED (X11): logout before the login restore starts (X28) and while a restore runs (P09) | X28, P09, `interrupted_restore_overlay` |
 
+Per-item results (SRS 6.2 step 11) use the nine statuses listed there, plus
+`CANCELLED` (the user cancelled the run, RS-12), `PENDING`/`LAUNCHING` while a
+run is in progress, and `RESTORED_WITHOUT_GEOMETRY` on a desktop that can reopen apps and set
+workspaces and states but cannot set positions or sizes (COSMIC, CA-04):
+none of the nine says "reopened, on its workspace, not positioned" without
+claiming a placement or a failure. Restore after a real reboot on COSMIC:
+C10, C11 (E16).
+
 ## Layouts, rules, extras (SRS 2.3, 2.4)
 
 | ID | Requirement | Status | Evidence |
@@ -107,7 +117,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | CA-01 | Adapter API with per-operation support levels and version negotiation | VERIFIED (W23, K00, X24, H01, bridge unit test) |
 | CA-02 | GNOME Wayland via Shell extension and restricted IPC | VERIFIED (GW) |
 | CA-03 | GNOME X11 via EWMH/RandR | VERIFIED (X11) |
-| CA-04 | COSMIC | BLOCKED BY PLATFORM: no geometry API in cosmic-comp 0.1~1793802426 (rechecked 2026-11-14; [docs/compatibility/cosmic.md](docs/compatibility/cosmic.md)). Fractile detects COSMIC and reports window control as unsupported. Upstream proposal filed as required by SRS sections 4 and 13: [pop-os/cosmic-protocols#97](https://github.com/pop-os/cosmic-protocols/issues/97) |
+| CA-04 | COSMIC | PARTIAL (real COSMIC 1.11.0 login, E16, C01-C11): the COSMIC adapter (toplevel info v3, toplevel manager v4, ext-workspace) lists windows, moves them between workspaces, sets maximized/minimized/fullscreen/sticky, and restores sessions without positions or sizes (RESTORED_WITHOUT_GEOMETRY). Placement is BLOCKED BY PLATFORM: no request in cosmic-comp 1.11.0 (rechecked 2026-11-15) or the Pop!_OS host's cosmic-comp 0.1~1793802426 sets a window's position or size ([docs/compatibility/cosmic.md](docs/compatibility/cosmic.md)); it is refused with the reason. Upstream proposal filed as required by SRS sections 4 and 13: [pop-os/cosmic-protocols#97](https://github.com/pop-os/cosmic-protocols/issues/97) |
 | CA-05 | KDE Plasma Wayland via KWin script | VERIFIED (KW, virtual backend; and a real Plasma 6.6.6 Wayland login in the Ubuntu 26.04 VM: install, script enabled, log-out, reboot, restore of 10 apps / 15 windows, 7/7) |
 | CA-06 | KDE Plasma X11 | VERIFIED: the full X11 suite (44/44) with kwin_x11 5.27.11 as the window manager (Ubuntu 24.04 container, Xvfb, no plasmashell). Plasma 6.8 (Arch) ships no X11 session, so 5.27 is the newest Plasma X11 tested |
 | CA-07 | Sway/Hyprland (optional) | Hyprland: VERIFIED nested (Hyprland 0.57.2 inside a headless KWin, H00-H26, SEC7: 28/28), in a real Hyprland 0.57.2 login on Arch in a VM (start at login, restore after log-out and reboot, hyprlock, waybar tray, launched apps without the service's restrictions: V00-V09 10/10), and a real Omarchy login (Hyprland 0.56.2, scale 1.5) checked by hand: detection, scaled monitor, shortcut conflict fallback, UI, placement from the panel; a Hyprland without the Lua configuration is not supported ([docs/compatibility/hyprland.md](docs/compatibility/hyprland.md)). Sway: VERIFIED nested (Sway 1.12 inside a headless KWin, S00-S26, SEC7: 28/28) and in a real Sway 1.11 login on Ubuntu 26.04 in a VM (start at login, restore after log-out and reboot, swaylock, swaybar tray, launched apps without the service's restrictions: V00-V09 10/10); Sway before 1.8 not supported ([docs/compatibility/sway.md](docs/compatibility/sway.md)). Other Wayland compositors reported unsupported (X24) |
@@ -131,7 +141,7 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | T01 | Drag 1x1, half, thirds, quarter, full | VERIFIED (X11, GW, KW) | G03, X04-X06, W04-W06, K04-K06 |
 | T02 | 1x1, 10x10, 20x20, no drift | VERIFIED (X11: G15); VERIFIED (GW: W04 10x10 and 20x20 placements exact, W06 1x1, W06b five alternating 20x20 placements return to the identical rectangle, PW06 Alt 20x20 drag); VERIFIED (KW: K04, K06, K06b, same checks). A single 20x20 cell smaller than a window's minimum size is fitted, not forced, and reported as constrained by the window | G15, M06, W04, W06, W06b, PW06, K04, K06, K06b |
 | T03 | Margins + gaps | VERIFIED (X11) | X25, property tests |
-| T04 | Panel by hotkey, tray, relaunch; target preserved | VERIFIED across platforms: hotkey and relaunch (X11), tray (GW, AppIndicator extension); tray on X11 not run | G01, G17, Y07 |
+| T04 | Panel by hotkey, tray, relaunch; target preserved | VERIFIED: hotkey and relaunch (X11, GW, KW); a tray click shows the panel for the focused window (GW and GNOME Xorg with the AppIndicator extension, Plasma 6.6 Wayland and 5.27 X11: P19 in real logins; Sway and Hyprland: V08) | G01, G17, Y07, P16, P19, V08 |
 | T05 | Local and global shortcuts; no ghost bindings | VERIFIED: X11 (G16, X09), GW (W09, W16), KW (K09, K17) | |
 | T06 | Shift and Alt | VERIFIED (X11) | G09, G15 |
 | T07 | Multi-monitor selection and cycle | VERIFIED (GW: M01-M05, PM02-PM04; X11 under GNOME Shell 46 and under kwin_x11, two RandR monitors: G22, G23, G25; KW with two virtual outputs: KM02 one panel per output, KM03-KM04 exact drag and preview on the second output, KM05 the repeated shortcut cycles a, b, a) | M01-M05, G22-G25, PM02-PM04, KM02-KM05 |
@@ -144,8 +154,8 @@ platform are all of DV-01..28 VERIFIED. The gaps are listed per row.
 | T14 | Browser/IDE native session restore | VERIFIED (X11) with real Firefox 159, Google Chrome 157 and VS Code 1.145 on throwaway profiles: after the app quits, a restore launches it once, it reopens its own two windows, both go back to where they were, no extra windows, nothing claimed about tabs or unsaved content, a second restore launches nothing (A01-A03). Such apps are on a built-in list that starts them once; the per-app setting overrides it. GW and KW not run | `e2e-x11-apps.json` |
 | T15 | Crash during snapshot write | VERIFIED (E10, simulated power loss: QEMU `system_reset` during back-to-back snapshot writes, twice): SQLite integrity check ok and every listed snapshot (580, then 858) reads back with a valid checksum (PC01, PC03); corrupt-row fallback (unit) | PC01, PC03 |
 | T16 | Crash during restore + retry | VERIFIED (X11) | X21 |
-| T17 | Unsupported compositor / extension failure | VERIFIED | X24, W16, K00, K14 |
-| T18 | COSMIC auto-tiling | BLOCKED BY PLATFORM: no window control on COSMIC; Fractile never touches tiling settings | |
+| T17 | Unsupported compositor / extension failure | VERIFIED: missing or mismatched integration (X24, W16, W23, K00, K14); COSMIC in a real login says placement is not available and why, refuses it, moves nothing and claims no placement (C02, C04, C08, C10) | X24, W16, K00, K14, C02-C11 |
+| T18 | COSMIC auto-tiling | VERIFIED (real COSMIC 1.11.0 login with auto-tiling on, E16): detected and reported; no file under `~/.config/cosmic` changed while Fractile listed, refused, moved a window to a workspace, maximized it and saved (C05). There is no fight loop because Fractile cannot place windows on COSMIC | C02, C05 |
 | T19 | Shell/KWin upgrade: mismatch detected, fix offered | VERIFIED (GW: W23; both bridges: unit test); KW E2E not run | |
 | T20 | Unicode names, title changes, transient dialogs | VERIFIED (X11): a Unicode title is listed exactly, recorded, restored, and left out of redacted exports and logs (X29a, X29); a window retitled after the snapshot keeps its identity (X30); a transient dialog is never offered, recorded or moved (X31); GW: dialogs excluded (W15) | X29-X31, W15, G12 |
 | T21 | Logout with unsaved document: no false promise | VERIFIED by inspection: UI, CLI and docs state that contents are not restored; snapshots record `restore_content: application_managed` | |

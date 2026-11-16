@@ -38,6 +38,14 @@ struct Sim {
     fought: RefCell<std::collections::HashSet<String>>,
     next_id: RefCell<u32>,
     can_move: bool,
+    /// No window control at all (an unsupported desktop): nothing listed,
+    /// nothing moved.
+    no_control: bool,
+    /// The desktop refuses every state change.
+    reject_state: bool,
+    /// The desktop applies a state change but does not confirm it in time
+    /// (COSMIC, window on a workspace not in view).
+    late_state: bool,
 }
 
 fn out(id: &str, x: i32, w: i32) -> Output {
@@ -59,6 +67,9 @@ impl Sim {
             fought: RefCell::new(Default::default()),
             next_id: RefCell::new(1),
             can_move: true,
+            no_control: false,
+            reject_state: false,
+            late_state: false,
         }
     }
     fn app(mut self, desktop: &str, wpl: u32, delay_ms: u64, fights: bool, titles: &[&str]) -> Sim {
@@ -107,6 +118,11 @@ impl RestoreHost for Sim {
         if !self.can_move {
             ops.insert(Operation::MoveResize, SupportLevel::Unsupported("sim".into()));
         }
+        if self.no_control {
+            for op in Operation::ALL {
+                ops.insert(op, SupportLevel::Unsupported("sim".into()));
+            }
+        }
         Capabilities { adapter: "sim".into(), adapter_version: "0".into(), api_version: 1, session_type: "sim".into(), compositor: "sim".into(), compositor_version: None, operations: ops, tiling_manager: None, notes: vec![] }
     }
     fn windows(&self) -> Result<Vec<WindowInfo>, String> {
@@ -142,9 +158,15 @@ impl RestoreHost for Sim {
         Ok(PlacementOutcome { window_id: id.into(), requested: rect, observed: Some(rect), max_error_px: Some(0), within_tolerance: true, attempts: 1, note: None })
     }
     fn set_state(&self, id: &str, s: &WindowState) -> Result<(), String> {
+        if self.reject_state {
+            return Err("rejected by the desktop".into());
+        }
         let mut ws = self.windows.borrow_mut();
         let w = ws.iter_mut().find(|w| w.id == id).ok_or("gone")?;
         w.state = *s;
+        if self.late_state {
+            return Err("not confirmed yet".into());
+        }
         Ok(())
     }
     fn move_to_workspace(&self, id: &str, n: u32) -> Result<(), String> {
@@ -221,6 +243,7 @@ fn opts(cfg: &Config) -> RunOptions {
     o.total_timeout = Duration::from_secs(10);
     o.stabilization = Duration::from_millis(400);
     o.instance_settle = Duration::from_millis(200);
+    o.state_confirm = Duration::from_millis(600);
     o
 }
 
@@ -456,7 +479,7 @@ fn crash_and_retry_is_idempotent() {
 fn unsupported_adapter_reports_honestly() {
     let outs = vec![out("A", 0, 2560)];
     let mut sim = Sim::new(outs.clone()).app("x.desktop", 1, 10, false, &[]);
-    sim.can_move = false;
+    sim.no_control = true;
     let cfg = Config::default();
     let s = snapshot(outs, vec![rec("r0", "x.desktop", "x", 0, "A", Rect::new(0, 32, 10, 10), WA_A)]);
     let o = opts(&cfg);
@@ -465,6 +488,118 @@ fn unsupported_adapter_reports_honestly() {
     let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
     assert_eq!(rep.items[0].status, ItemStatus::Unsupported);
     assert!(sim.launches.borrow().is_empty());
+}
+
+/// A desktop that lists windows and moves them between workspaces but cannot
+/// set geometry (COSMIC): approved apps are reopened once, windows go back
+/// to their workspace and maximized state, nothing is moved or resized, and
+/// each item says so (RESTORED_WITHOUT_GEOMETRY, never "placed"). A retry
+/// launches nothing more.
+#[test]
+fn restore_without_geometry_reopens_and_sets_workspace_only() {
+    let outs = vec![out("A", 0, 2560)];
+    let mut sim = Sim::new(outs.clone()).app("x.desktop", 1, 10, false, &[]).app("y.desktop", 1, 10, false, &[]);
+    sim.can_move = false;
+    let open = sim.open("y.desktop", "y");
+    let cfg = Config::default();
+    let mut rx = rec("r0", "x.desktop", "x", 0, "A", Rect::new(0, 32, 1280, 1408), WA_A);
+    rx.workspace_id = Some("ws-2".into());
+    rx.state.maximized = true;
+    let mut ry = rec("r1", "y.desktop", "y", 0, "A", Rect::new(1280, 32, 1280, 1408), WA_A);
+    ry.workspace_id = Some("ws-1".into());
+    let s = snapshot(outs, vec![rx, ry]);
+    let mut o = opts(&cfg);
+    o.approve_all = true;
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    assert!(p.warnings.iter().any(|w| w.contains("not to their position or size")), "{:?}", p.warnings);
+    assert_eq!(p.items[0].action, PlannedAction::WillReopen);
+    assert_eq!(p.items[1].action, PlannedAction::AlreadyOpen);
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    for it in &rep.items {
+        assert_eq!(it.status, ItemStatus::RestoredWithoutGeometry, "{it:?}");
+        assert!(it.message.as_deref().unwrap_or("").contains("position and size not restored"), "{it:?}");
+    }
+    assert_eq!(*sim.launches.borrow(), vec!["x.desktop".to_string()]);
+    let ws = sim.windows.borrow().clone();
+    let x = ws.iter().find(|w| w.desktop_file_id.as_deref() == Some("x.desktop")).unwrap();
+    assert_eq!(x.workspace, Some(2));
+    assert!(x.state.maximized);
+    assert_eq!(x.frame, Rect::new(100, 100, 800, 600), "nothing may be moved or resized");
+    let y = ws.iter().find(|w| w.id == open).unwrap();
+    assert_eq!(y.workspace, Some(1));
+    assert_eq!(y.frame, Rect::new(100, 100, 800, 600));
+    // Retry of the same run: everything done already, no second launch.
+    let mut o2 = o.clone();
+    o2.previous = rep.items.iter().map(|i| (i.record_id.clone(), (i.status, i.window_id.clone(), i.launched))).collect();
+    let p2 = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o2, &cfg).unwrap();
+    assert!(p2.items.iter().all(|i| i.action == PlannedAction::AlreadyDone));
+    execute(&p2, &sim, &o2, &AtomicBool::new(false));
+    assert_eq!(sim.launches.borrow().len(), 1);
+}
+
+/// Without geometry, a state the desktop refuses makes the item fail
+/// (FAILED for a window that was open, LAUNCHED_UNPLACED for one Fractile
+/// started), with what was and was not done in the message; never a success.
+#[test]
+fn restore_without_geometry_reports_a_refused_state_as_failed() {
+    let outs = vec![out("A", 0, 2560)];
+    let mut sim = Sim::new(outs.clone()).app("x.desktop", 1, 10, false, &[]).app("y.desktop", 1, 10, false, &[]);
+    sim.can_move = false;
+    sim.reject_state = true;
+    sim.open("y.desktop", "y");
+    let cfg = Config::default();
+    let mut rx = rec("r0", "x.desktop", "x", 0, "A", Rect::new(0, 32, 1280, 1408), WA_A);
+    rx.workspace_id = Some("ws-2".into());
+    rx.state.maximized = true;
+    let mut ry = rec("r1", "y.desktop", "y", 0, "A", Rect::new(1280, 32, 1280, 1408), WA_A);
+    ry.workspace_id = Some("ws-1".into());
+    ry.state.maximized = true;
+    let s = snapshot(outs, vec![rx, ry]);
+    let mut o = opts(&cfg);
+    o.approve_all = true;
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    let by = |id: &str| rep.items.iter().find(|i| i.record_id == id).unwrap().clone();
+    let (x, y) = (by("r0"), by("r1"));
+    assert_eq!(x.status, ItemStatus::LaunchedUnplaced, "{x:?}");
+    assert_eq!(y.status, ItemStatus::Failed, "{y:?}");
+    for it in [&x, &y] {
+        let m = it.message.as_deref().unwrap_or("");
+        assert!(m.contains("not done: state") && m.contains("position and size not restored"), "{m}");
+        assert!(!it.status.is_success());
+    }
+    assert!(x.message.as_deref().unwrap().contains("moved to workspace 3"), "{x:?}");
+    assert_eq!(sim.launches.borrow().len(), 1);
+}
+
+/// Without geometry, a state the desktop confirms only after the request
+/// returned (COSMIC, a window on a workspace not in view) is checked again at
+/// the end of the run and then reported restored, with no second launch.
+#[test]
+fn restore_without_geometry_accepts_a_state_confirmed_late() {
+    let outs = vec![out("A", 0, 2560)];
+    let mut sim = Sim::new(outs.clone()).app("x.desktop", 1, 10, false, &[]);
+    sim.can_move = false;
+    sim.late_state = true;
+    let cfg = Config::default();
+    let mut rx = rec("r0", "x.desktop", "x", 0, "A", Rect::new(0, 32, 1280, 1408), WA_A);
+    rx.workspace_id = Some("ws-1".into());
+    rx.state.maximized = true;
+    let s = snapshot(outs, vec![rx]);
+    let mut o = opts(&cfg);
+    o.approve_all = true;
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    let it = &rep.items[0];
+    assert_eq!(it.status, ItemStatus::RestoredWithoutGeometry, "{it:?}");
+    let m = it.message.as_deref().unwrap_or("");
+    assert!(m.contains("moved to workspace 2") && m.contains("state restored (confirmed by the desktop") && m.contains("position and size not restored"), "{m}");
+    assert!(!m.contains("not done"), "{m}");
+    let ws = sim.windows.borrow().clone();
+    let x = ws.iter().find(|w| w.desktop_file_id.as_deref() == Some("x.desktop")).unwrap();
+    assert_eq!(x.workspace, Some(1));
+    assert!(x.state.maximized);
+    assert_eq!(sim.launches.borrow().len(), 1);
 }
 
 /// Cancellation stops waiting and reports CANCELLED.

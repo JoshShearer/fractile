@@ -4,6 +4,8 @@
 #     (plasma-wayland and sway on Ubuntu 26.04; the others on Ubuntu 24.04)
 #   tests/vm/vm-e2e.sh hyprland path/to/fractile-*.pkg.tar.zst
 #     (Arch Linux: its cloud image, Hyprland, GDM; the Arch package)
+#   tests/vm/vm-e2e.sh cosmic path/to/fractile-*.pkg.tar.zst
+#     (Arch Linux with COSMIC: the degraded mode, T17/T18)
 #   tests/vm/vm-e2e.sh provision [session]  (only build the cached base image)
 #   tests/vm/vm-e2e.sh soak [minutes]   (T27 soak in the VM, detached; default 1440)
 # Needs docker and read/write access to /dev/kvm; no root. The first run
@@ -11,7 +13,7 @@
 # the desktop into a cached base image (docker volume fractile-vm-cache,
 # about 8 GB). Each run then uses a throwaway copy-on-write disk.
 set -euo pipefail
-what=${1:?wayland, x11, plasma-x11, plasma-wayland, sway, hyprland, soak or provision}
+what=${1:?wayland, x11, plasma-x11, plasma-wayland, sway, hyprland, cosmic, soak or provision}
 root=$(cd "$(dirname "$0")/../.." && pwd)
 if [[ $what != soak && $what != provision ]]; then
   deb=${2:-$(ls "$root"/packaging/build/fractile_*_amd64.deb | tail -1)}

@@ -189,10 +189,13 @@ class RecoveryDialog(QDialog):
         elif ev == "restore_finished":
             rep = data.get("report") or {}
             items = rep.get("items") or []
-            ok = [i for i in items if i.get("status") in ("ALREADY_PRESENT", "LAUNCHED_AND_PLACED", "PLACED_ONLY")]
+            ok = [i for i in items if i.get("status") in ("ALREADY_PRESENT", "LAUNCHED_AND_PLACED", "PLACED_ONLY", "RESTORED_WITHOUT_GEOMETRY")]
             bad = [i for i in items if i not in ok and not i.get("excluded")]
             self.prog.setValue(self.prog.maximum())
             lines = [f"Done: {len(ok)} of {len(items)} windows restored."]
+            if any(i.get("status") == "RESTORED_WITHOUT_GEOMETRY" for i in items):
+                lines.append("Apps were reopened and windows put back on their workspace, but not at their position or size: "
+                             "this desktop has no way to set them.")
             for i in bad[:8]:
                 lines.append(f"• {i['label']}: {i['status'].replace('_', ' ').lower()}" + (f" ({i['message']})" if i.get("message") else ""))
             self.sub.setText("\n".join(lines))

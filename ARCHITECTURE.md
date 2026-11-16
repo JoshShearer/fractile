@@ -18,7 +18,7 @@ overview, the adapter model and the decision records.
  │ fractile CLI │───────┘               │   identity, snapshot/layout schemas  │
  └──────────────┘                       │  CompositorAdapter (one active):     │
                                         │   x11 │ gnome bridge │ kwin bridge │ │
-                                        │   stub (cosmic / unknown Wayland)    │
+                                        │   cosmic (no geometry) │ stub        │
                                         └────────┬───────────────┬─────────────┘
                      same socket, bridge_attach  │               │ session D-Bus io.fractile.Bridge1
                          ┌───────────────────────▼──┐   ┌────────▼───────────────┐
@@ -56,7 +56,7 @@ assumes an operation exists. Errors are typed (`unsupported`, `not_found`,
 | `x11` | in-process, `adapters/x11` (x11rb) | GNOME/Mutter X11 VERIFIED (nested); Openbox smoke |
 | `gnome` | `BridgeAdapter` in the daemon + `adapters/gnome-shell/fractile@fractile.io` | GNOME 46 Wayland VERIFIED (headless) |
 | `kwin` | `BridgeAdapter` + `kwin_dbus.rs` + `adapters/kwin/fractile` + `kglobalaccel.rs` | KWin 6.8.2 Wayland VERIFIED (container, virtual backend) |
-| `cosmic` | `StubAdapter`: every operation unsupported, with the reason | BLOCKED BY PLATFORM |
+| `cosmic` | in-process Wayland client, `adapters/cosmic` (cosmic-protocols toplevel info v3 / manager v4, ext-workspace); move/resize unsupported with the reason; `StubAdapter` if the protocols are missing | COSMIC 1.11.0 PARTIAL (real login in a VM): window list, workspaces, states, restore without geometry; placement BLOCKED BY PLATFORM |
 | `none` | `StubAdapter` for unknown Wayland compositors | reports unsupported, never fakes support |
 
 ## Decision records
@@ -106,9 +106,12 @@ each item under a run id, so a crash mid-restore resumes without duplicate
 launches (X21). Launching is opt-in per app, and imports force `ask`.
 
 **ADR-7: Never imitate unsupported platforms.**
-On COSMIC and unknown Wayland compositors, Fractile reports "unsupported" with
-the reason. It does not approximate grid placement with maximize or workspace
-moves, and it never changes tiling settings.
+On COSMIC, move/resize is reported "unsupported" with the reason; on unknown
+Wayland compositors every operation is. Fractile does not approximate grid
+placement with maximize or workspace moves, and it never changes tiling
+settings. Where COSMIC offers an operation for what it is (workspace moves,
+maximize), Fractile uses it, and a restore that could not set positions or
+sizes says so per item (`RESTORED_WITHOUT_GEOMETRY`).
 
 **ADR-8: Automatic snapshots never record a half-restored desktop as if it were the user's.**
 Periodic snapshots are skipped while a restore is pending or running. At exit:

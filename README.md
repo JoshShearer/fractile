@@ -14,10 +14,13 @@ launches apps you approved.
   KDE Plasma on Wayland (needs the bundled KWin script), Hyprland with a Lua configuration (0.56 or later)
   and Sway 1.8 or later (through their own IPC; placed windows become
   floating), and X11 window managers.
-- **Does not work on:** COSMIC. It offers no API for moving other programs'
-  windows; see [docs/compatibility/cosmic.md](docs/compatibility/cosmic.md).
-  Other Wayland compositors (river, Wayfire, labwc, ...) are not supported
-  either. Fractile says so instead of pretending.
+- **Partly works on:** COSMIC. It offers no API for moving or resizing other
+  programs' windows, so the grid panel and snapping do not work there.
+  Session restore does, without positions or sizes: apps are reopened and
+  windows go back to their workspace, maximized or not. See
+  [docs/compatibility/cosmic.md](docs/compatibility/cosmic.md).
+- **Does not work on:** other Wayland compositors (river, Wayfire, labwc,
+  ...). Fractile says so instead of pretending.
 - **Does not restore window contents.** Unsaved documents, tabs and terminal
   sessions come back only if the application restores them itself.
 

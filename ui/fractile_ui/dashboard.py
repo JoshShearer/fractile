@@ -314,6 +314,8 @@ class DashboardWindow(QWidget):
             self.cancel_b.setVisible(False)
             rep = data.get("report") or {}
             items = rep.get("items") or []
-            ok = sum(1 for i in items if i.get("status") in ("ALREADY_PRESENT", "LAUNCHED_AND_PLACED", "PLACED_ONLY"))
-            self.prog_lbl.setText(f"Restore {data.get('state')}: {ok} of {len(items)} windows restored in {rep.get('duration_ms', 0) / 1000:.1f} s")
+            ok = sum(1 for i in items if i.get("status") in ("ALREADY_PRESENT", "LAUNCHED_AND_PLACED", "PLACED_ONLY", "RESTORED_WITHOUT_GEOMETRY"))
+            nogeo = any(i.get("status") == "RESTORED_WITHOUT_GEOMETRY" for i in items)
+            self.prog_lbl.setText(f"Restore {data.get('state')}: {ok} of {len(items)} windows restored in {rep.get('duration_ms', 0) / 1000:.1f} s"
+                                  + (" (not at their position or size: this desktop has no way to set them)" if nogeo else ""))
             self.reload()

@@ -221,6 +221,9 @@ pub fn status(d: &Daemon) -> Value {
         "desktop": d.env.current_desktop,
         "adapter": caps.adapter,
         "window_control": caps.supports(fractile_core::adapter::Operation::MoveResize),
+        // Window placement is not possible, but restore can still reopen
+        // apps and put windows back on their workspace (COSMIC).
+        "restore_without_geometry": fractile_session::restore::without_geometry(&caps),
         "global_shortcuts": caps.supports(fractile_core::adapter::Operation::RegisterHotkey),
         "tiling_manager": d.tiling,
         "restore_policy": cfg.session.policy,

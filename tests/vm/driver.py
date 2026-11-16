@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import shlex
+import shutil
 import hashlib
 import json
 import socket
@@ -47,9 +48,10 @@ GUEST_TOOL = "/src/tests/vm/guest/vmctl.py"
 # session -> (GDM session name, logind session type, the shell process)
 SESSIONS = {"wayland": ("ubuntu", "wayland", "gnome-shell"), "x11": ("ubuntu-xorg", "x11", "gnome-shell"),
             "plasma-x11": ("plasma", "x11", "plasmashell"), "plasma-wayland": ("plasma", "wayland", "plasmashell"),
-            "sway": ("sway", "wayland", "sway"), "hyprland": ("hyprland", "wayland", "Hyprland")}
+            "sway": ("sway", "wayland", "sway"), "hyprland": ("hyprland", "wayland", "Hyprland"),
+            "cosmic": ("cosmic", "wayland", "cosmic-comp")}
 # The Ubuntu release each session runs on.
-SESSION_RELEASE = {"wayland": "noble", "x11": "noble", "plasma-x11": "noble", "plasma-wayland": "resolute", "sway": "resolute", "hyprland": "arch"}
+SESSION_RELEASE = {"wayland": "noble", "x11": "noble", "plasma-x11": "noble", "plasma-wayland": "resolute", "sway": "resolute", "hyprland": "arch", "cosmic": "arch"}
 PLASMA_VERSIONS = "dpkg-query -W -f='${Package} ${Version}; ' plasma-workspace kwin-wayland kwin-x11 2>/dev/null"
 APT = ("sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 -o Acquire::http::Timeout=60")
 APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-editor gnome-calculator "
@@ -61,6 +63,10 @@ APPS_PKGS = ("ubuntu-desktop-minimal linux-generic gnome-terminal gnome-text-edi
 ARCH_PKGS = ("hyprland hyprlock hypridle waybar gdm mesa noto-fonts ttf-dejavu xdg-desktop-portal-hyprland "
              "gnome-terminal gnome-text-editor gnome-calculator gnome-system-monitor gnome-characters gnome-clocks "
              "baobab gnome-disk-utility gnome-font-viewer nautilus python python-gobject")
+# Arch with COSMIC (cosmic-session pulls in the whole desktop) for the
+# degraded-mode check (T17, T18): no window control, said so, nothing faked.
+# vulkan-swrast provides the session's vulkan-driver dependency in a VM.
+COSMIC_PKGS = ("cosmic-session vulkan-swrast gdm mesa noto-fonts ttf-dejavu gnome-text-editor python python-gobject")
 ARCH_IMG = "https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2"
 
 HOLD = 0
@@ -143,7 +149,7 @@ def ssh_key() -> Path:
     return k
 
 
-def seed_arch(path: Path) -> Path:
+def seed_arch(path: Path, pkgs: str = ARCH_PKGS) -> Path:
     pub = (ssh_key().with_suffix(".pub")).read_text().strip()
     ud = f"""#cloud-config
 hostname: fractile-vm
@@ -158,7 +164,7 @@ users:
 ssh_pwauth: false
 runcmd:
   - pacman-key --init && pacman-key --populate archlinux
-  - for i in 1 2 3; do pacman -Syu --noconfirm --needed {ARCH_PKGS} > /var/log/fractile-pacman.log 2>&1 && touch /var/lib/fractile-apps-installed && break; sleep 30; done
+  - for i in 1 2 3; do pacman -Syu --noconfirm --needed {pkgs} > /var/log/fractile-pacman.log 2>&1 && touch /var/lib/fractile-apps-installed && break; sleep 30; done
   - systemctl enable gdm.service
   - systemctl set-default graphical.target
   - test -e /var/lib/fractile-apps-installed && echo FRACTILE-PROVISION-OK > /dev/ttyS0 || (tail -20 /var/log/fractile-pacman.log > /dev/ttyS0; echo FRACTILE-PROVISION-FAILED > /dev/ttyS0)
@@ -174,17 +180,17 @@ power_state:
     return path
 
 
-def ensure_arch_base() -> Path:
-    out = CACHE / "base-arch-hyprland.qcow2"
+def ensure_arch_base(name: str = "hyprland", pkgs: str = ARCH_PKGS) -> Path:
+    out = CACHE / f"base-arch-{name}.qcow2"
     if out.exists():
         return out
     img = ensure_arch_image()
-    tmp = CACHE / "base-arch-hyprland.part.qcow2"
+    tmp = CACHE / f"base-arch-{name}.part.qcow2"
     subprocess.run(["qemu-img", "convert", "-O", "qcow2", str(img), str(tmp)], check=True)
     subprocess.run(["qemu-img", "resize", str(tmp), "24G"], check=True)
-    sd = seed_arch(Path("/tmp/seed-arch.img"))
-    say("provisioning the Arch image: Hyprland, GDM, hyprlock, hypridle, waybar and the test apps (cloud-init)")
-    serial = CACHE / "provision-arch-serial.log"
+    sd = seed_arch(Path("/tmp/seed-arch.img"), pkgs)
+    say(f"provisioning the Arch {name} image: {pkgs} (cloud-init)")
+    serial = CACHE / f"provision-arch-{name}-serial.log"
     p = subprocess.Popen(qemu_cmd(tmp, sd, serial))
     try:
         p.wait(timeout=3600)
@@ -195,7 +201,7 @@ def ensure_arch_base() -> Path:
         tmp.unlink(missing_ok=True)
         raise SystemExit(f"Arch provisioning failed (no success marker from cloud-init); see {serial}")
     tmp.rename(out)
-    say("Arch Hyprland image ready")
+    say(f"Arch {name} image ready")
     return out
 
 
@@ -654,6 +660,8 @@ def base_for(session: str) -> Path:
         return ensure_sway_base(rel)
     if session == "hyprland":
         return ensure_arch_base()
+    if session == "cosmic":
+        return ensure_arch_base("cosmic", COSMIC_PKGS)
     return ensure_plasma_base(rel) if session.startswith("plasma") else ensure_base(rel)
 
 
@@ -886,6 +894,195 @@ def run(session: str, deb: str) -> None:
         (EVID / "vm" / f"{session}-fractile-log.txt").write_text(logs)
     finally:
         vm.stop()
+
+
+def screen_changed(a: str, b: str, top: int = 60) -> float:
+    """Fraction of pixels that differ between two screenshots, below the
+    top panel (its clock changes on its own)."""
+    from PIL import Image, ImageChops
+    ia, ib = Image.open(a).convert("RGB"), Image.open(b).convert("RGB")
+    w, h = ia.size
+    box = (0, top, w, h)
+    diff = ImageChops.difference(ia.crop(box), ib.crop(box)).convert("L").point(lambda v: 255 if v > 24 else 0)
+    return sum(1 for v in diff.getdata() if v) / ((h - top) * w)
+
+
+def settled_shot(vm: VM, name: str, timeout: float = 60) -> str:
+    """A screenshot once the screen has stopped changing (a window that is
+    still opening, or being tiled, would otherwise count as a change)."""
+    prev, end = None, time.time() + timeout
+    while True:
+        cur = vm.screenshot(name)
+        if cur.startswith("(") or time.time() > end:
+            return cur
+        local = cur.replace("tests/evidence/", "/evidence/", 1)
+        if prev and screen_changed(prev, local) < 0.0005:
+            return cur
+        prev = f"/tmp/settle-{name}.png"
+        shutil.copy(local, prev)
+        time.sleep(2)
+
+
+def run_cosmic(deb: str) -> None:
+    """T17/T18 and SRS Phase 5 in a real COSMIC login. COSMIC has no client
+    API to move or resize other apps' windows: Fractile must say so (status,
+    diagnose, the tray click), refuse placing and snapping with the reason,
+    change nothing on screen and claim no placement. What COSMIC does offer
+    (the window list, workspace moves, maximize) is used: a session restore
+    after a real reboot reopens the approved app once and puts it back on its
+    workspace, maximized, reported as RESTORED_WITHOUT_GEOMETRY. COSMIC's
+    settings are never touched (auto-tiling is on here, as a user who tiles
+    would have it)."""
+    session = "cosmic"
+    vm = VM(base_for(session), "run-cosmic")
+    try:
+        if not check("V00", "the VM boots and answers over ssh", vm.wait_ssh(600)):
+            return
+        gdm_and_session(vm, session)
+        vm.scp(deb, "/tmp/fractile.pkg.tar.zst")
+        vm.scp(GUEST_TOOL, "/home/tester/vmctl.py")
+        rel = vm.ssh(". /etc/os-release; echo $PRETTY_NAME; pacman -Q cosmic-comp cosmic-session; uname -r").stdout.strip().replace("\n", "; ")
+        # COSMIC's own setting (Settings > Desktop > Workspaces > auto-tile),
+        # as cosmic-config stores it.
+        vm.ssh("mkdir -p ~/.config/cosmic/com.system76.CosmicComp/v1 && printf true > ~/.config/cosmic/com.system76.CosmicComp/v1/autotile", check_rc=True)
+        inst = vm.ssh("for i in 1 2 3; do sudo pacman -U --noconfirm /tmp/fractile.pkg.tar.zst > /tmp/pacman.log 2>&1 && break; "
+                      "echo \"attempt $i failed\"; sleep 30; sudo pacman -Sy --noconfirm > /dev/null 2>&1; done; tail -4 /tmp/pacman.log; pacman -Q fractile", timeout=1800)
+        check("V01", "pacman installs the Arch package (dependencies from the Arch repositories)",
+              inst.returncode == 0 and "fractile 0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
+
+        vm.ssh("sudo systemctl reboot", timeout=20)
+        vm.wait_down()
+        vm.wait_ssh(600)
+        s1 = wait_session_shell(vm, "wayland")
+        hold("login")
+        if not check("C01", "a real COSMIC login: GDM logs in to the COSMIC session and cosmic-comp runs",
+                     bool(s1.get("shell_pid")) and "COSMIC" in (s1.get("desktop") or ""),
+                     f"{rel}; session {s1.get('graphical_session')} desktop {s1.get('desktop')} display {s1.get('display')} cosmic-comp pid {s1.get('shell_pid')}"):
+            vm.screenshot("cosmic-00-no-login")
+            return
+        vm.vmctl("launch io.fractile.Fractile.desktop")
+        up = wait_for(lambda: vm.ssh("test -S /run/user/$(id -u)/fractile/fractile.sock").returncode == 0, 60)
+        setup = vm.vmctl("setup")
+        b = vm.vmctl("cosmic-before", timeout=300)
+        st = b.get("status") or {}
+        reason = "no client API to move or resize"
+        check("C02", "started from the app menu, Fractile runs with the COSMIC adapter and says what it can do: window placement not available "
+                     "(the reason in diagnose), session restore without positions or sizes, COSMIC auto-tiling detected",
+              bool(up) and st.get("adapter") == "cosmic" and st.get("window_control") is False and st.get("restore_without_geometry") is True
+              and st.get("tiling_manager") == "cosmic-autotile"
+              and "NOT AVAILABLE" in (b.get("status_text") or "") and reason in (b.get("diagnose") or ""),
+              f"socket {bool(up)}; setup {json.dumps(setup)[:200]}; adapter {st.get('adapter')} window_control {st.get('window_control')} "
+              f"restore_without_geometry {st.get('restore_without_geometry')} tiling {st.get('tiling_manager')}; "
+              f"status: {(b.get('status_text') or '')[:400]!r}; diagnose rc {b.get('diagnose_rc')}: {(b.get('diagnose') or '')[:600]!r}")
+        shot_a = settled_shot(vm, "cosmic-01-before")
+        t = vm.vmctl("cosmic-try", timeout=300)
+        time.sleep(2)
+        shot_b = settled_shot(vm, "cosmic-02-after")
+        outs = (t.get("list-outputs") or {}).get("json") or []
+        eds = t.get("editors") or []
+        wss = (t.get("workspaces") or {}).get("result") or []
+
+        def inside(fr, o):
+            g = o.get("rect") or {}
+            return bool(fr and g) and g["x"] <= fr["x"] and g["y"] <= fr["y"] and fr["x"] + fr["w"] <= g["x"] + g["w"] + 1 and fr["y"] + fr["h"] <= g["y"] + g["h"] + 1
+        ed0 = eds[0] if eds else {}
+        check("C03", "the COSMIC adapter lists the monitor, the workspaces and the text editor window (its app, workspace and a frame on the monitor)",
+              (t.get("list-windows") or {}).get("rc") == 0 and len(outs) >= 1 and len(eds) == 1 and len(wss) >= 2
+              and ed0.get("workspace") == 0 and any(inside(ed0.get("frame"), o) for o in outs),
+              f"outputs {[(o.get('stable_id'), o.get('rect')) for o in outs]}; workspaces {wss}; "
+              f"editor {[(e.get('id'), e.get('desktop_file_id'), e.get('workspace'), e.get('frame'), e.get('state')) for e in eds]}; "
+              f"list-windows rc {(t.get('list-windows') or {}).get('rc')} {(t.get('list-windows') or {}).get('stderr', '')[:200]!r}")
+        refused = {k: (t.get(k) or {}).get("rc") != 0 and reason in ((t.get(k) or {}).get("stderr", "") + (t.get(k) or {}).get("stdout", ""))
+                   for k in ("place", "snap")}
+        ok_shots = not (shot_a.startswith("(") or shot_b.startswith("("))
+        frac = screen_changed(*(x.replace("tests/evidence/", "/evidence/", 1) for x in (shot_a, shot_b))) if ok_shots else 1.0
+        check("C04", "no false success (T17): placing and snapping fail with the reason, and nothing moved (the screen below the panel clock is the same)",
+              all(refused.values()) and b.get("editor") and frac < 0.002,
+              f"refused with the reason {refused}; text editor open {b.get('editor')}; {frac:.5f} of pixels changed; {shot_a}, {shot_b}; "
+              + "; ".join(f"{k}: {((t.get(k) or {}).get('stderr') or (t.get(k) or {}).get('stdout') or '')[:200]!r}" for k in ("place", "snap")))
+
+        tray = vm.vmctl("tray")
+        check("C06", "the tray icon is registered with COSMIC's panel (StatusNotifierItem)", tray.get("registered") and "Active" in (tray.get("status") or ""),
+              json.dumps(tray)[:300])
+        # A click on the tray icon (what the panel's status area sends) must
+        # show something: here, that windows cannot be placed and why.
+        before_click = settled_shot(vm, "cosmic-03-before-tray-click")
+        act = vm.vmctl("tray-activate")
+        time.sleep(3)
+        after_click = settled_shot(vm, "cosmic-04-tray-click")
+        ok_shots = not (before_click.startswith("(") or after_click.startswith("("))
+        shown = screen_changed(*(x.replace("tests/evidence/", "/evidence/", 1) for x in (before_click, after_click))) if ok_shots else 0.0
+        check("C08", "a click on the tray icon shows a window that says windows cannot be placed on this desktop (no silent nothing, no grid that cannot work)",
+              act.get("activated") and shown > 0.01, f"activated {act}; {shown:.4f} of the screen changed; {after_click}")
+
+        # What COSMIC does allow: the editor to the second workspace and
+        # maximized (Fractile's requests, carried out by cosmic-comp), saved.
+        ar = vm.vmctl("cosmic-arrange", timeout=300)
+        aft = (ar.get("after") or [{}])[0] if ar.get("after") else {}
+        recs = [r for r in (ar.get("records") or []) if r.get("app") == "org.gnome.TextEditor.desktop"]
+        check("C09", "the editor is moved to the second workspace and maximized on request (COSMIC may confirm a window on a workspace not in view only "
+                     "later, and the request says so), and a saved snapshot records that workspace and state",
+              "error" not in (ar.get("move") or {"error": 1})
+              and ("error" not in (ar.get("maximize") or {"error": 1}) or "not confirmed it yet" in str((ar.get("maximize") or {}).get("error")))
+              and aft.get("workspace") == 1 and (aft.get("state") or {}).get("maximized") and bool(ar.get("snapshot_id"))
+              and len(recs) == 1 and recs[0].get("workspace_id") == "ws-1" and (recs[0].get("state") or {}).get("maximized"),
+              f"move {ar.get('move')}; maximize {ar.get('maximize')} (state seen after {ar.get('confirmed_after_s')} s); after {[(e.get('workspace'), e.get('state'), e.get('frame')) for e in (ar.get('after') or [])]}; "
+              f"snapshot {ar.get('snapshot_id')} records {recs}; workspaces {ar.get('workspaces')}")
+        shot_ar = settled_shot(vm, "cosmic-05-arranged")
+        cfg_a, cfg_b = b.get("config") or {}, ar.get("config") or {}
+        changed = sorted(k for k in set(cfg_a) | set(cfg_b) if cfg_a.get(k) != cfg_b.get(k))
+        auto = vm.ssh("cat ~/.config/cosmic/com.system76.CosmicComp/v1/autotile").stdout.strip()
+        check("C05", "COSMIC's settings are untouched (T18): auto-tiling still on, no file under ~/.config/cosmic written while Fractile listed, "
+                     "refused, moved to a workspace, maximized and saved",
+              auto == "true" and not changed, f"autotile {auto!r}; {len(cfg_b)} files; changed {changed[:10]}; {shot_ar}")
+
+        # Restore without asking first, then a real reboot.
+        vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set session.confirm_before_restore false", check_rc=True)
+        boot0 = vm.vmctl("session").get("boot_id")
+        vm.ssh("sudo systemctl reboot", timeout=20)
+        vm.wait_down()
+        vm.wait_ssh(600)
+        wait_session_shell(vm, "wayland")
+        up2 = wait_for(lambda: (vm.vmctl("session").get("status") or {}).get("adapter") == "cosmic", 120, 3)
+        s2 = vm.vmctl("session")
+        gst = vm.ssh("systemctl --user is-active graphical-session.target").stdout.strip()
+        st2 = s2.get("status") or {}
+        check("C07", "after a real reboot the service starts at login by itself (the systemd unit) with the COSMIC adapter",
+              bool(up2) and s2.get("unit_active") == "active" and st2.get("adapter") == "cosmic" and s2.get("boot_id") != boot0,
+              f"boot id changed {s2.get('boot_id') != boot0}; unit {s2.get('unit_active')}/{s2.get('unit_enabled')}; graphical-session.target {gst}; "
+              f"adapter {st2.get('adapter')} window_control {st2.get('window_control')}")
+        wait_restore_done(vm)
+        time.sleep(5)
+        af = vm.vmctl("cosmic-after", timeout=300)
+        shot_r = settled_shot(vm, "cosmic-06-after-reboot")
+        run_ = af.get("run") or {}
+        items = [i for i in (run_.get("items") or []) if "TextEditor" in (i.get("record_id", "") + (i.get("label") or "") + (i.get("window_id") or ""))
+                 or len(run_.get("items") or []) == 1]
+        eds2 = af.get("editors") or []
+        e2 = eds2[0] if eds2 else {}
+        srcs = af.get("source_records") or []
+        src = srcs[0] if len(srcs) == 1 else {}
+        check("C10", "after the reboot Fractile reopens the approved editor once and puts it back on the second workspace, maximized as the snapshot it "
+                     "restored from records; the item says RESTORED_WITHOUT_GEOMETRY (position and size not restored), never placed",
+              len(eds2) == 1 and af.get("procs") == 1 and e2.get("workspace") == 1 and src.get("workspace_id") == "ws-1"
+              and (src.get("state") or {}).get("maximized") is True and (e2.get("state") or {}).get("maximized") is True
+              and run_.get("state") in ("completed", "partial") and items
+              and all(i.get("status") == "RESTORED_WITHOUT_GEOMETRY" and "not restored" in (i.get("message") or "") for i in items),
+              f"editors {[(e.get('id'), e.get('workspace'), e.get('state')) for e in eds2]}; processes {af.get('procs')}; source records {srcs}; "
+              f"run {run_.get('state')} {run_.get('summary')} from {run_.get('source')}; items {[(i.get('status'), (i.get('message') or '')[:160], i.get('launched_at')) for i in (run_.get('items') or [])]}; {shot_r}")
+        again = vm.vmctl(f"cosmic-restore-again {shlex.quote(ar.get('snapshot_id') or 'latest')}", timeout=300)
+        rr = ((again.get("restore") or {}).get("result") or {})
+        rep_items = rr.get("items") or ((rr.get("report") or {}).get("items")) or []
+        check("C11", "restoring the same snapshot again opens nothing new (no duplicates) and claims no placement",
+              len(again.get("editors") or []) == 1 and again.get("procs") == 1
+              and not any(i.get("status") in ("LAUNCHED_AND_PLACED", "PLACED_ONLY") or i.get("launched") for i in rep_items),
+              f"editors {len(again.get('editors') or [])}; processes {again.get('procs')}; "
+              f"items {[(i.get('status'), i.get('launched')) for i in rep_items]}; {json.dumps(again.get('restore'))[:300]}")
+        log = vm.ssh("grep -a -E 'warn|error|cosmic|unsupported|restore' ~/.local/state/fractile/fractile.log | tail -80").stdout
+        log_lines.extend(log.splitlines()[-80:])
+        hold("end")
+    finally:
+        vm.p.kill()
 
 
 def run_upgrade(session: str, old_debs: list[str], deb: str) -> None:
@@ -1600,7 +1797,10 @@ def main() -> int:
         if a.upgrade_from:
             run_upgrade(a.session, a.upgrade_from, a.deb)
         else:
-            (run_panel if PANEL else run)(a.session, a.deb)
+            if a.session == "cosmic":
+                run_cosmic(a.deb)
+            else:
+                (run_panel if PANEL else run)(a.session, a.deb)
     except Exception as ex:  # noqa: BLE001  record, then still write evidence
         import traceback
         traceback.print_exc()
@@ -1609,8 +1809,10 @@ def main() -> int:
     distro = "vm-arch" if SESSION_RELEASE.get(a.session) == "arch" else f"vm-ubuntu{ver}"
     suite = f"{distro}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "") + ("-upgrade" if a.upgrade_from else "")
     ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-          "environment": ("Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, "
-                          f"hyprland session (hyprlock via hypridle, waybar), Fractile {Path(a.deb).name} installed with pacman -U")
+          "environment": ((f"Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, COSMIC session "
+                          f"(cosmic-session from the Arch repositories, auto-tiling on), Fractile {Path(a.deb).name} installed with pacman -U")
+          if a.session == "cosmic" else ("Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, "
+                          f"hyprland session (hyprlock via hypridle, waybar), Fractile {Path(a.deb).name} installed with pacman -U"))
           if SESSION_RELEASE.get(a.session) == "arch" else f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}
     out = EVID / f"{suite}.json"

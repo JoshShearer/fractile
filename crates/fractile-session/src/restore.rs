@@ -25,6 +25,10 @@ pub enum ItemStatus {
     LaunchedAndPlaced,
     PlacedOnly,
     LaunchedUnplaced,
+    /// The window is there (open already or launched) and is back on its
+    /// workspace and in its state, but the desktop cannot set position or
+    /// size (COSMIC), so those were not restored.
+    RestoredWithoutGeometry,
     Skipped,
     TimedOut,
     Unsupported,
@@ -42,6 +46,7 @@ impl ItemStatus {
             ItemStatus::LaunchedAndPlaced => "LAUNCHED_AND_PLACED",
             ItemStatus::PlacedOnly => "PLACED_ONLY",
             ItemStatus::LaunchedUnplaced => "LAUNCHED_UNPLACED",
+            ItemStatus::RestoredWithoutGeometry => "RESTORED_WITHOUT_GEOMETRY",
             ItemStatus::Skipped => "SKIPPED",
             ItemStatus::TimedOut => "TIMED_OUT",
             ItemStatus::Unsupported => "UNSUPPORTED",
@@ -55,7 +60,7 @@ impl ItemStatus {
     }
     /// Done successfully: never re-launched or re-placed on retry.
     pub fn is_success(&self) -> bool {
-        matches!(self, ItemStatus::AlreadyPresent | ItemStatus::LaunchedAndPlaced | ItemStatus::PlacedOnly | ItemStatus::Ambiguous)
+        matches!(self, ItemStatus::AlreadyPresent | ItemStatus::LaunchedAndPlaced | ItemStatus::PlacedOnly | ItemStatus::RestoredWithoutGeometry | ItemStatus::Ambiguous)
     }
     pub fn is_terminal(&self) -> bool {
         !matches!(self, ItemStatus::Pending | ItemStatus::Launching)
@@ -227,6 +232,9 @@ pub struct RunOptions {
     pub previous: HashMap<String, (ItemStatus, Option<String>, bool)>,
     /// Gap after an app's last new window before launching another instance.
     pub instance_settle: Duration,
+    /// How long the end of a run waits for states the desktop confirms
+    /// late (see Phase E).
+    pub state_confirm: Duration,
 }
 
 impl RunOptions {
@@ -246,6 +254,7 @@ impl RunOptions {
             restore_focus: true,
             previous: HashMap::new(),
             instance_settle: Duration::from_millis(1500),
+            state_confirm: Duration::from_secs(60),
         }
     }
 }
@@ -367,7 +376,13 @@ pub fn plan(targets: Vec<Target>, recorded_outputs: &[Output], host: &dyn Restor
     let outputs = host.outputs()?;
     let windows = host.windows()?;
     let mut warnings = vec![];
-    if !caps.supports(Operation::MoveResize) {
+    let without_geometry = without_geometry(&caps);
+    if without_geometry {
+        warnings.push(format!(
+            "adapter '{}' cannot move/resize windows on this desktop: apps are reopened and windows go back to their workspace and state, but not to their position or size",
+            caps.adapter
+        ));
+    } else if !caps.supports(Operation::MoveResize) {
         warnings.push(format!("adapter '{}' cannot move/resize windows on this desktop", caps.adapter));
     }
     let mapping = map_outputs(recorded_outputs, &outputs);
@@ -386,7 +401,7 @@ pub fn plan(targets: Vec<Target>, recorded_outputs: &[Output], host: &dyn Restor
             (PlannedAction::Excluded, "excluded by user".to_string(), None)
         } else if prev.map(|p| p.0.is_success()).unwrap_or(false) {
             (PlannedAction::AlreadyDone, "completed in an earlier attempt".into(), None)
-        } else if !caps.supports(Operation::MoveResize) {
+        } else if !caps.supports(Operation::MoveResize) && !without_geometry {
             (PlannedAction::CannotRestoreGeometry, "compositor adapter cannot set window geometry".into(), None)
         } else if win.is_some() {
             (PlannedAction::AlreadyOpen, "matching window is open".into(), None)
@@ -405,6 +420,13 @@ pub fn plan(targets: Vec<Target>, recorded_outputs: &[Output], host: &dyn Restor
         });
     }
     Ok(Plan { targets, items, output_mapping: mapping, warnings })
+}
+
+/// A desktop that cannot set geometry but can list windows and put them
+/// back on their workspace or in their state (COSMIC): a restore still
+/// reopens apps and does that much, and says what it could not do.
+pub fn without_geometry(caps: &Capabilities) -> bool {
+    !caps.supports(Operation::MoveResize) && caps.supports(Operation::ListWindows) && (caps.supports(Operation::MoveToWorkspace) || caps.supports(Operation::SetState))
 }
 
 fn launch_decision(t: &Target, windows: &[WindowInfo], host: &dyn RestoreHost, opts: &RunOptions) -> (PlannedAction, String, Option<String>) {
@@ -442,6 +464,13 @@ struct Live {
     observed: Option<Rect>,
     reapplied: u32,
     placed_at: Option<Instant>,
+    /// Restored without geometry (workspace and state only).
+    no_geometry: bool,
+    /// Without geometry: the workspace is done but the desktop has not yet
+    /// confirmed the state (COSMIC confirms late for a window on a workspace
+    /// not in view); checked again at the end of the run. Holds the wanted
+    /// state and what was done.
+    state_pending: Option<(WindowState, Vec<String>)>,
 }
 
 fn target_rect(t: &Target, outputs: &[Output], mapping: &[OutputMapping], w: &WindowInfo) -> Option<Rect> {
@@ -467,6 +496,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
     let start = Instant::now();
     let caps = host.capabilities();
     let can_place = caps.supports(Operation::MoveResize);
+    let no_geometry = without_geometry(&caps);
     let mut warnings = p.warnings.clone();
     let mut live: Vec<Live> = p
         .targets
@@ -482,6 +512,8 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 observed: None,
                 reapplied: 0,
                 placed_at: None,
+                no_geometry: false,
+                state_pending: None,
             }
         })
         .collect();
@@ -530,8 +562,56 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
             }
         };
         if !can_place {
-            l.message = Some("adapter cannot move/resize".into());
-            return false;
+            if !no_geometry {
+                l.message = Some("adapter cannot move/resize".into());
+                return false;
+            }
+            // Workspace and state only; nothing claims a position. The
+            // workspace first: moving a maximized window onto a tiled
+            // workspace un-maximizes it on COSMIC (VM check C10).
+            let mut done = vec![];
+            let mut failed = vec![];
+            let mut pending = None;
+            if let Some(ws) = t.workspace {
+                if w.workspace != Some(ws) && caps.supports(Operation::MoveToWorkspace) {
+                    match host.move_to_workspace(wid, ws) {
+                        Ok(()) => done.push(format!("moved to workspace {}", ws + 1)),
+                        Err(e) => failed.push(format!("workspace {}: {e}", ws + 1)),
+                    }
+                }
+            }
+            if let Some(st) = &t.state {
+                if (st.maximized || st.fullscreen || st.sticky) && caps.supports(Operation::SetState) {
+                    let s = WindowState { minimized: false, ..*st };
+                    match host.set_state(wid, &s) {
+                        Ok(()) => done.push("state restored".into()),
+                        Err(e) => {
+                            pending = Some(s);
+                            failed.push(format!("state: {e}"));
+                        }
+                    }
+                }
+            }
+            // Only the state unconfirmed: checked again at the end of the run.
+            if failed.len() == 1 {
+                if let Some(s) = pending {
+                    l.state_pending = Some((s, done.clone()));
+                }
+            }
+            l.message = Some(format!(
+                "{}position and size not restored (this desktop has no way to set them){}",
+                if done.is_empty() { String::new() } else { format!("{}; ", done.join(", ")) },
+                if failed.is_empty() { String::new() } else { format!("; not done: {}", failed.join("; ")) }
+            ));
+            // A workspace or state the desktop refused is a failed item
+            // (FAILED, or LAUNCHED_UNPLACED for a window Fractile started),
+            // not a success with a footnote; a retry tries it again.
+            if !failed.is_empty() {
+                return false;
+            }
+            l.no_geometry = true;
+            l.placed_at = Some(Instant::now());
+            return true;
         }
         if let Some(ws) = t.workspace {
             if w.workspace != Some(ws) {
@@ -579,7 +659,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
             let i = pending[k];
             if let Some(wid) = win {
                 claimed.insert(wid.clone());
-                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched: false, message: None, requested: None, observed: None, reapplied: 0, placed_at: None });
+                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched: false, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None });
                 l.window = Some(wid.clone());
                 let ok = place(&p.targets[i], &wid, &mut l);
                 l.status = if !ok {
@@ -587,6 +667,8 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 } else if amb {
                     l.message = Some("indistinguishable windows; assigned by instance order".into());
                     ItemStatus::Ambiguous
+                } else if l.no_geometry {
+                    ItemStatus::RestoredWithoutGeometry
                 } else if l.launched {
                     ItemStatus::LaunchedAndPlaced
                 } else {
@@ -790,11 +872,12 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 }
                 claimed.insert(wid.clone());
                 let launched = live[i].launched;
-                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched, message: None, requested: None, observed: None, reapplied: 0, placed_at: None });
+                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None });
                 l.window = Some(wid.clone());
                 let ok = place(&p.targets[i], &wid, &mut l);
                 l.status = match (ok, launched, amb) {
                     (true, _, true) => ItemStatus::Ambiguous,
+                    (true, _, _) if l.no_geometry => ItemStatus::RestoredWithoutGeometry,
                     (true, true, _) => ItemStatus::LaunchedAndPlaced,
                     (true, false, _) => ItemStatus::PlacedOnly,
                     (false, true, _) => ItemStatus::LaunchedUnplaced,
@@ -861,6 +944,34 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 }
             }
         }
+    }
+
+    // Phase E: states the desktop confirms late (COSMIC, for a window on a
+    // workspace not in view: 11-38 s in a VM). All pending items are
+    // checked together until confirmed or `state_confirm` has passed; one that
+    // never confirms stays failed with the reason.
+    let t0 = Instant::now();
+    while live.iter().any(|l| l.state_pending.is_some()) && t0.elapsed() < opts.state_confirm && !cancel.load(Ordering::SeqCst) {
+        std::thread::sleep(Duration::from_millis(500));
+        for i in 0..total {
+            let Some((want, done)) = live[i].state_pending.clone() else { continue };
+            let Some(wid) = live[i].window.clone() else { continue };
+            let Ok(w) = host.window(&wid) else { continue };
+            if w.state.maximized == want.maximized && w.state.fullscreen == want.fullscreen && w.state.sticky == want.sticky {
+                let mut done = done;
+                done.push(format!("state restored (confirmed by the desktop after {} s)", t0.elapsed().as_secs()));
+                let l = &mut live[i];
+                l.state_pending = None;
+                l.no_geometry = true;
+                l.status = ItemStatus::RestoredWithoutGeometry;
+                l.placed_at = Some(Instant::now());
+                l.message = Some(format!("{}; position and size not restored (this desktop has no way to set them)", done.join(", ")));
+                emit(&live, i, "confirm-state");
+            }
+        }
+    }
+    for l in live.iter_mut() {
+        l.state_pending = None;
     }
 
     // Phase D: minimized state last (so geometry applied first), then focus.

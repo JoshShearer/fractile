@@ -667,6 +667,34 @@ mod tests {
         assert_eq!(x, wa.right());
     }
 
+    /// A portrait monitor left of and above the primary (negative x and y,
+    /// odd sizes): every cell of a 20x20 grid tiles its work area exactly,
+    /// with no gaps, overlaps or drift.
+    #[test]
+    fn portrait_monitor_at_negative_origin_tiles_exactly() {
+        let wa = Rect::new(-1081, -333, 1081, 1917);
+        let g = Grid::new(20, 20);
+        let mut area = 0i64;
+        for c in 0..20 {
+            for r in 0..20 {
+                let cell = selection_rect(wa, g, Selection { col0: c, row0: r, col1: c, row1: r }, &Spacing::default());
+                assert!(cell.x >= wa.x && cell.y >= wa.y && cell.right() <= wa.right() && cell.bottom() <= wa.bottom(), "{cell:?}");
+                if c + 1 < 20 {
+                    let n = selection_rect(wa, g, Selection { col0: c + 1, row0: r, col1: c + 1, row1: r }, &Spacing::default());
+                    assert_eq!(cell.right(), n.x);
+                }
+                if r + 1 < 20 {
+                    let n = selection_rect(wa, g, Selection { col0: c, row0: r + 1, col1: c, row1: r + 1 }, &Spacing::default());
+                    assert_eq!(cell.bottom(), n.y);
+                }
+                area += cell.w as i64 * cell.h as i64;
+            }
+        }
+        assert_eq!(area, wa.w as i64 * wa.h as i64);
+        let full = selection_rect(wa, g, Selection { col0: 0, row0: 0, col1: 19, row1: 19 }, &Spacing::default());
+        assert_eq!(full, wa);
+    }
+
     #[test]
     fn gaps_are_exact_between_neighbours() {
         let sp = Spacing {

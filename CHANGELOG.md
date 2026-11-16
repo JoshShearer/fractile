@@ -3,10 +3,31 @@
 ## 0.9.0 (unreleased)
 
 First feature-complete pre-release. Validated on nested, headless and container
-desktops only. See PLATFORM_MATRIX.md.
+desktops, in real logins in VMs (GNOME, Plasma, Sway, Hyprland, COSMIC), and
+by hand on the developer's GNOME Xorg desktop and an Omarchy (Hyprland)
+laptop. See PLATFORM_MATRIX.md.
 
 ### Added
 
+- **COSMIC adapter (partial).** On COSMIC (cosmic-comp 1.11.0 tested) Fractile
+  now lists windows, moves them between workspaces and sets maximized,
+  minimized, fullscreen and sticky through COSMIC's toplevel info (v3),
+  toplevel manager (v4) and ext-workspace protocols. Window placement stays
+  unavailable: COSMIC has no client API to move or resize another app's
+  window, and placing, snapping and the panel say so.
+- **Session restore without geometry.** Where windows can be listed and
+  moved between workspaces but not positioned (COSMIC), a restore reopens
+  approved apps, puts each window back on its workspace and in its
+  maximized/fullscreen/sticky state, and reports
+  `RESTORED_WITHOUT_GEOMETRY` ("position and size not restored"); `fractile
+  status`, the wizard, the dashboard, the recovery dialog and the
+  notification say positions and sizes were not restored.
+- **Real COSMIC login suite** (`tests/vm/vm-e2e.sh cosmic`, Arch Linux with
+  COSMIC 1.11.0 in a QEMU/KVM VM, auto-tiling on): install with `pacman -U`,
+  start at login, the window list, placement refused with the reason and
+  nothing moved, a window moved to the second workspace and maximized,
+  restored there after a real reboot without duplicates, COSMIC's settings
+  untouched, the tray. 13/13 (C01-C11).
 - **Sway start at login.** The packages install
   `/etc/sway/config.d/60-fractile.conf` (`exec fractiled --autostart
   --compositor-start`, a conffile). Ubuntu's Sway session never reaches
@@ -102,8 +123,9 @@ desktops only. See PLATFORM_MATRIX.md.
   for Wayland (45-48 declared; see PLATFORM_MATRIX.md for the versions run). KWin script for Plasma Wayland (6.x,
   6.8.2 tested). Hyprland with a Lua configuration (0.56 or later) through Hyprland's own
   IPC (nothing to enable; 0.57.2 tested nested, 0.56.2 on Omarchy by hand). Sway 1.8 or later through Sway's IPC
-  (1.12 tested, nested only). COSMIC and other Wayland compositors (river,
-  Wayfire, ...) are reported as unsupported, with reasons.
+  (1.12 tested, nested only). COSMIC (partial: window list, workspaces and
+  states, no placement; 1.11.0 tested in a real login). Other Wayland
+  compositors (river, Wayfire, ...) are reported as unsupported, with reasons.
 - **UI.** A PyQt6 panel, settings (General, Appearance, Shortcuts, Session,
   Rules, Monitors, Diagnostics, About), dashboard, first-run wizard, recovery
   dialog and tray icon.
@@ -166,6 +188,21 @@ desktops only. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **A tray click on a desktop where windows cannot be placed showed
+  nothing.** On COSMIC the panel had no monitors to open on and the UI
+  opened no window. Opening the panel there now shows "Fractile can't place
+  windows on this desktop" with the reason and a button to Diagnostics
+  (found by the COSMIC VM suite, C08).
+- **COSMIC restore reported states it had not kept, or refused ones it
+  had.** Moving a maximized window onto a tiled workspace un-maximizes it,
+  and COSMIC confirms a state change for a window on a workspace not in view
+  only 11 to 38 s later. A restore now moves the window first, then sets the
+  state, checks late states again at the end of the run, and reports a state
+  that never shows up as a failed item (found by the COSMIC VM suite, C09,
+  C10).
+- **The first-run wizard warns on a desktop where windows cannot be
+  placed**, in bold (a style sheet there drew black text on the dark theme),
+  and says what still works.
 - **A size limit is no longer learned from a window that is still
   starting.** When a placement came back larger than asked, Fractile
   recorded that size as the window's minimum at once. GNOME Clocks, cold
@@ -519,7 +556,8 @@ desktops only. See PLATFORM_MATRIX.md.
   may have closed by then (Plasma reopens those itself). On Plasma 6 Wayland
   every window is closed first; the layout last seen is saved instead. If the display is
   already gone, the layout last seen (up to about 10 s old) is saved.
-- COSMIC: no window control (platform limitation).
+- COSMIC: no window placement (platform limitation); session restore there
+  reopens apps and restores workspaces and states, not positions or sizes.
 - Hyprland: the automated suite runs nested inside a headless KWin only. A
   real Omarchy login (Hyprland 0.56.2, uwsm, scale 1.5) was checked by hand;
   autostart and the log-out snapshot there are not tested. A Hyprland without

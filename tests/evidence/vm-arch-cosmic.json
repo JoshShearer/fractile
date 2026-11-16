@@ -1,0 +1,97 @@
+{
+  "suite": "vm-arch-cosmic",
+  "when": "2026-11-16T00:35:16+0000",
+  "environment": "Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, COSMIC session (cosmic-session from the Arch repositories, auto-tiling on), Fractile fractile-0.9.0-1-x86_64.pkg.tar.zst installed with pacman -U",
+  "results": [
+    {
+      "id": "V00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V01",
+      "name": "pacman installs the Arch package (dependencies from the Arch repositories)",
+      "ok": true,
+      "detail": "Arch Linux; cosmic-comp 1:1.11.0-1; cosmic-session 1:1.11.0-1; 7.3.4-arch1-2 :: (1/4) Reloading user manager configuration...\n(2/4) Arming ConditionNeedsUpdate...\n(3/4) Updating icon theme caches...\n(4/4) Updating the desktop file MIME type cache...\nfractile 0.9.0-1"
+    },
+    {
+      "id": "C01",
+      "name": "a real COSMIC login: GDM logs in to the COSMIC session and cosmic-comp runs",
+      "ok": true,
+      "detail": "Arch Linux; cosmic-comp 1:1.11.0-1; cosmic-session 1:1.11.0-1; 7.3.4-arch1-2; session wayland desktop COSMIC display wayland-1 cosmic-comp pid 569"
+    },
+    {
+      "id": "C02",
+      "name": "started from the app menu, Fractile runs with the COSMIC adapter and says what it can do: window placement not available (the reason in diagnose), session restore without positions or sizes, COSMIC auto-tiling detected",
+      "ok": true,
+      "detail": "socket True; setup {\"extension\": \"n/a\", \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.config/autostart/io.fractile.Fractile.desktop\"}, \"unit_enabled\": \"enabled\", \"p; adapter cosmic window_control False restore_without_geometry True tiling cosmic-autotile; status: \"Fractile 0.9.0 running (pid 1442, up 2s)\\nSession:          wayland / COSMIC\\nAdapter:          cosmic\\nWindow control:   NOT AVAILABLE on this desktop: windows cannot be moved or resized (run 'fractile diagnose')\\n                  Session restore reopens apps and restores workspaces and window states, not positions or sizes\\nGlobal shortcuts: not available\\nTiling manager:   cosmic-autotile (may overr\"; diagnose rc 0: \"Fractile 0.9.0 diagnostics\\nOS: Arch Linux\\nSession: wayland desktop=COSMIC gnome-shell=51.1\\nAdapter: cosmic 0.9.0 (compositor cosmic-comp)\\n  activate               full\\n  get_active_window      full\\n  get_geometry           partial: read only: COSMIC reports each window's position and size but offers no way to set them\\n  get_outputs            partial: the work area is the whole monitor: COSMIC does not tell clients where its panel and dock are\\n  get_permissions        full\\n  get_workspaces         partial: the workspaces of the leftmost monitor (COSMIC keeps a set per monitor by default)\\n  lis\""
+    },
+    {
+      "id": "C03",
+      "name": "the COSMIC adapter lists the monitor, the workspaces and the text editor window (its app, workspace and a frame on the monitor)",
+      "ok": true,
+      "detail": "outputs [('edid-309f8b6149', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0})]; workspaces [{'active': True, 'index': 0, 'name': '1'}, {'active': False, 'index': 1, 'name': '2'}]; editor [('cosmic:Q8yqQT7jAguxMHNwNaWGS09rfpiA0poO', 'org.gnome.TextEditor.desktop', 0, {'h': 1076, 'w': 788, 'x': 804, 'y': 40}, {'above': False, 'fullscreen': False, 'maximized': False, 'minimized': False, 'modal': False, 'skip_taskbar': False, 'sticky': False, 'tiled': False})]; list-windows rc 0 ''"
+    },
+    {
+      "id": "C04",
+      "name": "no false success (T17): placing and snapping fail with the reason, and nothing moved (the screen below the panel clock is the same)",
+      "ok": true,
+      "detail": "refused with the reason {'place': True, 'snap': True}; text editor open True; 0.00001 of pixels changed; tests/evidence/vm/cosmic-01-before.png, tests/evidence/vm/cosmic-02-after.png; place: 'fractile: MoveResize is not available with adapter \\'cosmic\\' on this desktop: Unsupported(\"COSMIC has no client API to move or resize other applications\\' windows (its toplevel management protocol cover'; snap: 'fractile: MoveResize is not available with adapter \\'cosmic\\' on this desktop: Unsupported(\"COSMIC has no client API to move or resize other applications\\' windows (its toplevel management protocol cover'"
+    },
+    {
+      "id": "C06",
+      "name": "the tray icon is registered with COSMIC's panel (StatusNotifierItem)",
+      "ok": true,
+      "detail": "{\"registered\": true, \"service\": \":1.166\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}"
+    },
+    {
+      "id": "C08",
+      "name": "a click on the tray icon shows a window that says windows cannot be placed on this desktop (no silent nothing, no grid that cannot work)",
+      "ok": true,
+      "detail": "activated {'activated': True, 'stderr': ''}; 0.0167 of the screen changed; tests/evidence/vm/cosmic-04-tray-click.png"
+    },
+    {
+      "id": "C09",
+      "name": "the editor is moved to the second workspace and maximized on request (COSMIC may confirm a window on a workspace not in view only later, and the request says so), and a saved snapshot records that workspace and state",
+      "ok": true,
+      "detail": "move {'result': {'ok': True}}; maximize {'error': 'rejected by compositor: COSMIC has not confirmed it yet; for a window on a workspace that is not in view it reports state changes late (wanted maximized=true minimized=false fullscreen=false sticky=false, now maximized=false minimized=false fullscreen=false sticky=false)'} (state seen after 4.0 s); after [(1, {'above': False, 'fullscreen': False, 'maximized': True, 'minimized': False, 'modal': False, 'skip_taskbar': False, 'sticky': False, 'tiled': False}, {'h': 1092, 'w': 1600, 'x': 0, 'y': 32})]; snapshot b3a0d9e2-1e14-4f1f-89d6-5e59640e7ae5 records [{'app': 'org.gnome.TextEditor.desktop', 'workspace_id': 'ws-1', 'state': {'above': False, 'fullscreen': False, 'maximized': True, 'minimized': False, 'modal': False, 'skip_taskbar': False, 'sticky': False, 'tiled': False}, 'frame': {'h': 1092, 'w': 1600, 'x': 0, 'y': 32}}]; workspaces [{'id': 'ws-0', 'name': '1', 'ordinal': 0}, {'id': 'ws-1', 'name': '2', 'ordinal': 1}, {'id': 'ws-2', 'name': '3', 'ordinal': 2}]"
+    },
+    {
+      "id": "C05",
+      "name": "COSMIC's settings are untouched (T18): auto-tiling still on, no file under ~/.config/cosmic written while Fractile listed, refused, moved to a workspace, maximized and saved",
+      "ok": true,
+      "detail": "autotile 'true'; 4 files; changed []; tests/evidence/vm/cosmic-05-arranged.png"
+    },
+    {
+      "id": "C07",
+      "name": "after a real reboot the service starts at login by itself (the systemd unit) with the COSMIC adapter",
+      "ok": true,
+      "detail": "boot id changed True; unit active/enabled; graphical-session.target active; adapter cosmic window_control False"
+    },
+    {
+      "id": "C10",
+      "name": "after the reboot Fractile reopens the approved editor once and puts it back on the second workspace, maximized as the snapshot it restored from records; the item says RESTORED_WITHOUT_GEOMETRY (position and size not restored), never placed",
+      "ok": true,
+      "detail": "editors [('cosmic:n9oYzA0Bpr4k4sgbQM3DYAnK63dh2dIu', 1, {'above': False, 'fullscreen': False, 'maximized': True, 'minimized': False, 'modal': False, 'skip_taskbar': False, 'sticky': False, 'tiled': False})]; processes 1; source records [{'workspace_id': 'ws-1', 'state': {'above': False, 'fullscreen': False, 'maximized': True, 'minimized': False, 'modal': False, 'skip_taskbar': False, 'sticky': False, 'tiled': False}, 'mode': 'shutdown'}]; run completed RESTORED_WITHOUT_GEOMETRY=1 from login; items [('RESTORED_WITHOUT_GEOMETRY', 'moved to workspace 2, state restored (confirmed by the desktop after 25 s); position and size not restored (this desktop has no way to set them)', '2026-11-16T00:34:28.692087351+00:00')]; tests/evidence/vm/cosmic-06-after-reboot.png"
+    },
+    {
+      "id": "C11",
+      "name": "restoring the same snapshot again opens nothing new (no duplicates) and claims no placement",
+      "ok": true,
+      "detail": "editors 1; processes 1; items [('RESTORED_WITHOUT_GEOMETRY', False)]; {\"result\": {\"report\": {\"cancelled\": false, \"duration_ms\": 1501, \"items\": [{\"excluded\": false, \"label\": \"org.gnome.TextEditor\", \"launched\": false, \"message\": \"state restored; position and size not restored (this desktop has no way to set them)\", \"observed\": null, \"record_id\": \"69fae684-b403-418a-a684"
+    }
+  ],
+  "log": [
+    "2026-11-16T00:33:29.949 Info COSMIC adapter connected (window list, workspaces and states; no geometry): cosmic-comp 1.0.0 (git commit 8cb1802caada438bb5cc7670dfabdaca5fad0502)",
+    "2026-11-16T00:33:29.949 Warn tiling manager detected: cosmic-autotile",
+    "2026-11-16T00:34:07.069 Warn the display closed (the COSMIC Wayland connection ended: Backend error: Io error: Broken pipe (os error 32)): the desktop session has ended; exiting",
+    "2026-11-16T00:34:26.426 Info COSMIC adapter connected (window list, workspaces and states; no geometry): cosmic-comp 1.0.0 (git commit 8cb1802caada438bb5cc7670dfabdaca5fad0502)",
+    "2026-11-16T00:34:26.426 Warn tiling manager detected: cosmic-autotile",
+    "2026-11-16T00:34:26.964 Info login restore decision=restore unclean=false snapshot=fb57850f-5c9e-46f2-a56b-95b323eef16e",
+    "2026-11-16T00:34:28.488 Info restore d6af9d73-8ddf-4edb-bb8c-aebc3099308f started source=login targets=1",
+    "2026-11-16T00:35:00.570 Info restore d6af9d73-8ddf-4edb-bb8c-aebc3099308f finished state=completed RESTORED_WITHOUT_GEOMETRY=1 launches=1 32709ms",
+    "2026-11-16T00:35:11.545 Info restore 884372bd-79aa-43c0-9f29-8c99f9927109 started source=manual targets=1",
+    "2026-11-16T00:35:13.048 Info restore 884372bd-79aa-43c0-9f29-8c99f9927109 finished state=completed RESTORED_WITHOUT_GEOMETRY=1 launches=0 1501ms"
+  ]
+}

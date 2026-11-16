@@ -76,6 +76,17 @@ def session_env() -> dict:
             newest = max(inst, key=lambda i: i.get("time", 0))
             env.update(HYPRLAND_INSTANCE_SIGNATURE=newest["instance"], WAYLAND_DISPLAY=newest.get("wl_socket") or env.get("WAYLAND_DISPLAY", ""),
                        XDG_CURRENT_DESKTOP=env.get("XDG_CURRENT_DESKTOP") or "Hyprland", XDG_SESSION_TYPE="wayland")
+    # COSMIC: if the session did not export its environment to the user
+    # manager, its panel (a client of the compositor) has it.
+    if not env.get("WAYLAND_DISPLAY"):
+        for pid in subprocess.run(["pgrep", "-u", str(UID), "-x", "cosmic-panel"], capture_output=True, text=True).stdout.split()[:1]:
+            try:
+                penv = dict(kv.split("=", 1) for kv in open(f"/proc/{pid}/environ").read().split("\0") if "=" in kv)
+            except OSError:
+                penv = {}
+            for k in ("WAYLAND_DISPLAY", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP", "DISPLAY"):
+                if penv.get(k) and not env.get(k):
+                    env[k] = penv[k]
     return env
 
 
@@ -83,7 +94,8 @@ ENV = session_env()
 PLASMA = "KDE" in ENV.get("XDG_CURRENT_DESKTOP", "").split(":")
 SWAY = "sway" in ENV.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
 HYPR = "hyprland" in ENV.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
-SHELL = "plasmashell" if PLASMA else "sway" if SWAY else "Hyprland" if HYPR else "gnome-shell"
+COSMIC = "cosmic" in ENV.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
+SHELL = "plasmashell" if PLASMA else "sway" if SWAY else "Hyprland" if HYPR else "cosmic-comp" if COSMIC else "gnome-shell"
 
 
 def run(*args, timeout=60) -> subprocess.CompletedProcess:
@@ -165,9 +177,10 @@ def cmd_setup() -> dict:
                                                           "org.kde.kwin.Scripting.isScriptLoaded", "string:fractile").stdout, 20.0)
         out["extension"] = 0 if (w.returncode == 0 and r.returncode == 0 and loaded) else 1
         out["extension_info"] = [f"kwriteconfig6 {w.returncode}", f"reconfigure {r.returncode} {r.stderr.strip()[-200:]}", f"script loaded {bool(loaded)}"]
-    elif PLASMA or SWAY or HYPR:
+    elif PLASMA or SWAY or HYPR or COSMIC:
         # Plasma X11 needs no integration (the service talks to the X
-        # server), nor do Sway and Hyprland (their IPC sockets).
+        # server), nor do Sway and Hyprland (their IPC sockets); COSMIC has
+        # nothing to enable.
         out["extension"] = "n/a"
     else:
         # The extension: what the docs tell the user to do (or the Extensions app).
@@ -457,11 +470,147 @@ def cmd_settings_probe() -> dict:
         return {"results": [{"id": "SXX", "name": "probe produced results", "ok": False, "detail": (p.stdout + p.stderr)[-800:]}]}
 
 
+def cosmic_config() -> dict:
+    """sha256 of every file under ~/.config/cosmic: COSMIC's own settings,
+    auto-tiling among them, which Fractile must never write (T18)."""
+    import hashlib
+    root = os.path.expanduser("~/.config/cosmic")
+    out = {}
+    for d, _subs, files in os.walk(root):
+        for f in files:
+            p = os.path.join(d, f)
+            try:
+                out[os.path.relpath(p, root)] = hashlib.sha256(open(p, "rb").read()).hexdigest()
+            except OSError as ex:
+                out[os.path.relpath(p, root)] = f"unreadable: {ex}"
+    return out
+
+
+def cmd_cosmic_before() -> dict:
+    """COSMIC (T17): what Fractile reports, before anything is asked of it;
+    then a text editor window opened from its desktop entry."""
+    out = {"status": try_cli("status"), "diagnose_rc": None, "config": cosmic_config(),
+           "unit_active": run("systemctl", "--user", "is-active", "fractile.service").stdout.strip()}
+    d = run("fractile", "diagnose")
+    out["diagnose_rc"], out["diagnose"] = d.returncode, (d.stdout + d.stderr)[-3000:]
+    t = run("fractile", "status")
+    out["status_text"] = (t.stdout + t.stderr)[-2000:]
+    up = lambda: run("pgrep", "-u", str(UID), "-x", "gnome-text-edit").stdout.strip()
+    out["launch_rc"] = launch("org.gnome.TextEditor.desktop")
+    out["editor"] = bool(wait_for(up, 30.0))
+    if not out["editor"]:
+        # Test set-up, not the product: `gio launch` of this D-Bus
+        # activatable entry was once lost right after login (one run of
+        # seven); a user would click the icon again.
+        out["launch_retry_rc"] = launch("org.gnome.TextEditor.desktop")
+        out["editor"] = bool(wait_for(up, 30.0))
+    time.sleep(5)
+    return out
+
+
+EDITOR = "org.gnome.TextEditor.desktop"
+
+
+def editors() -> list:
+    return [w for w in (try_cli("list-windows") or []) if isinstance(w, dict) and w.get("desktop_file_id") == EDITOR]
+
+
+def ipc(method: str, params: dict | None = None) -> dict:
+    from fractile_ui.ipc import Client, RpcError
+    c = Client("vm-test")
+    try:
+        return {"result": c.call(method, params or {})}
+    except RpcError as ex:
+        return {"error": str(ex)}
+    finally:
+        c.close()
+
+
+def cmd_cosmic_try() -> dict:
+    """What the COSMIC adapter can do (list windows, outputs and workspaces)
+    and what it must refuse with the reason (placing, snapping): nothing may
+    be moved or resized, nothing may claim to have been placed."""
+    out = {}
+    for name, args in (("list-windows", ("list-windows",)), ("list-outputs", ("list-outputs",)),
+                       ("place", ("place", "--grid", "2x2", "--cells", "0,0,0,0")),
+                       ("snap", ("snap", "left-half"))):
+        p = run("fractile", "--json", *args)
+        out[name] = {"rc": p.returncode, "stdout": p.stdout.strip()[-3000:], "stderr": p.stderr.strip()[-600:]}
+        try:
+            out[name]["json"] = json.loads(p.stdout) if p.returncode == 0 and p.stdout.strip() else None
+        except ValueError:
+            out[name]["json"] = None
+    out["workspaces"] = ipc("list_workspaces")
+    out["editors"] = editors()
+    out["snapshots"] = try_cli("list-snapshots", "--limit", "5")
+    out["status"] = try_cli("status")
+    out["config"] = cosmic_config()
+    out["log"] = run("bash", "-c", "grep -E 'warn|error|unsupported|cosmic' ~/.local/state/fractile/fractile.log 2>/dev/null | tail -40").stdout[-4000:]
+    return out
+
+
+def cmd_cosmic_arrange() -> dict:
+    """The user puts the text editor on the second workspace (index 1) and maximizes it (the
+    service's own requests, which COSMIC's toplevel manager carries out),
+    then saves a snapshot."""
+    out = {"before": editors(), "config": cosmic_config()}
+    ed = out["before"][0] if out["before"] else None
+    if not ed:
+        return out
+    out["move"] = ipc("move_to_workspace", {"window": ed["id"], "workspace": 1})
+    out["maximize"] = ipc("set_state", {"window": ed["id"], "state": {"maximized": True}})
+    # On a workspace not in view COSMIC reports the new state about 25 s
+    # late; the request may say so instead of confirming.
+    t0 = time.time()
+    wait_for(lambda: (lambda e: e and e[0].get("workspace") == 1 and e[0]["state"].get("maximized"))(editors()), 60.0, 1.0)
+    out["confirmed_after_s"] = round(time.time() - t0, 1)
+    time.sleep(2)
+    out["after"] = editors()
+    out["save"] = try_cli("save", "--name", "cosmic-check")
+    sid = (out["save"] or {}).get("snapshot_id") if isinstance(out["save"], dict) else None
+    snap = (ipc("snapshot_get", {"id": sid}).get("result") if sid else None) or {}
+    snap = snap.get("snapshot", snap) if isinstance(snap, dict) else {}
+    out["snapshot_id"] = sid
+    out["records"] = [{"app": r.get("desktop_file_id"), "workspace_id": r.get("workspace_id"), "state": r.get("state"), "frame": r.get("absolute_geometry")}
+                      for r in (snap.get("windows") or [])]
+    out["workspaces"] = snap.get("workspaces")
+    out["config"] = cosmic_config()
+    return out
+
+
+def cmd_cosmic_after() -> dict:
+    """After the next login: the editor windows, and the last restore run
+    with each item's status and message."""
+    out = {"editors": editors(), "restore": try_cli("restore-status")}
+    runs = (out["restore"] or {}).get("recent_runs") or [] if isinstance(out["restore"], dict) else []
+    rid = runs[0].get("run_id") if runs else None
+    out["run"] = ipc("restore_run", {"run_id": rid}).get("result") if rid else None
+    # What the run restored from: the editor's record in that snapshot.
+    src = (out["run"] or {}).get("source_id")
+    snap = (ipc("snapshot_get", {"id": src}).get("result") if src else None) or {}
+    out["source_records"] = [{"workspace_id": r.get("workspace_id"), "state": r.get("state"), "mode": snap.get("mode")}
+                             for r in (snap.get("windows") or []) if r.get("desktop_file_id") == EDITOR]
+    out["snapshots"] = try_cli("list-snapshots", "--limit", "5")
+    out["status"] = try_cli("status")
+    out["procs"] = len(run("pgrep", "-u", str(UID), "-x", "gnome-text-edit").stdout.split())
+    return out
+
+
+def cmd_cosmic_restore_again() -> dict:
+    """Restore the same snapshot once more by hand: nothing new may open."""
+    sid = sys.argv[2]
+    r = ipc("restore_start", {"snapshot": sid, "wait": True})
+    time.sleep(3)
+    return {"restore": r, "editors": editors(), "procs": len(run("pgrep", "-u", str(UID), "-x", "gnome-text-edit").stdout.split())}
+
+
 def main() -> int:
     cmd = sys.argv[1]
     fn = {"session": cmd_session, "setup": cmd_setup, "open-apps": cmd_open_apps, "state": cmd_state, "logout": cmd_logout, "launch": cmd_launch,
           "call": cmd_call, "panel-prep": cmd_panel_prep, "panel-geom": cmd_panel_geom,
-          "tray": cmd_tray, "x11-preview": cmd_x11_preview, "tray-activate": cmd_tray_activate, "settings-probe": cmd_settings_probe}[cmd]
+          "tray": cmd_tray, "x11-preview": cmd_x11_preview, "tray-activate": cmd_tray_activate, "settings-probe": cmd_settings_probe,
+          "cosmic-before": cmd_cosmic_before, "cosmic-try": cmd_cosmic_try,
+          "cosmic-arrange": cmd_cosmic_arrange, "cosmic-after": cmd_cosmic_after, "cosmic-restore-again": cmd_cosmic_restore_again}[cmd]
     print(json.dumps(fn()))
     return 0
 

@@ -17,7 +17,7 @@ This page covers components, protocols and data.
 | `adapters/sway` | the Sway adapter (Sway's i3-compatible IPC socket: the tree, outputs, workspaces, commands and events; runtime `bindsym` for shortcuts, checked against the user's configuration) |
 | `adapters/gnome-shell/fractile@fractile.io` | the GNOME Shell extension (GJS) |
 | `adapters/kwin/fractile` | the KWin script (JS) |
-| `adapters/cosmic` | empty: see [compatibility/cosmic.md](../compatibility/cosmic.md) |
+| `adapters/cosmic` | COSMIC Wayland client: window list, workspaces, states; no geometry (see [compatibility/cosmic.md](../compatibility/cosmic.md)) |
 | `ui/fractile_ui` | the PyQt6 UI: panel and grid, overlay, settings, dashboard, wizard, palette, recovery dialog, tray |
 | `packaging/` | `install.sh` (shared layout), `.deb` builder, PKGBUILD, systemd user unit, desktop entry, metainfo, container package tests |
 | `tests/` | E2E suites (`integration/`, `gui/`, `kwin/`, `hyprland/`, `sway/`, `perf/`, `vm/`), tools (`tools/`), evidence (`evidence/`) |

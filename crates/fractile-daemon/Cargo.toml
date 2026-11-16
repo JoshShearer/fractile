@@ -16,6 +16,7 @@ fractile-session.workspace = true
 fractile-adapter-x11.workspace = true
 fractile-adapter-hyprland.workspace = true
 fractile-adapter-sway.workspace = true
+fractile-adapter-cosmic.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true

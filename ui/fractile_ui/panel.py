@@ -342,6 +342,7 @@ class PanelController:
         # reach the panel.
         self._alt_tap = False
         self._alt_latched = False
+        self._unavailable = None
 
     # ---- lifecycle ----
     def show(self, payload: dict):
@@ -357,6 +358,13 @@ class PanelController:
         self.cell_px = int(appearance.get("cell_size", 40))
         self.payload = payload
         outputs = payload.get("outputs") or []
+        op = ((payload.get("caps") or {}).get("operations") or {}).get("move_resize")
+        if not outputs or (isinstance(op, dict) and op.get("level") == "unsupported"):
+            # Windows cannot be placed here (no monitors reported, or the
+            # desktop has no way to move or resize windows, e.g. COSMIC):
+            # say so, never show a grid that cannot do anything.
+            self._show_unavailable(payload)
+            return
         target = payload.get("target")
         home = output_of_frame(outputs, target.get("frame") if target else None)
         wanted = outputs if self.cfg.get("general", {}).get("panel_on_all_monitors", True) else ([home] if home else [])
@@ -387,6 +395,28 @@ class PanelController:
         self.app.bridge.try_call("panel_visible", {"visible": True})
         if os.environ.get("FRACTILE_UI_TEST_GEOMETRY"):
             QTimer.singleShot(150, self._dump_geometry)
+
+    def _show_unavailable(self, payload: dict):
+        from PyQt6.QtWidgets import QMessageBox
+        op = ((payload.get("caps") or {}).get("operations") or {}).get("move_resize")
+        reason = op.get("note") if isinstance(op, dict) and op.get("level") == "unsupported" else None
+        if self._unavailable is None:
+            m = QMessageBox(QMessageBox.Icon.Information, "Fractile", "Fractile can't place windows on this desktop.")
+            m.setWindowFlag(Qt.WindowType.Window, True)
+            m.setModal(False)
+            diag = m.addButton("Open Diagnostics", QMessageBox.ButtonRole.ActionRole)
+            m.addButton(QMessageBox.StandardButton.Close)
+            diag.clicked.connect(lambda: self.app.show_settings("diagnostics"))
+            self._unavailable = m
+        m = self._unavailable
+        m.setInformativeText((reason or "The desktop did not report any monitors to Fractile.")
+                             + "\n\nSettings \u2192 Diagnostics shows what works on this desktop.")
+        m.show()
+        m.raise_()
+        m.activateWindow()
+        self.app.register_own_windows()
+        # No panel is open, so the service must not think one is.
+        self.app.bridge.try_call("panel_visible", {"visible": False})
 
     def _dump_geometry(self):
         """Test hook (only with FRACTILE_UI_TEST_GEOMETRY set): record where
