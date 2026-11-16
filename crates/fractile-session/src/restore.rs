@@ -5,7 +5,7 @@
 use fractile_core::adapter::{Capabilities, Operation, PlacementOutcome};
 use fractile_core::config::Config;
 use fractile_core::geometry::{norm_rect_to_rect, NormRect, Rect, Spacing};
-use fractile_core::identity::{assign, match_threshold, score};
+use fractile_core::identity::{assign, match_threshold, score, title_similarity};
 use fractile_core::layout::{ApplyMode, Layout};
 use fractile_core::output::{map_outputs, Output, OutputMapping};
 use fractile_core::rules::{OutputSel, Placement};
@@ -491,6 +491,121 @@ fn target_rect(t: &Target, outputs: &[Output], mapping: &[OutputMapping], w: &Wi
     }
 }
 
+/// How much longer than the stabilization time a restore waits for an app
+/// to give its windows titles that tell them apart.
+const TITLE_SETTLE: Duration = Duration::from_secs(5);
+
+/// The pairing of records (rows) to windows (columns) with the highest total
+/// title score, by trying every pairing (groups are small: at most 7), and
+/// whether no other pairing reaches that total.
+fn best_pairing(scores: &[Vec<u32>]) -> Option<(Vec<usize>, u32, bool)> {
+    let n = scores.len();
+    if n < 2 || n > 7 {
+        return None;
+    }
+    let mut perm: Vec<usize> = (0..n).collect();
+    let mut best: Option<(Vec<usize>, u32)> = None;
+    let mut ties = 0;
+    // Heap's algorithm, iterative.
+    let mut c = vec![0usize; n];
+    let total = |p: &[usize]| p.iter().enumerate().map(|(r, &w)| scores[r][w]).sum::<u32>();
+    let mut consider = |p: &[usize]| {
+        let t = total(p);
+        match &best {
+            Some((_, b)) if t < *b => {}
+            Some((_, b)) if t == *b => ties += 1,
+            _ => {
+                best = Some((p.to_vec(), t));
+                ties = 0;
+            }
+        }
+    };
+    consider(&perm);
+    let mut i = 0;
+    while i < n {
+        if c[i] < i {
+            if i % 2 == 0 { perm.swap(0, i) } else { perm.swap(c[i], i) }
+            consider(&perm);
+            c[i] += 1;
+            i = 0;
+        } else {
+            c[i] = 0;
+            i += 1;
+        }
+    }
+    best.map(|(p, t)| (p, t, ties == 0))
+}
+
+/// Re-match the placed windows of each app by their current titles (see
+/// Phase C). Returns true while some app's records have titles that would
+/// tell its windows apart but its windows' titles do not (yet).
+fn rematch_by_title<P, E>(p: &Plan, host: &dyn RestoreHost, live: &mut Vec<Live>, place: &P, emit: &E) -> bool
+where
+    P: Fn(&Target, &str, &mut Live) -> bool,
+    E: Fn(&Vec<Live>, usize, &str),
+{
+    let hint = |i: usize| p.targets[i].record.title_hint.clone().filter(|h| !h.is_empty() && h != "[redacted]");
+    let mut groups: Vec<(String, Vec<usize>)> = vec![];
+    for i in 0..live.len() {
+        let l = &live[i];
+        if !l.status.is_success() || l.window.is_none() || l.no_geometry || hint(i).is_none() {
+            continue;
+        }
+        let Some(app) = p.targets[i].launch_desktop_id.clone().or_else(|| p.targets[i].record.desktop_file_id.clone()) else { continue };
+        match groups.iter_mut().find(|g| g.0 == app) {
+            Some(g) => g.1.push(i),
+            None => groups.push((app, vec![i])),
+        }
+    }
+    let mut undecided = false;
+    for (_, members) in groups {
+        let hints: Vec<String> = members.iter().map(|&i| hint(i).unwrap()).collect();
+        if hints.iter().collect::<HashSet<_>>().len() < 2 {
+            continue; // nothing in the records tells these windows apart
+        }
+        let wins: Vec<String> = members.iter().map(|&i| live[i].window.clone().unwrap()).collect();
+        let titles: Vec<Option<String>> = wins.iter().map(|w| host.window(w).ok().map(|w| w.title)).collect();
+        if titles.iter().any(|t| t.is_none()) {
+            continue;
+        }
+        let scores: Vec<Vec<u32>> = hints.iter().map(|h| titles.iter().map(|t| title_similarity(h, t.as_deref().unwrap())).collect()).collect();
+        let Some((best, best_total, unique)) = best_pairing(&scores) else { continue };
+        if !unique {
+            undecided = true;
+            continue;
+        }
+        let current_total: u32 = (0..members.len()).map(|r| scores[r][r]).sum();
+        for (r, &i) in members.iter().enumerate() {
+            let new_w = &wins[best[r]];
+            let moved = best_total > current_total && *new_w != wins[r];
+            if moved {
+                let mut l = std::mem::replace(
+                    &mut live[i],
+                    Live { status: ItemStatus::Pending, window: None, launched: false, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None },
+                );
+                l.window = Some(new_w.clone());
+                l.reapplied = 0;
+                let ok = place(&p.targets[i], new_w, &mut l);
+                l.status = match (ok, l.launched) {
+                    (true, true) => ItemStatus::LaunchedAndPlaced,
+                    (true, false) => ItemStatus::AlreadyPresent,
+                    (false, true) => ItemStatus::LaunchedUnplaced,
+                    (false, false) => ItemStatus::Failed,
+                };
+                l.message = Some("matched to this window by its title once the app had named it".into());
+                live[i] = l;
+                emit(live, i, "rematch-title");
+            } else if live[i].status == ItemStatus::Ambiguous && best[r] == r {
+                // the titles now confirm the pairing chosen by instance order
+                live[i].status = if live[i].launched { ItemStatus::LaunchedAndPlaced } else { ItemStatus::AlreadyPresent };
+                live[i].message = Some("confirmed by the window's title".into());
+                emit(live, i, "rematch-title");
+            }
+        }
+    }
+    undecided
+}
+
 /// Execute a plan. Blocking; honours `cancel`; bounded by timeouts.
 pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &AtomicBool) -> RunReport {
     let start = Instant::now();
@@ -875,6 +990,9 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None });
                 l.window = Some(wid.clone());
                 let ok = place(&p.targets[i], &wid, &mut l);
+                if ok && amb {
+                    l.message = Some("indistinguishable windows; assigned by instance order".into());
+                }
                 l.status = match (ok, launched, amb) {
                     (true, _, true) => ItemStatus::Ambiguous,
                     (true, _, _) if l.no_geometry => ItemStatus::RestoredWithoutGeometry,
@@ -919,13 +1037,30 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
     }
 
     // Phase C: stabilization. Apps that overwrite their geometry after map
-    // get re-placed a bounded number of times.
+    // get re-placed a bounded number of times. Windows of one app are also
+    // re-matched by title here: an app can map a window before naming it
+    // (VS Code on KWin Wayland: "Visual Studio Code", then
+    // "<folder> - Visual Studio Code"), so the window caught first may have
+    // been given another window's record.
     let deadline = Instant::now() + opts.stabilization;
-    while Instant::now() < deadline && !cancel.load(Ordering::SeqCst) {
+    let title_deadline = deadline + TITLE_SETTLE;
+    loop {
+        if cancel.load(Ordering::SeqCst) {
+            break;
+        }
+        let now = Instant::now();
+        let undecided = rematch_by_title(p, host, &mut live, &place, &emit);
+        if now >= deadline && !(undecided && now < title_deadline) {
+            break;
+        }
         std::thread::sleep(Duration::from_millis(150));
         for i in 0..total {
             let l = &live[i];
-            if !l.status.is_success() || l.requested.is_none() || l.reapplied >= opts.max_reapply {
+            // A launched window that had not taken its geometry yet (the app
+            // was still sizing it) gets the same bounded re-tries, and counts
+            // as placed once it is where it was asked to be.
+            let unsettled = l.status == ItemStatus::LaunchedUnplaced;
+            if !(l.status.is_success() || unsettled) || l.requested.is_none() {
                 continue;
             }
             let Some(wid) = l.window.clone() else { continue };
@@ -935,6 +1070,16 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
             }
             let req = l.requested.unwrap();
             let tol = opts.tolerance_px.max(w.constraints.inc_w.unwrap_or(0)).max(w.constraints.inc_h.unwrap_or(0));
+            if unsettled && w.frame.max_edge_delta(&req) <= tol {
+                live[i].status = ItemStatus::LaunchedAndPlaced;
+                live[i].observed = Some(w.frame);
+                live[i].message = Some("placed once the app had finished sizing the window".into());
+                emit(&live, i, "stabilize");
+                continue;
+            }
+            if l.reapplied >= opts.max_reapply {
+                continue;
+            }
             if w.frame.max_edge_delta(&req) > tol {
                 live[i].reapplied += 1;
                 if let Ok(o) = host.place(&wid, req) {

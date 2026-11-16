@@ -29,7 +29,10 @@ logins, log-outs and reboots in VMs (GNOME 46, Plasma 6.6 and 5.27, Sway,
 Hyprland, COSMIC) on virtual displays; checked by hand on two desktops with
 physical monitors. Every Divvy item (SRS DV-01..28) passed on one precise
 platform, KDE Plasma 6.6.6 Wayland on Ubuntu 26.04, so that is the one platform
-called Divvy-equivalent ([SRS_STATUS.md](SRS_STATUS.md), section 16). Read
+called Divvy-equivalent; it is also the one platform where all five session
+restore tests the SRS names pass (reboot, power loss, no duplicates, monitor
+changes, mixed apps including Firefox, Chrome and VS Code), so session restore
+is called supported there ([SRS_STATUS.md](SRS_STATUS.md), section 16). Read
 [PLATFORM_MATRIX.md](PLATFORM_MATRIX.md) before relying on it.
 
 ## Install

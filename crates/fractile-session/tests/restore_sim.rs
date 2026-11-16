@@ -23,6 +23,12 @@ struct AppSim {
     /// app re-asserts its own size once after being placed
     fights: bool,
     titles: Vec<String>,
+    /// maps each window titled `generic_title` and gives it its real title
+    /// this much later (VS Code on KWin Wayland)
+    late_title: Option<(String, Duration)>,
+    /// the first resize of each window is not taken (the app is still
+    /// sizing it); later ones are
+    slow_size: bool,
 }
 
 struct Sim {
@@ -37,6 +43,8 @@ struct Sim {
     persisted: RefCell<BTreeMap<String, ItemResult>>,
     fought: RefCell<std::collections::HashSet<String>>,
     next_id: RefCell<u32>,
+    renames: RefCell<Vec<(Instant, String, String)>>,
+    sized: RefCell<std::collections::HashSet<String>>,
     can_move: bool,
     /// No window control at all (an unsupported desktop): nothing listed,
     /// nothing moved.
@@ -66,6 +74,8 @@ impl Sim {
             persisted: RefCell::new(BTreeMap::new()),
             fought: RefCell::new(Default::default()),
             next_id: RefCell::new(1),
+            renames: RefCell::new(vec![]),
+            sized: RefCell::new(Default::default()),
             can_move: true,
             no_control: false,
             reject_state: false,
@@ -73,7 +83,15 @@ impl Sim {
         }
     }
     fn app(mut self, desktop: &str, wpl: u32, delay_ms: u64, fights: bool, titles: &[&str]) -> Sim {
-        self.apps.insert(desktop.into(), AppSim { windows_per_launch: wpl, delay: Duration::from_millis(delay_ms), fights, titles: titles.iter().map(|s| s.to_string()).collect() });
+        self.apps.insert(desktop.into(), AppSim { windows_per_launch: wpl, delay: Duration::from_millis(delay_ms), fights, titles: titles.iter().map(|s| s.to_string()).collect(), late_title: None, slow_size: false });
+        self
+    }
+    fn slow_size(mut self, desktop: &str) -> Sim {
+        self.apps.get_mut(desktop).unwrap().slow_size = true;
+        self
+    }
+    fn late_titles(mut self, desktop: &str, generic: &str, after_ms: u64) -> Sim {
+        self.apps.get_mut(desktop).unwrap().late_title = Some((generic.into(), Duration::from_millis(after_ms)));
         self
     }
     fn open(&self, desktop: &str, title: &str) -> String {
@@ -100,8 +118,22 @@ impl Sim {
             let app = &self.apps[&d];
             let k = self.count(&d);
             let title = app.titles.get(k).cloned().unwrap_or_else(|| format!("{d} window"));
-            let id = self.open(&d, &title);
+            let id = match &app.late_title {
+                Some((generic, after)) => {
+                    let id = self.open(&d, generic);
+                    self.renames.borrow_mut().push((now + *after, id.clone(), title));
+                    id
+                }
+                None => self.open(&d, &title),
+            };
             self.new_events.borrow_mut().push_back(id);
+        }
+        let due: Vec<(Instant, String, String)> = self.renames.borrow().iter().filter(|r| r.0 <= now).cloned().collect();
+        self.renames.borrow_mut().retain(|r| r.0 > now);
+        for (_, id, title) in due {
+            if let Some(w) = self.windows.borrow_mut().iter_mut().find(|w| w.id == id) {
+                w.title = title;
+            }
         }
     }
     fn count(&self, desktop: &str) -> usize {
@@ -154,6 +186,12 @@ impl RestoreHost for Sim {
     fn place(&self, id: &str, rect: Rect) -> Result<PlacementOutcome, String> {
         let mut ws = self.windows.borrow_mut();
         let w = ws.iter_mut().find(|w| w.id == id).ok_or("gone")?;
+        let slow = w.desktop_file_id.as_ref().and_then(|d| self.apps.get(d)).is_some_and(|a| a.slow_size);
+        if slow && self.sized.borrow_mut().insert(id.into()) {
+            w.frame = Rect::new(rect.x, rect.y, rect.w, rect.h - 226);
+            let err = 226;
+            return Ok(PlacementOutcome { window_id: id.into(), requested: rect, observed: Some(w.frame), max_error_px: Some(err), within_tolerance: false, attempts: 1, note: None });
+        }
         w.frame = rect;
         Ok(PlacementOutcome { window_id: id.into(), requested: rect, observed: Some(rect), max_error_px: Some(0), within_tolerance: true, attempts: 1, note: None })
     }
@@ -681,4 +719,56 @@ fn cancel_before_placing_reports_cancelled() {
     assert!(rep.cancelled);
     assert_eq!(rep.items[0].status, ItemStatus::Cancelled, "{:?}", rep.items[0]);
     assert_eq!(sim.persisted.borrow().get("r0").map(|i| i.status), Some(ItemStatus::Cancelled));
+}
+
+/// An app that maps its windows before naming them, in another order than
+/// the records (VS Code on KWin Wayland reopened "t14-zeta" first, titled
+/// "Visual Studio Code" until the folder loaded): each record still ends on
+/// the window with its title, placed where that window was.
+#[test]
+fn windows_named_after_mapping_are_matched_by_title() {
+    let outs = vec![out("A", 0, 2560), out("B", 2560, 3440)];
+    // one launch reopens both, zeta first; titles arrive 300 ms after mapping
+    let sim = Sim::new(outs.clone())
+        .app("code.desktop", 2, 50, false, &["t14-zeta - Visual Studio Code", "t14-epsilon - Visual Studio Code"])
+        .late_titles("code.desktop", "Visual Studio Code", 300);
+    let ra = Rect::new(0, 32, 1280, 1408);
+    let rb = Rect::new(4280, 32, 1720, 1408);
+    let recs = vec![
+        rec("eps", "code.desktop", "t14-epsilon - Visual Studio Code", 0, "A", ra, WA_A),
+        rec("zeta", "code.desktop", "t14-zeta - Visual Studio Code", 1, "B", rb, WA_B),
+    ];
+    let mut cfg = Config::default();
+    cfg.apps.insert("code.desktop".into(), AppPolicy { launch: LaunchPolicy::IfMissing, extra_args: vec![], app_manages_session: Some(true) });
+    let s = snapshot(outs, recs);
+    let o = opts(&cfg);
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    assert_eq!(sim.launches.borrow().len(), 1, "{:#?}", rep.items);
+    for (id, want, title) in [("eps", ra, "t14-epsilon"), ("zeta", rb, "t14-zeta")] {
+        let it = rep.items.iter().find(|i| i.record_id == id).unwrap();
+        assert_eq!(it.status, ItemStatus::LaunchedAndPlaced, "{:#?}", rep.items);
+        let w = sim.window(it.window_id.as_ref().unwrap()).unwrap();
+        assert!(w.title.contains(title), "{id} got window {:?}", w.title);
+        assert_eq!(w.frame, want, "{id}");
+    }
+}
+
+/// A launched window that has not taken its size when it is first placed
+/// (VS Code on KWin Wayland: 800x928 asked 800x1154) is placed again and
+/// reported placed once it is where it was asked to be, not left as
+/// "launched, not placed".
+#[test]
+fn window_still_being_sized_is_placed_again_and_reported_placed() {
+    let outs = vec![out("A", 0, 2560)];
+    let sim = Sim::new(outs.clone()).app("code.desktop", 1, 50, false, &["t14-epsilon - Visual Studio Code"]).slow_size("code.desktop");
+    let ra = Rect::new(0, 32, 1280, 1408);
+    let s = snapshot(outs, vec![rec("eps", "code.desktop", "t14-epsilon - Visual Studio Code", 0, "A", ra, WA_A)]);
+    let cfg = Config::default();
+    let o = opts(&cfg);
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    let it = &rep.items[0];
+    assert_eq!(it.status, ItemStatus::LaunchedAndPlaced, "{:#?}", rep.items);
+    assert_eq!(sim.window(it.window_id.as_ref().unwrap()).unwrap().frame, ra);
 }

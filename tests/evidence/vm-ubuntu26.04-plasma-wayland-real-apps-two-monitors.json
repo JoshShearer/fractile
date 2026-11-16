@@ -1,0 +1,146 @@
+{
+  "suite": "vm-ubuntu26.04-plasma-wayland-real-apps-two-monitors",
+  "when": "2026-11-16T04:42:22+0000",
+  "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering, two outputs: 1600x1200 at scale 1 and 5120x2160 at scale 2.7, 1896x800 logical) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "results": [
+    {
+      "id": "P00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P01",
+      "name": "the .deb installs (Ubuntu 26.04.1 LTS; kwin-wayland 4:6.6.6-0ubuntu0.1; kwin-x11 ; plasma-workspace 4:6.6.6-0ubuntu0.1;)",
+      "ok": true,
+      "detail": "fractile\t0.9.0-1"
+    },
+    {
+      "id": "P02",
+      "name": "real plasma-wayland login: the service runs from the systemd unit and controls windows",
+      "ok": true,
+      "detail": "adapter kwin session wayland; setup {\"extension\": 0, \"extension_info\": [\"kwriteconfig6 0\", \"reconfigure 0 \", \"script loaded True\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.con; prep {\"set_env\": 0, \"restart\": 0, \"service_up\": true, \"shortcut\": 0, \"first_run\": 0, \"status\": {\"adapter\": \"kwin\", \"session_type\": \"wayland\", \"window_control\": true, \"global_shortcuts\": true, \"hotkey_errors\": {}, \"ui_attached\": true}}"
+    },
+    {
+      "id": "P03",
+      "name": "a second service started by hand says it is already running and leaves the running one alone (one instance)",
+      "ok": true,
+      "detail": "fractiled: already running\nrc=0; service pid 5771 -> 5771"
+    },
+    {
+      "id": "P04b",
+      "name": "the desktop has two monitors",
+      "ok": true,
+      "detail": "[('conn-Virtual-1-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}), ('conn-Virtual-2-1896x800', {'h': 800, 'w': 1896, 'x': 1600, 'y': 0})]"
+    },
+    {
+      "id": "R00",
+      "name": "Firefox, Google Chrome and VS Code install in the VM",
+      "ok": true,
+      "detail": "Mozilla Firefox 160.0; Google Chrome 157.0.8103.78 ; 1.146.0 "
+    },
+    {
+      "id": "R01a",
+      "name": "Firefox: two windows open with a throwaway profile and are identified as one app",
+      "ok": true,
+      "detail": "[('T14 Alpha \u2014 Mozilla Firefox', 'firefox_firefox', 'firefox_firefox.desktop', None), ('T14 Beta \u2014 Mozilla Firefox', 'firefox_firefox', 'firefox_firefox.desktop', None)]"
+    },
+    {
+      "id": "R01p",
+      "name": "Firefox: before saving, its windows keep the cells they were placed in (one on each monitor)",
+      "ok": true,
+      "detail": "asked {'T14 Alpha': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Beta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} got {'T14 Alpha': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Beta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}}"
+    },
+    {
+      "id": "R01b",
+      "name": "Firefox: restore launches it once, it reopens its own two windows, and each is placed where it was, one on each monitor; no extra windows",
+      "ok": true,
+      "detail": "launches=1 windows=2 placed={'T14 Alpha': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Beta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} want={'T14 Alpha': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Beta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} state=completed closed_on_sigterm=True killed_after_15s=0; desktop firefox_firefox.desktop"
+    },
+    {
+      "id": "R01c",
+      "name": "Firefox: the report covers both windows (AMBIGUOUS with the reason when the app's titles are never stored) and claims nothing about tabs or unsaved content",
+      "ok": true,
+      "detail": "titles withheld False; [{\"label\": \"firefox_firefox\", \"status\": \"LAUNCHED_AND_PLACED\", \"message\": null}, {\"label\": \"firefox_firefox #2\", \"status\": \"LAUNCHED_AND_PLACED\", \"message\": null}]"
+    },
+    {
+      "id": "R01d",
+      "name": "Firefox: restoring again launches nothing and opens nothing new",
+      "ok": true,
+      "detail": "launches=0 windows=2"
+    },
+    {
+      "id": "R01e",
+      "name": "Firefox: with a private window open, the private window's title is not in the snapshot (left out, or titles of this browser are never stored)",
+      "ok": true,
+      "detail": "private window 'T14 Secret \u2014 Mozilla Firefox Private Browsing'; open 3; recorded 2 (left out: True); title hints ['T14 Alpha \u2014 Mozilla Firefox', 'T14 Beta \u2014 Mozilla Firefox']"
+    },
+    {
+      "id": "R02a",
+      "name": "Google Chrome: two windows open with a throwaway profile and are identified as one app",
+      "ok": true,
+      "detail": "[('T14 Gamma - Google Chrome', 'google-chrome', 'google-chrome.desktop', None), ('T14 Delta - Google Chrome', 'google-chrome', 'google-chrome.desktop', None)]"
+    },
+    {
+      "id": "R02p",
+      "name": "Google Chrome: before saving, its windows keep the cells they were placed in (one on each monitor)",
+      "ok": true,
+      "detail": "asked {'T14 Gamma': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Delta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} got {'T14 Gamma': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Delta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}}"
+    },
+    {
+      "id": "R02b",
+      "name": "Google Chrome: restore launches it once, it reopens its own two windows, and each is placed where it was, one on each monitor; no extra windows",
+      "ok": true,
+      "detail": "launches=1 windows=2 placed={'T14 Gamma': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Delta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} want={'T14 Gamma': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 'T14 Delta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} state=completed closed_on_sigterm=True killed_after_15s=0; desktop google-chrome.desktop"
+    },
+    {
+      "id": "R02c",
+      "name": "Google Chrome: the report covers both windows (AMBIGUOUS with the reason when the app's titles are never stored) and claims nothing about tabs or unsaved content",
+      "ok": true,
+      "detail": "titles withheld True; [{\"label\": \"google-chrome\", \"status\": \"AMBIGUOUS\", \"message\": \"indistinguishable windows; assigned by instance order\"}, {\"label\": \"google-chrome #2\", \"status\": \"LAUNCHED_AND_PLACED\", \"message\": null}]"
+    },
+    {
+      "id": "R02d",
+      "name": "Google Chrome: restoring again launches nothing and opens nothing new",
+      "ok": true,
+      "detail": "launches=0 windows=2"
+    },
+    {
+      "id": "R02e",
+      "name": "Google Chrome: with a private window open, the private window's title is not in the snapshot (left out, or titles of this browser are never stored)",
+      "ok": true,
+      "detail": "private window 'T14 Secret - Google Chrome'; open 3; recorded 3 (left out: False); title hints [None, None, None]"
+    },
+    {
+      "id": "R03a",
+      "name": "VS Code: two windows open with a throwaway profile and are identified as one app",
+      "ok": true,
+      "detail": "[('t14-epsilon - Visual Studio Code', 'com.microsoft.VSCode', 'com.microsoft.VSCode.desktop', None), ('t14-zeta - Visual Studio Code', 'com.microsoft.VSCode', 'com.microsoft.VSCode.desktop', None)]"
+    },
+    {
+      "id": "R03p",
+      "name": "VS Code: before saving, its windows keep the cells they were placed in (one on each monitor)",
+      "ok": true,
+      "detail": "asked {'t14-epsilon': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 't14-zeta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} got {'t14-epsilon': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 't14-zeta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}}"
+    },
+    {
+      "id": "R03b",
+      "name": "VS Code: restore launches it once, it reopens its own two windows, and each is placed where it was, one on each monitor; no extra windows",
+      "ok": true,
+      "detail": "launches=1 windows=2 placed={'t14-epsilon': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 't14-zeta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} want={'t14-epsilon': {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, 't14-zeta': {'h': 800, 'w': 948, 'x': 2548, 'y': 0}} state=completed closed_on_sigterm=True killed_after_15s=0; desktop com.microsoft.VSCode.desktop"
+    },
+    {
+      "id": "R03c",
+      "name": "VS Code: the report covers both windows (AMBIGUOUS with the reason when the app's titles are never stored) and claims nothing about tabs or unsaved content",
+      "ok": true,
+      "detail": "titles withheld False; [{\"label\": \"com.microsoft.VSCode\", \"status\": \"LAUNCHED_AND_PLACED\", \"message\": \"confirmed by the window's title\"}, {\"label\": \"com.microsoft.VSCode #2\", \"status\": \"LAUNCHED_AND_PLACED\", \"message\": null}]"
+    },
+    {
+      "id": "R03d",
+      "name": "VS Code: restoring again launches nothing and opens nothing new",
+      "ok": true,
+      "detail": "launches=0 windows=2"
+    }
+  ],
+  "log": []
+}

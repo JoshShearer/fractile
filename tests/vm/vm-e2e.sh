@@ -36,6 +36,8 @@ docker run --rm -v fractile-vm-cache:/cache --user 0 "$tag" chown "$(id -u)" /ca
 [[ -n ${FRACTILE_VM_PANEL:-} ]] && args+=(--panel)
 # FRACTILE_VM_HEADS=2 (with FRACTILE_VM_PANEL=1) adds a second monitor and the two-monitor checks.
 [[ -n ${FRACTILE_VM_HEADS:-} ]] && args+=(--heads "$FRACTILE_VM_HEADS")
+# FRACTILE_VM_REAL_APPS=1 (with FRACTILE_VM_HEADS=2): Firefox, Chrome and VS Code restored across the monitors (T14) instead of the panel checks.
+[[ -n ${FRACTILE_VM_REAL_APPS:-} ]] && args+=(--real-apps)
 # PK-06: FRACTILE_VM_UPGRADE_FROM="old1.deb old2.deb" (inside the repository,
 # oldest first) installs those, then upgrades to the .deb.
 if [[ -n ${FRACTILE_VM_UPGRADE_FROM:-} ]]; then

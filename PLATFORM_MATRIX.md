@@ -57,8 +57,16 @@ recoverable, apt install and upgrade checked there (SRS_STATUS.md, section
 16). Not claimed for GNOME X11 or GNOME Wayland, whose columns combine several
 versions and setups.
 
-**Session restore supported (SRS 16):** not claimed on any platform, because
-no single platform has passed all five tests SRS 16 names:
+**Session restore supported (SRS 16):** claimed on KDE Plasma 6.6.6
+Wayland (KWin 6.6.6), Ubuntu 26.04.1 LTS (E13) only, where all five tests SRS
+16 names pass with the final build: real reboot and log-out (V05, V06), two
+power cuts during snapshot writes (PC00-PC03), duplicate avoidance (V05/V06,
+P28, R01d-R03d), monitor remapping with the second monitor turned off and on
+(P29-P33) and mixed apps: Qt, GTK 3 and GTK 4 apps across two monitors (P27)
+and Firefox 160 (snap), Chrome 157 and VS Code 1.146 (R01-R03). Qualified as
+in SRS_STATUS.md section 16 (window frames only; Chrome's windows matched by
+order; KWin moves windows back itself on reconnect; virtual monitors). Not
+claimed elsewhere:
 
 - GNOME Xorg (E10) has passed four of them: a real reboot and log-out (V05,
   V06), a simulated power loss during snapshot writes (PC01-PC03, then all 15
@@ -68,8 +76,8 @@ no single platform has passed all five tests SRS 16 names:
 - GNOME Wayland has passed monitor remapping (D04-D09), a real reboot and
   log-out, and duplicate avoidance. The power-loss run was on the Xorg
   session only.
-- Plasma (6.6 Wayland and 5.27 X11), Sway 1.11 and Hyprland 0.57.2 have
-  passed a real reboot and a real log-out (E10, E13, E14, E15).
+- Plasma 5.27 X11, Sway 1.11 and Hyprland 0.57.2 have passed a real reboot
+  and a real log-out (E10, E14, E15).
 - COSMIC 1.11.0 restores without positions or sizes (apps, workspaces and
   maximized state after a real reboot, E16); it cannot qualify, since
   placement is blocked there.

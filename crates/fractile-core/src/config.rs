@@ -187,8 +187,8 @@ pub enum PowerLossPolicy {
 /// (checked with Google Chrome 157 on X11: same title form, same WM_CLASS,
 /// role and every other property).
 pub fn default_untitled_apps() -> Vec<String> {
-    ["google-chrome", "google-chrome-beta", "google-chrome-unstable", "chromium", "chromium-browser", "org.chromium.Chromium",
-     "brave-browser", "com.brave.Browser", "microsoft-edge", "microsoft-edge-beta", "com.microsoft.Edge", "vivaldi-stable", "com.vivaldi.Vivaldi"]
+    ["google-chrome", "google-chrome-beta", "google-chrome-unstable", "chromium", "chromium-browser", "org.chromium.Chromium", "chromium_chromium",
+     "brave-browser", "com.brave.Browser", "brave_brave", "microsoft-edge", "microsoft-edge-beta", "com.microsoft.Edge", "vivaldi-stable", "com.vivaldi.Vivaldi"]
         .iter()
         .map(|s| s.to_string())
         .collect()
@@ -301,6 +301,7 @@ pub fn builtin_manages_session(desktop_id: &str) -> bool {
         "chromium-browser",
         "org.chromium.chromium",
         "brave-browser",
+        "brave",
         "com.brave.browser",
         "microsoft-edge",
         "com.microsoft.edge",
@@ -317,7 +318,10 @@ pub fn builtin_manages_session(desktop_id: &str) -> bool {
         "com.vscodium.codium",
         "dev.zed.zed",
     ];
-    EXACT.contains(&id.as_str()) || id.starts_with("jetbrains-") || id.starts_with("com.jetbrains.")
+    let known = |id: &str| EXACT.contains(&id) || id.starts_with("jetbrains-") || id.starts_with("com.jetbrains.");
+    // A snap's desktop id is "<snap>_<app>" (Ubuntu's own Firefox is
+    // firefox_firefox.desktop): the app part names the app.
+    known(&id) || id.split_once('_').is_some_and(|(snap, app)| !snap.is_empty() && known(app))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -613,10 +617,12 @@ mod tests {
 
     #[test]
     fn well_known_browsers_and_editors_restore_their_own_windows() {
-        for id in ["firefox.desktop", "org.mozilla.firefox.desktop", "google-chrome.desktop", "code.desktop", "com.visualstudio.code.desktop", "com.microsoft.VSCode.desktop", "jetbrains-idea.desktop", "Chromium.desktop"] {
+        for id in ["firefox.desktop", "org.mozilla.firefox.desktop", "google-chrome.desktop", "code.desktop", "com.visualstudio.code.desktop", "com.microsoft.VSCode.desktop", "jetbrains-idea.desktop", "Chromium.desktop",
+                   // snaps (Ubuntu's default Firefox is one)
+                   "firefox_firefox.desktop", "chromium_chromium.desktop", "code_code.desktop", "brave_brave.desktop"] {
             assert!(builtin_manages_session(id), "{id}");
         }
-        for id in ["org.gnome.TextEditor.desktop", "xterm.desktop", "firefoxish.desktop", "codex.desktop"] {
+        for id in ["org.gnome.TextEditor.desktop", "xterm.desktop", "firefoxish.desktop", "codex.desktop", "gimp_gimp.desktop", "_firefox.desktop"] {
             assert!(!builtin_manages_session(id), "{id}");
         }
     }

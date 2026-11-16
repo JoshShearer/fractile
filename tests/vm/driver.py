@@ -74,6 +74,7 @@ HOLD = 0
 HOLD_AT = "login"
 POWER_CUT = False
 PANEL = False  # --panel: a USB tablet for absolute pointer input
+REAL_APPS = False  # --real-apps: Firefox, Chrome and VS Code across the monitors instead of the panel checks
 HEADS = 1  # --heads 2: a second virtual monitor (virtio-vga max_outputs=2, forced on in the guest)
 DB = "~/.local/share/fractile/fractile.db"
 CLI_ENV = "XDG_RUNTIME_DIR=/run/user/$(id -u)"
@@ -746,7 +747,7 @@ def run(session: str, deb: str) -> None:
 
         lay = vm.vmctl("open-apps", timeout=900)
         before = lay.get("windows") or []
-        shot = vm.screenshot(f"{session}-01-before-reboot")
+        shot = vm.screenshot(f"{session}-{'pc0-before-cut' if POWER_CUT else '01-before-reboot'}")
         apps = sorted({w["app"] for w in before})
         if not check("V04", "10 apps / 15 windows opened and placed on a 4x4 grid",
                      len(before) == 15 and len(apps) == 10, f"{len(before)} windows, {len(apps)} apps; {shot}; {json.dumps(lay)[:300] if len(before) != 15 else ''}"):
@@ -1305,6 +1306,10 @@ def run_panel(session: str, deb: str) -> None:
             vm.screenshot(f"panel-{session}-two-00-one-output")
             return
         hold("two")
+        if REAL_APPS:
+            real_app_checks(vm, session, outs)
+            hold("end")
+            return
         def find_editor():
             return next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.TextEditor.desktop"), None)
 
@@ -1838,6 +1843,321 @@ def two_monitor_checks(vm: "VM", session: str, wid: str, outs: list, frame, open
               bool(pb and want) and near(got, want, 1) and inside(got or {"x": -1, "y": -1, "w": 0, "h": 0}, pb),
               f"rotate {json.dumps(rot)[:160]}; output now {R} work area {(pb or {}).get('work_area')}; want {want} got {got}; {shot}")
         vm.vmctl(f"kscreen output.{ob['name']}.rotation.none")
+        wait_for(lambda: (lambda o: o if o and o["rect"]["w"] > o["rect"]["h"] else None)(
+            next((o for o in (vm.call("list_outputs").get("result") or []) if o["name"] == ob["name"]), None)), 30, 1)
+        time.sleep(2)
+    two_monitor_restore_checks(vm, session, outs, geo)
+
+
+REAL_APP_PREFS_FF = {
+    "browser.startup.page": 3, "browser.sessionstore.resume_from_crash": True, "browser.sessionstore.interval": 1000,
+    "browser.shell.checkDefaultBrowser": False, "browser.aboutwelcome.enabled": False, "trailhead.firstrun.didSeeAboutWelcome": True,
+    "browser.startup.homepage_override.mstone": "ignore", "startup.homepage_welcome_url": "", "startup.homepage_welcome_url.additional": "",
+    "datareporting.policy.dataSubmissionEnabled": False, "datareporting.healthreport.uploadEnabled": False,
+    "toolkit.telemetry.reportingpolicy.firstRun": False, "toolkit.telemetry.enabled": False, "app.update.auto": False,
+    "app.normandy.enabled": False, "extensions.update.enabled": False, "browser.newtabpage.enabled": False,
+    "browser.tabs.warnOnClose": False, "browser.warnOnQuit": False,
+}
+
+
+def real_app_checks(vm: "VM", session: str, outs: list) -> None:
+    """T14 / SRS 16 mixed-app regression on this desktop: real Firefox,
+    Google Chrome and VS Code (the A01-A03 checks of
+    tests/integration/e2e_x11_apps.py), with throwaway profiles, each with
+    one window on each monitor; quit as a log-out does (SIGTERM), then
+    restored by Fractile."""
+    home = "/home/tester/t14"
+    def cli(args: str, timeout=300):
+        p = vm.ssh(f"XDG_RUNTIME_DIR=/run/user/$(id -u) fractile --json {args}", timeout=timeout)
+        try:
+            return json.loads(p.stdout)
+        except ValueError:
+            return {"error": (p.stderr or p.stdout).strip()[-300:]}
+
+    def eq(r, q, t=4):
+        return bool(r and q) and all(abs(r[k] - q[k]) <= t for k in ("x", "y", "w", "h"))
+
+    inst = vm.ssh(
+        "set -e; cd /tmp; command -v firefox >/dev/null || sudo snap install firefox >/tmp/ff.log 2>&1; "
+        "command -v google-chrome >/dev/null || { curl -fsSL -o chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb; "
+        "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q ./chrome.deb >/tmp/chrome.log 2>&1; }; "
+        "command -v code >/dev/null || { curl -fsSL -o code.deb 'https://update.code.visualstudio.com/latest/linux-deb-x64/stable'; "
+        "echo 'code code/add-microsoft-repo boolean false' | sudo debconf-set-selections; "
+        "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q ./code.deb >/tmp/code.log 2>&1; }; "
+        "firefox --version 2>/dev/null | head -1; google-chrome --version; code --version | head -1", timeout=1800)
+    vers = inst.stdout.strip().replace("\n", "; ")
+    if not check("R00", "Firefox, Google Chrome and VS Code install in the VM", inst.returncode == 0 and "Firefox" in vers and "Chrome" in vers and len(vers.split("; ")) >= 3,
+                 f"{vers[-300:]} {inst.stderr.strip()[-300:]}"):
+        return
+    a, b = outs[0], outs[1]
+    pages = {}
+    for t in ("T14 Alpha", "T14 Beta", "T14 Gamma", "T14 Delta", "T14 Secret"):
+        f = f"{home}/pages/{t.replace(' ', '-')}.html"
+        pages[t] = "file://" + f
+    vm.ssh(f"rm -rf {home}; mkdir -p {home}/pages {home}/ff-profile {home}/chrome-profile/Default {home}/code-user/User {home}/code-ext {home}/t14-epsilon {home}/t14-zeta; "
+           + "; ".join(f"echo '<!doctype html><title>{t}</title><h1>{t}</h1>' > {shlex.quote(pages[t][7:])}" for t in pages)
+           + f"; echo t14-epsilon > {home}/t14-epsilon/README.md; echo t14-zeta > {home}/t14-zeta/README.md; touch '{home}/chrome-profile/First Run'")
+    ff_user = "".join(f"user_pref({json.dumps(k)}, {json.dumps(v)});\n" for k, v in REAL_APP_PREFS_FF.items())
+    vm.ssh(f"printf %s {shlex.quote(ff_user)} > {home}/ff-profile/user.js")
+    vm.ssh(f"printf %s {shlex.quote(json.dumps({'session': {'restore_on_startup': 1}, 'browser': {'check_default_browser': False, 'has_seen_welcome_page': True}}))} > {home}/chrome-profile/Default/Preferences")
+    vm.ssh(f"printf %s {shlex.quote(json.dumps({'window.restoreWindows': 'all', 'telemetry.telemetryLevel': 'off', 'update.mode': 'none', 'extensions.autoCheckUpdates': False, 'workbench.startupEditor': 'none', 'security.workspace.trust.enabled': False, 'window.titleBarStyle': 'native', 'workbench.enableExperiments': False}))} > {home}/code-user/User/settings.json")
+    ff = ["firefox", "--profile", f"{home}/ff-profile"]
+    ch = ["google-chrome", f"--user-data-dir={home}/chrome-profile", "--no-first-run", "--no-default-browser-check", "--password-store=basic",
+          "--disable-background-networking", "--disable-component-update", "--disable-sync", "--disable-features=Translate,MediaRouter"]
+    co = ["code", "--user-data-dir", f"{home}/code-user", "--extensions-dir", f"{home}/code-ext"]
+    specs = [
+        {"key": "firefox", "name": "Firefox", "argv": ff, "exe": "firefox", "first": ff + ["--new-window", pages["T14 Alpha"]], "second": ff + ["--new-window", pages["T14 Beta"]],
+         "private": ff + ["--private-window", pages["T14 Secret"]], "titles": ["T14 Alpha", "T14 Beta"], "ids": ("firefox",)},
+        {"key": "chrome", "name": "Google Chrome", "argv": ch, "exe": "chrome", "first": ch + ["--new-window", pages["T14 Gamma"]], "second": ch + ["--new-window", pages["T14 Delta"]],
+         "private": ch + ["--incognito", pages["T14 Secret"]], "titles": ["T14 Gamma", "T14 Delta"], "ids": ("google-chrome",)},
+        {"key": "code", "name": "VS Code", "argv": co, "exe": "code", "first": co + ["--new-window", f"{home}/t14-epsilon"], "second": co + ["--new-window", f"{home}/t14-zeta"],
+         "titles": ["t14-epsilon", "t14-zeta"], "ids": ("code", "com.microsoft.vscode", "visual-studio-code")},
+    ]
+    for n, spec in enumerate(specs, 1):
+        tid = f"R{n:02d}"
+        def mine(spec=spec):
+            ws = vm.call("list_windows").get("result") or []
+            return [w for w in ws if any(i in (w.get("app_id") or "").lower() or (w.get("desktop_file_id") or "").lower().startswith(i) for i in spec["ids"])]
+        def titled(t, spec=spec):
+            return next((w for w in mine(spec) if t in (w.get("title") or "")), None)
+        vm.vmctl("exec " + shlex.quote(json.dumps(spec["first"])))
+        w1 = wait_for(lambda: titled(spec["titles"][0]), 90, 1)
+        vm.vmctl("exec " + shlex.quote(json.dumps(spec["second"])))
+        w2 = wait_for(lambda: titled(spec["titles"][1]), 60, 1)
+        ws = mine()
+        did = {w.get("desktop_file_id") for w in ws}
+        if not check(f"{tid}a", f"{spec['name']}: two windows open with a throwaway profile and are identified as one app",
+                     bool(w1 and w2) and len(ws) == 2 and len(did) == 1 and None not in did and "" not in did,
+                     str([(w.get("title"), w.get("app_id"), w.get("desktop_file_id"), w.get("is_xwayland", w.get("backend"))) for w in ws])):
+            vm.ssh(f"pkill -u tester -x {spec['exe']}; true")
+            continue
+        desk = did.pop()
+        # Fractile launches the app from its desktop entry: point that at the
+        # throwaway profile (a user entry overrides the system one).
+        sysent = vm.ssh(f"cat /usr/share/applications/{desk} /var/lib/snapd/desktop/applications/{desk} 2>/dev/null | grep -m1 '^Name='").stdout.strip() or f"Name={spec['name']}"
+        vm.ssh(f"mkdir -p ~/.local/share/applications; printf '%s\\n' '[Desktop Entry]' 'Type=Application' {shlex.quote(sysent + ' (test profile)')} "
+               f"{shlex.quote('Exec=' + ' '.join(spec['argv']) + ' %U')} 'Terminal=false' > ~/.local/share/applications/{desk}")
+        vm.call("app_policy_set", {"desktop_id": desk, "policy": {"launch": "if_missing", "extra_args": []}})
+        # An app can apply its own window geometry a while after it opens
+        # (VS Code does): place until both windows keep their cell.
+        cells = {spec["titles"][0]: (w1["id"], a, 0), spec["titles"][1]: (w2["id"], b, 1)}
+        asked = {}
+        for _try in range(4):
+            for t, (wid_, o, col) in cells.items():
+                r = vm.call("place", {"window": wid_, "output": o["stable_id"], "grid": {"cols": 2, "rows": 1}, "selection": {"col0": col, "row0": 0, "col1": col, "row1": 0}}).get("result") or {}
+                asked[t] = (r.get("outcome") or r).get("requested") or asked.get(t)
+            time.sleep(3)
+            want = {t: (titled(t) or {}).get("frame") for t in spec["titles"]}
+            if all(eq(want[t], asked.get(t), 6) for t in spec["titles"]):
+                break
+        if not check(f"{tid}p", f"{spec['name']}: before saving, its windows keep the cells they were placed in (one on each monitor)",
+                     all(eq(want[t], asked.get(t), 6) for t in spec["titles"]), f"asked {asked} got {want}"):
+            vm.ssh(f"pkill -TERM -u tester -x {spec['exe']}; true")
+            continue
+        time.sleep(3)  # the apps write their own session state periodically
+        cli(f"save --name t14-{spec['key']}")
+        vm.ssh(f"pkill -TERM -u tester -x {spec['exe']}; true")
+        gone = wait_for(lambda: not mine(), 30, 0.5)
+        wait_for(lambda: vm.ssh(f"pgrep -u tester -x {spec['exe']}").returncode != 0, 15, 0.5)
+        lingered = vm.ssh(f"pgrep -u tester -x {spec['exe']} | wc -l; pkill -KILL -u tester -x {spec['exe']}; true").stdout.strip()
+        wait_for(lambda: vm.ssh(f"pgrep -u tester -x {spec['exe']}").returncode != 0, 10, 0.5)
+        rep = cli(f"restore --snapshot t14-{spec['key']} --approve-all", timeout=600)
+        both = wait_for(lambda: titled(spec["titles"][0]) and titled(spec["titles"][1]), 90, 1)
+        wait_for(lambda: (cli("restore-status").get("running") is None), 90, 1)
+        time.sleep(2)
+        ws = mine()
+        placed = {t: (titled(t) or {}).get("frame") for t in spec["titles"]}
+        launches = ((rep or {}).get("report") or {}).get("launches")
+        check(f"{tid}b", f"{spec['name']}: restore launches it once, it reopens its own two windows, and each is placed where it was, one on each monitor; no extra windows",
+              bool(both) and len(ws) == 2 and all(eq(placed[t], want[t]) for t in spec["titles"]) and launches == 1,
+              f"launches={launches} windows={len(ws)} placed={placed} want={want} state={(rep or {}).get('state')} closed_on_sigterm={bool(gone)} killed_after_15s={lingered}; desktop {desk}")
+        items = [i for i in ((rep or {}).get("report") or {}).get("items", []) if i.get("label", "").split(" #")[0] == desk.removesuffix(".desktop")]
+        text = json.dumps(rep).lower()
+        # Titles of some browsers are never stored (their private windows
+        # cannot be told apart); their windows are then indistinguishable and
+        # the report must say so (AMBIGUOUS, with the reason).
+        withheld = all(r.get("title_hint") is None for r in ((cli(f"snapshot export t14-{spec['key']}") or {}).get("windows") or []) if r.get("desktop_file_id") == desk)
+        fine = lambda i: i.get("status") == "LAUNCHED_AND_PLACED" or (withheld and i.get("status") == "AMBIGUOUS" and "indistinguishable" in (i.get("message") or ""))  # noqa: E731
+        check(f"{tid}c", f"{spec['name']}: the report covers both windows (AMBIGUOUS with the reason when the app's titles are never stored) and claims nothing about tabs or unsaved content",
+              len(items) == 2 and all(fine(i) for i in items) and "unsaved" not in text and "tabs restored" not in text,
+              f"titles withheld {withheld}; " + json.dumps([{k: i.get(k) for k in ("label", "status", "message")} for i in items])[:400])
+        rep2 = cli(f"restore --snapshot t14-{spec['key']} --approve-all", timeout=600)
+        time.sleep(4)
+        check(f"{tid}d", f"{spec['name']}: restoring again launches nothing and opens nothing new",
+              ((rep2 or {}).get("report") or {}).get("launches") == 0 and len(mine()) == 2,
+              f"launches={((rep2 or {}).get('report') or {}).get('launches')} windows={len(mine())}")
+        if spec.get("private"):
+            vm.vmctl("exec " + shlex.quote(json.dumps(spec["private"])))
+            priv = wait_for(lambda: titled("T14 Secret"), 60, 1)
+            cli(f"save --name t14-{spec['key']}-private")
+            snap = cli(f"snapshot export t14-{spec['key']}-private")
+            recs = [r for r in (snap.get("windows") or []) if r.get("desktop_file_id") == desk]
+            hints = [r.get("title_hint") for r in recs]
+            left_out = bool(priv) and len(mine()) == 3 and len(recs) == 2
+            no_title = "Secret" not in json.dumps(snap)
+            check(f"{tid}e", f"{spec['name']}: with a private window open, the private window's title is not in the snapshot (left out, or titles of this browser are never stored)",
+                  bool(priv) and no_title and len(recs) >= 2,
+                  f"private window {(priv or {}).get('title')!r}; open {len(mine())}; recorded {len(recs)} (left out: {left_out}); title hints {hints}")
+        vm.screenshot(f"realapps-{session}-{spec['key']}-a")
+        vm.screenshot(f"realapps-{session}-{spec['key']}-b", head=1)
+        vm.ssh(f"pkill -TERM -u tester -x {spec['exe']}; true")
+        wait_for(lambda: vm.ssh(f"pgrep -u tester -x {spec['exe']}").returncode != 0, 20, 0.5)
+        vm.ssh(f"pkill -KILL -u tester -x {spec['exe']}; true")
+
+
+def two_monitor_restore_checks(vm: "VM", session: str, outs: list, geo: dict) -> None:
+    """SRS 16 "session restore supported": mixed apps (Qt, GTK 3, GTK 4)
+    restored across two monitors, a second restore that opens nothing, and
+    monitor remapping (T13; the same checks as D04-D08 on GNOME) with the
+    second monitor turned off and on in Plasma's display settings
+    (kscreen-doctor; QEMU cannot unplug it)."""
+    def cli(args: str, timeout=300):
+        p = vm.ssh(f"XDG_RUNTIME_DIR=/run/user/$(id -u) fractile --json {args}", timeout=timeout)
+        try:
+            return json.loads(p.stdout)
+        except ValueError:
+            return {"error": (p.stderr or p.stdout).strip()[-300:]}
+
+    def wins():
+        return vm.call("list_windows").get("result") or []
+
+    def by_app():
+        d = {}
+        for w in wins():
+            d.setdefault(w.get("desktop_file_id"), []).append(w)
+        return d
+
+    def eq(r, q, t=2):
+        return bool(r and q) and all(abs(r[k] - q[k]) <= t for k in ("x", "y", "w", "h"))
+
+    def inside(r, wa):
+        return bool(r and wa) and r["x"] >= wa["x"] and r["y"] >= wa["y"] and r["x"] + r["w"] <= wa["x"] + wa["w"] and r["y"] + r["h"] <= wa["y"] + wa["h"]
+
+    def outputs_now():
+        return vm.call("list_outputs").get("result") or []
+
+    now = outputs_now()
+    a, b = now[0], now[1]
+    ida, idb = a["stable_id"], b["stable_id"]
+    plan = [  # (desktop id, output, 2x2 cell): Qt, GTK 3 and GTK 4 apps on both monitors
+        ("org.gnome.TextEditor.desktop", ida, (0, 0)), ("org.gnome.Calculator.desktop", ida, (1, 0)),
+        ("org.kde.konsole.desktop", ida, (0, 1)), ("org.kde.dolphin.desktop", ida, (1, 1)),
+        ("org.kde.kate.desktop", idb, (0, 0)), ("org.gnome.DiskUtility.desktop", idb, (1, 1)),
+    ]
+    for app, _o, _c in plan:
+        vm.call("app_policy_set", {"desktop_id": app, "policy": {"launch": "if_missing", "extra_args": []}})
+        if not by_app().get(app):
+            geo["activate_monitor"](a)
+            vm.vmctl(f"launch {app}")
+            wait_for(lambda: by_app().get(app), 60, 2)
+    apps = by_app()
+    home = {}
+    for app, o, (c, r) in plan:
+        w = (apps.get(app) or [None])[0]
+        if w:
+            vm.call("place", {"window": w["id"], "output": o, "grid": {"cols": 2, "rows": 2}, "selection": {"col0": c, "row0": r, "col1": c, "row1": r}})
+    time.sleep(2)
+    apps = by_app()
+    for app, _o, _c in plan:
+        w = (apps.get(app) or [None])[0]
+        home[app] = w and w["frame"]
+    saved = cli("save --name mixed-two")
+    shot0 = vm.screenshot(f"panel-{session}-two-27-before-a")
+    vm.screenshot(f"panel-{session}-two-27-before-b", head=1)
+    # quit them all (as at the end of a session), then restore
+    vm.ssh("pkill -u tester -x konsole; pkill -u tester -x dolphin; pkill -u tester -x kate; pkill -u tester -f '[g]nome-disks'; "
+           "pkill -u tester -f '[g]nome-text-editor'; pkill -u tester -f '[g]nome-calculator'; true")
+    gone = wait_for(lambda: not any(by_app().get(app) for app, _o, _c in plan), 30, 1)
+    rep = cli("restore --snapshot mixed-two", timeout=600)
+    apps = wait_for(lambda: (lambda d: d if all(len(d.get(app) or []) == 1 and eq(d[app][0]["frame"], home[app]) for app, _o, _c in plan) else None)(by_app()), 60, 2) or by_app()
+    got = {app: [w["frame"] for w in apps.get(app) or []] for app, _o, _c in plan}
+    ok = bool(gone) and all(len(got[app]) == 1 and eq(got[app][0], home[app]) for app, _o, _c in plan)
+    shot_a = vm.screenshot(f"panel-{session}-two-27-restored-a")
+    shot_b = vm.screenshot(f"panel-{session}-two-27-restored-b", head=1)
+    check("P27", "mixed apps (Qt: Konsole, Dolphin, Kate; GTK 3: Disks; GTK 4: Text Editor, Calculator) on two monitors, all quit, then restored from the snapshot: each reopened once and placed exactly on its monitor",
+          ok, f"saved {json.dumps(saved)[:80]}; all quit {bool(gone)}; restore {rep.get('state') if isinstance(rep, dict) else rep}; "
+              + "; ".join(f"{app.split('.')[-2]} want {home[app]} got {got[app]}" for app, _o, _c in plan) + f"; {shot0}; {shot_a}; {shot_b}")
+    rep2 = cli("restore --snapshot mixed-two", timeout=600)
+    time.sleep(8)
+    counts = {app.split(".")[-2]: len(by_app().get(app) or []) for app, _o, _c in plan}
+    check("P28", "restoring the same snapshot again opens nothing new (one window of each app)",
+          all(n == 1 for n in counts.values()), f"{counts}; restore {rep2.get('state') if isinstance(rep2, dict) else rep2}")
+
+    # T13 monitor remapping, as D04-D08 on GNOME
+    vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set session.restore_on_monitor_reconnect true")
+    kate = (by_app().get("org.kde.kate.desktop") or [None])[0]
+    ed = (by_app().get("org.gnome.TextEditor.desktop") or [None])[0]
+    snap = cli("snapshot export mixed-two")
+    rec = next((r for r in (snap.get("windows") or []) if r.get("app_id", "").lower().startswith("org.kde.kate")), None) if isinstance(snap, dict) else None
+    if not (kate and ed and rec):
+        check("P29", "second monitor turned off: Fractile sees one monitor, and the window from it is now on the remaining one", False,
+              f"kate {bool(kate)} editor {bool(ed)} record {bool(rec)}; {json.dumps(snap)[:300]}")
+        return
+    # the layout moves on after the snapshot: the return must use what the
+    # setup had when the monitor went
+    vm.call("place", {"window": kate["id"], "output": idb, "grid": {"cols": 2, "rows": 2}, "selection": {"col0": 1, "row0": 0, "col1": 1, "row1": 0}})
+    time.sleep(1.5)
+    home_k = (by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame")
+    home_e = ed["frame"]
+    time.sleep(11)  # the service remembers the current setup's layout every 10 s
+    off = vm.vmctl(f"kscreen output.{b['name']}.disable")
+    one = wait_for(lambda: (lambda o: o if len(o) == 1 else None)(outputs_now()), 30, 1)
+    wa_a = one[0]["work_area"] if one else None
+    moved_in = bool(one) and wait_for(lambda: inside((by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame"), wa_a), 10, 0.5)
+    geo["screen"] = (a["rect"]["x"] + a["rect"]["w"], a["rect"]["y"] + a["rect"]["h"])
+    check("P29", "second monitor turned off (Plasma's display settings, kscreen-doctor): Fractile sees one monitor, and the window from it is now on the remaining one",
+          bool(one) and one[0]["stable_id"] == ida and bool(moved_in), f"{json.dumps(off)[:100]}; outputs {[o['stable_id'] for o in (one or [])]}; kate {(by_app().get('org.kde.kate.desktop') or [{}])[0].get('frame')}")
+    dry = cli("restore --dry-run --snapshot mixed-two")
+    warn = " ".join((dry.get("warnings") or []) if isinstance(dry, dict) else [])
+    rep = cli("restore --snapshot mixed-two --no-launch")
+    n = rec["normalized_geometry"]
+    want = {"x": round(wa_a["x"] + n[0] * wa_a["w"]), "y": round(wa_a["y"] + n[1] * wa_a["h"]), "w": round(n[2] * wa_a["w"]), "h": round(n[3] * wa_a["h"])} if wa_a else None
+    kf = wait_for(lambda: (lambda f: f if eq(f, want, 3) else None)((by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame")), 10, 0.5) \
+        or (by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame")
+    check("P30", "restoring the two-monitor snapshot with one monitor: the missing monitor's window goes to the remaining one at the same relative position, with a warning naming the missing monitor",
+          idb in warn and eq(kf, want, 3), f"warning: {warn[:160]}; kate {kf} want {want}; restore {rep.get('state') if isinstance(rep, dict) else rep}")
+    kept = []
+    for sn in (cli("list-snapshots --limit 50") or []):
+        if isinstance(sn, dict) and sn.get("mode") == "topology":
+            x = cli(f"snapshot export {sn['id']}")
+            rk = next((r for r in (x.get("windows") or []) if r.get("app_id", "").lower().startswith("org.kde.kate")), None)
+            if len(x.get("outputs") or []) == 2 and rk and eq(rk["absolute_geometry"], home_k, 2):
+                kept.append(sn["id"])
+    check("P31", "the layout the two-monitor setup had is kept as a 'monitor setup' snapshot when the monitor goes", len(kept) == 1, f"{len(kept)} matching topology snapshots")
+    on = vm.vmctl(f"kscreen output.{b['name']}.enable")
+    two = wait_for(lambda: (lambda o: o if len(o) == 2 else None)(outputs_now()), 30, 1)
+    if two:
+        geo["screen"] = (max(o["rect"]["x"] + o["rect"]["w"] for o in two), max(o["rect"]["y"] + o["rect"]["h"] for o in two))
+    back = wait_for(lambda: eq((by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame"), home_k) and eq((by_app().get("org.gnome.TextEditor.desktop") or [{}])[0].get("frame"), home_e), 20, 0.5)
+    check("P32", "second monitor turned on again (return enabled): same stable ids, and the windows go back to where they were on the two-monitor setup",
+          bool(two) and sorted(o["stable_id"] for o in two) == sorted([ida, idb]) and bool(back),
+          f"{json.dumps(on)[:80]}; outputs {[o['stable_id'] for o in (two or [])]}; kate {(by_app().get('org.kde.kate.desktop') or [{}])[0].get('frame')} want {home_k}")
+    vm.ssh("XDG_RUNTIME_DIR=/run/user/$(id -u) fractile config set session.restore_on_monitor_reconnect false")
+    time.sleep(11)
+    vm.vmctl(f"kscreen output.{b['name']}.disable")
+    wait_for(lambda: len(outputs_now()) == 1, 30, 1)
+    wait_for(lambda: inside((by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame"), (outputs_now() or [{}])[0].get("work_area")), 10, 0.5)
+    kid = (by_app().get("org.kde.kate.desktop") or [{}])[0].get("id")
+    vm.call("snap", {"action": "center", "window": kid})
+    time.sleep(1.5)
+    parked = (by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame")
+    def newest_run():
+        r = (vm.call("restore_status").get("result") or {}).get("recent_runs") or [{}]
+        return r[0].get("run_id")
+    runs_before = newest_run()
+    log_n = int(vm.ssh("wc -l < ~/.local/state/fractile/fractile.log").stdout.strip() or 0)
+    vm.vmctl(f"kscreen output.{b['name']}.enable")
+    wait_for(lambda: len(outputs_now()) == 2, 30, 1)
+    time.sleep(5)
+    after = (by_app().get("org.kde.kate.desktop") or [{}])[0].get("frame")
+    new_log = vm.ssh(f"tail -n +{log_n + 1} ~/.local/state/fractile/fractile.log").stdout
+    runs_after = newest_run()
+    # KWin 6.6 itself puts windows back where they were on a monitor setup
+    # when that setup returns (seen with fractiled stopped), so the window
+    # may move; what Fractile promises is that it restores nothing.
+    check("P33", "with the return turned off (the default), turning the monitor on again starts no Fractile restore (KWin may still move windows back by itself)",
+          "restoring the layout" not in new_log and "monitor setup changed" in new_log and runs_after == runs_before,
+          f"Fractile restore lines {new_log.count('restoring the layout')}; newest restore run {runs_before} -> {runs_after}; kate {parked} -> {after} (moved by KWin: {not eq(after, parked)})")
 
 
 # After a power cut the service log can end in a block of NUL bytes (data
@@ -2072,13 +2392,15 @@ def main() -> int:
     ap.add_argument("--power-cut", action="store_true", help="RS-18/T15: power cuts during snapshot writes instead of the reboot/log-out tests")
     ap.add_argument("--panel", action="store_true", help="the panel driven with the VM's keyboard and tablet instead of the reboot/log-out tests")
     ap.add_argument("--heads", type=int, choices=[1, 2], default=1, help="with --panel: 2 gives the VM a second monitor and adds the two-monitor checks")
+    ap.add_argument("--real-apps", action="store_true", help="with --panel: Firefox, Chrome and VS Code (T14 / A01-A03) restored across the monitors instead of the panel checks")
     ap.add_argument("--upgrade-from", nargs="+", help="PK-06: earlier .debs (oldest first) installed before --deb")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
     ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail", "tray", "two"])
     a = ap.parse_args()
-    global HOLD, HOLD_AT, POWER_CUT, PANEL, HEADS
+    global HOLD, HOLD_AT, POWER_CUT, PANEL, HEADS, REAL_APPS
     POWER_CUT = a.power_cut
-    PANEL = a.panel
+    PANEL = a.panel or a.real_apps
+    REAL_APPS = a.real_apps
     HEADS = a.heads
     HOLD = min(a.hold, 2400)
     HOLD_AT = a.hold_at
@@ -2103,7 +2425,7 @@ def main() -> int:
         check("VXX", "run crashed", False, repr(ex))
     ver = RELEASES[SESSION_RELEASE[a.session]] if a.session else "24.04"
     distro = "vm-arch" if SESSION_RELEASE.get(a.session) == "arch" else f"vm-ubuntu{ver}"
-    suite = f"{distro}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "") + ("-two-monitors" if HEADS == 2 else "") + ("-upgrade" if a.upgrade_from else "")
+    suite = f"{distro}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-real-apps" if REAL_APPS else "-panel" if PANEL else "") + ("-two-monitors" if HEADS == 2 else "") + ("-upgrade" if a.upgrade_from else "")
     ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
           "environment": ((f"Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, COSMIC session "
                           f"(cosmic-session from the Arch repositories, auto-tiling on), Fractile {Path(a.deb).name} installed with pacman -U")

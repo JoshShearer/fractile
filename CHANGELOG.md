@@ -188,6 +188,33 @@ laptop. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **Ubuntu's Firefox (a snap) was launched once per window on restore.** Its
+  desktop id is `firefox_firefox.desktop`, which the built-in list of apps
+  that reopen their own windows did not know, so restoring two Firefox
+  windows started Firefox twice (reproduced in the Plasma 6.6 VM: 2 launches,
+  an extra window). Snap ids (`<snap>_<app>`) are now matched by their app
+  part, and snap Chromium and Brave titles are never stored, like the
+  non-snap ids. Now 1 launch, both windows placed (R01b).
+- **Windows an app names after mapping them could swap places on restore.**
+  VS Code on KWin Wayland reopens its windows titled "Visual Studio Code" and
+  names them a moment later; the first window caught took the first record,
+  so the two windows went to each other's places. During stabilization the
+  restore now re-matches one app's windows by their current titles (waiting
+  up to 5 s more for titles that tell them apart) and moves them if a
+  different pairing fits better (R03b, restore_sim).
+- **A launched window still being sized was reported "launched, not
+  placed".** It now gets the same bounded re-tries as a placed one and is
+  reported placed when it reaches its target (R03c, restore_sim).
+- An AMBIGUOUS restore item caught after launch now says why
+  ("indistinguishable windows; assigned by instance order"), as one already
+  open did.
+- **On KWin Wayland the drag preview could stay on a cell range the pointer
+  had already left.** Each preview move was a separate call to the KWin
+  script, sent from a thread pool, so two close together could be applied in
+  the wrong order: the label showed the target ("800 x 1154") while the
+  preview window kept an earlier size (533x769). Seen once in the two-monitor
+  VM suite (run 13, P07). The UI now keeps one placement in flight and sends
+  only the newest target when it finishes (ui/tests/test_overlay_order.py).
 - **With two monitors on KWin Wayland, the keyboard went to the other
   monitor's panel.** The panels are placed on their monitors in the
   background, and KWin focuses each one as it maps, so the last to map kept
@@ -555,6 +582,17 @@ laptop. See PLATFORM_MATRIX.md.
 
 ### Known issues and limits
 
+- **Two windows of Chrome (or another browser whose titles are never stored)
+  can come back in each other's places.** Titles of these browsers are not
+  stored, because their private windows cannot be told apart from normal
+  ones; their windows are then indistinguishable and are matched by instance
+  order. The report marks them AMBIGUOUS with the reason. Removing the
+  browser from `session.titles_never_stored_for` lets titles tell them apart.
+- **KWin 6.6 moves windows back by itself when a monitor setup returns.**
+  KWin remembers where windows were on each monitor setup; with "return
+  windows when a monitor is reconnected" off (the default) Fractile restores
+  nothing, but KWin still moves windows back (seen with Fractile stopped,
+  P33).
 - **KWin Wayland with monitors of different sizes: a GTK 4 window cannot be
   made larger than the monitor it first opened on.** KWin sends a window's
   size bounds once, when it first maps; GTK 4 (seen with Text Editor 50.1 on

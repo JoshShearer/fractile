@@ -615,13 +615,25 @@ def cmd_kscreen() -> dict:
     return {"rc": p.returncode, "stdout": p.stdout[-1500:], "stderr": p.stderr[-800:]}
 
 
+def cmd_exec() -> dict:
+    """Run an argv (JSON list) in the desktop session, in its own scope, as a
+    launcher would (for apps started with test-profile arguments)."""
+    # A scope runs the program in the foreground: do not wait for it (a
+    # browser stays in the foreground; waiting timed out and killed it).
+    argv = json.loads(sys.argv[2])
+    p = subprocess.Popen(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", *argv], env=ENV,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    time.sleep(1)
+    return {"rc": p.poll(), "pid": p.pid}
+
+
 def main() -> int:
     cmd = sys.argv[1]
     fn = {"session": cmd_session, "setup": cmd_setup, "open-apps": cmd_open_apps, "state": cmd_state, "logout": cmd_logout, "launch": cmd_launch,
           "call": cmd_call, "panel-prep": cmd_panel_prep, "panel-geom": cmd_panel_geom,
           "tray": cmd_tray, "x11-preview": cmd_x11_preview, "tray-activate": cmd_tray_activate, "settings-probe": cmd_settings_probe,
           "cosmic-before": cmd_cosmic_before, "cosmic-try": cmd_cosmic_try,
-          "cosmic-arrange": cmd_cosmic_arrange, "cosmic-after": cmd_cosmic_after, "cosmic-restore-again": cmd_cosmic_restore_again, "kscreen": cmd_kscreen}[cmd]
+          "cosmic-arrange": cmd_cosmic_arrange, "cosmic-after": cmd_cosmic_after, "cosmic-restore-again": cmd_cosmic_restore_again, "kscreen": cmd_kscreen, "exec": cmd_exec}[cmd]
     print(json.dumps(fn()))
     return 0
 

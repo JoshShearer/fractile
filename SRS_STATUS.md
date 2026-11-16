@@ -31,7 +31,7 @@ reason it is accepted. Test ids refer to `tests/evidence/*.json`
 | 12 Discovery, licensing | VERIFIED | below |
 | 13 Phases 0-7 | gates 0-6 met; phase 7 (tag and publish) left to the maintainer | below |
 | 14-15 Operating protocol, master prompt deliverables | VERIFIED | below |
-| 16 Definition of done | Divvy-equivalent on KDE Plasma 6.6.6 Wayland (Ubuntu 26.04) claimed; session restore supported not claimed | below |
+| 16 Definition of done | Divvy-equivalent and session restore supported, both on KDE Plasma 6.6.6 Wayland (Ubuntu 26.04) only | below |
 
 ## 0. Rules
 
@@ -225,8 +225,29 @@ artifacts in `tests/evidence/`. Every claim names its environment and test.
   Wayland DV-01..28 are VERIFIED, but each column combines several versions
   and setups (nested, headless, container and real VM logins), not one
   precise platform/version as SRS 16 requires.
-- **Session restore supported on Platform X:** not claimed. No single
-  platform has passed all five tests SRS 16 names (clean reboot, unexpected
-  interruption, duplicate avoidance, monitor remapping, mixed apps); the
-  closest, GNOME Xorg, lacks monitor remapping on X11 (PLATFORM_MATRIX.md).
+- **Session restore supported on KDE Plasma 6.6.6 Wayland (KWin 6.6.6),
+  Ubuntu 26.04.1 LTS:** claimed. All five tests SRS 16 names pass there in
+  real logins with the final `.deb` (2026-11-16):
+  - clean reboot and log-out: 15 windows of 10 apps restored where they
+    were, asked first by default (V05, V06; vm-ubuntu26.04-plasma-wayland);
+  - unexpected interruption: two power cuts (QEMU reset) during snapshot
+    writes, store intact, all 15 windows restored (PC00-PC03;
+    vm-ubuntu26.04-plasma-wayland-power-cut);
+  - duplicate avoidance: no duplicates after reboot and log-out (V05, V06),
+    a second restore opens nothing (P28, R01d-R03d), a browser or editor
+    that reopens its own windows is launched once (R01b-R03b);
+  - monitor remapping: second monitor turned off and on (P29-P33; the
+    two-monitor suite, 56/56 in 2/2);
+  - mixed apps: Qt, GTK 3 and GTK 4 apps across two monitors (P27), and
+    Firefox 160 (snap), Chrome 157 and VS Code 1.146 (R01-R03; 23/23 in 2/2).
+  Qualified: positions, sizes, monitors and states of windows only; window
+  contents (tabs, documents, terminals) come back only when the app restores
+  them itself. Two Chrome windows (titles never stored) are matched by
+  order and reported AMBIGUOUS. KWin itself moves windows back when a
+  monitor setup returns. A GTK 4 window first shown on a smaller monitor
+  stays within that monitor's size (Known issues). Monitors are virtual
+  (QEMU); no physical-monitor or real power-loss run on this platform.
+- **Session restore supported elsewhere:** not claimed. GNOME Xorg has four
+  of the five (no monitor remapping on X11); the rest have fewer
+  (PLATFORM_MATRIX.md).
 - Product UI and release notes report measured results only.

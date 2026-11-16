@@ -76,6 +76,14 @@ class CompositorOverlay:
         self._unsupported = False
         self._client: PreviewOverlay | None = None
         self._placed_for = None
+        # One place_own_window in flight at a time: call_async runs on a
+        # thread pool, so calls sent back to back during a drag can reach
+        # the compositor out of order, and an older rect applied last left
+        # the preview window on a cell range the pointer had passed (seen on
+        # KWin Wayland: label "800 x 1154", window 533x769). Only the newest
+        # pending rect is sent when the one in flight finishes.
+        self._inflight = False
+        self._pending = None
 
     def _use_client_window(self) -> bool:
         caps = self.bridge.try_call("capabilities") or {}
@@ -114,11 +122,29 @@ class CompositorOverlay:
     def _place(self, rect: dict, key, first: bool, tries: int) -> None:
         from PyQt6.QtCore import QTimer
 
+        if self._inflight:
+            # keep the refocus owed by a superseded first placement
+            first = first or bool(self._pending and self._pending[2])
+            self._pending = (rect, key, first, tries)
+            return
+        self._inflight = True
+
+        def next_pending() -> bool:
+            self._inflight = False
+            p, self._pending = self._pending, None
+            if p is not None and self._visible and self._last == p[1]:
+                self._place(*p)
+                return True
+            return False
+
         def ok(_res):
             if first and self.refocus:
                 self.refocus()
+            next_pending()
 
         def fail(_err):
+            if next_pending():
+                return
             # Just mapped: the compositor may not list the window yet.
             if tries > 1 and self._visible and self._last == key:
                 QTimer.singleShot(60, lambda: self._place(rect, key, first, tries - 1))
@@ -132,6 +158,7 @@ class CompositorOverlay:
             self.bridge.try_call("overlay_hide", {})
         self._visible = False
         self._last = None
+        self._pending = None
 
     def isVisible(self) -> bool:
         return self._visible
