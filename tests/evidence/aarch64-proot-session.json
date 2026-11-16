@@ -1,0 +1,44 @@
+{
+  "suite": "aarch64-proot-session",
+  "when": "2026-11-16T23:05:45+00:00",
+  "environment": "amd64 ubuntu:26.04 container (proot 5.4, qemu-user 10.2); arm64 ubuntu-base 24.04.5 rootfs run with proot -q qemu-aarch64 (user-mode emulation, no binfmt); Xvfb + openbox, all aarch64; x86_64 host",
+  "results": [
+    {
+      "id": "AP0",
+      "name": "the userland is aarch64 (uname -m inside proot)",
+      "ok": true,
+      "detail": "aarch64; arm64"
+    },
+    {
+      "id": "AP1",
+      "name": "apt installs the arm64 .deb with its dependencies from the Ubuntu ports archive (--no-install-recommends: systemd, a Recommends, aborts proot in its postinst)",
+      "ok": true,
+      "detail": "apt rc 0; fractile 0.9.0-1 arm64; python3-pyqt6 6.6.1-2build4 arm64"
+    },
+    {
+      "id": "AP2",
+      "name": "fractiled (aarch64) starts as a plain user under X11/openbox and reports window control",
+      "ok": true,
+      "detail": "fractile 0.9.0; {   \"adapter\": \"x11\",   \"config_error\": null,   \"desktop\": \"\",   \"global_shortcuts\": true,   \"hotkey_errors\": {},   \"hotkeys_paused\": false,   \"integration\": null,   \"locked\": false,   \"pid\": 9417,   \"restore\": null,   \"restore_policy\": \"manual\",   \"restore_without_geometry\": false,   \"running\": tru"
+    },
+    {
+      "id": "AP3",
+      "name": "fractile place --grid 2x2 --cells 0,0,0,0 moves a real X window into the top-left quarter (read back by fractile and by xwininfo)",
+      "ok": true,
+      "detail": "rc 0; before {'h': 225, 'w': 302, 'x': 500, 'y': 400} after {'h': 400, 'w': 640, 'x': 0, 'y': 0}; xwininfo:  Absolute upper-left X: 1; Absolute upper-left Y: 20; Width: 638; Height: 375;"
+    },
+    {
+      "id": "AP4",
+      "name": "the control socket is mode 0600 (srw-------)",
+      "ok": true,
+      "detail": "srw------- 1 4242 4242 0 Nov 16 23:04 fractile.sock"
+    },
+    {
+      "id": "AP5",
+      "name": "fractile-ui (arm64 Python and PyQt6 on X11) runs and the service reports it attached, with no Python errors",
+      "ok": true,
+      "detail": "ui after 60 s: exited 0; process: /usr/bin/qemu-aarch64 -U LD_LIBRARY_PATH -0 /usr/bin/python3 /usr/bin/python3 /usr/bin/fractile-ui --background; \"ui_attached\": true; errors: none"
+    }
+  ],
+  "ok": true
+}
