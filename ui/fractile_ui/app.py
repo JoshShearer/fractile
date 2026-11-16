@@ -269,11 +269,14 @@ class FractileApp:
             # runs, and the daemon looks the window up in the compositor.
             self.bridge.call_async("focus_own_window", {"title": w.windowTitle()})
 
-    def position_own(self, w, rect: QRect):
+    def position_own(self, w, rect: QRect, done=None):
         """Wayland clients cannot position themselves; ask the compositor
-        integration to do it. On X11, Qt's move() already did."""
+        integration to do it. On X11, Qt's move() already did. `done` runs
+        (on the GUI thread) once the compositor has the window in place, or
+        the request failed; on X11 it is not called."""
         if self.wayland:
-            self.bridge.call_async("place_own_window", {"title": w.windowTitle(), "rect": {"x": rect.x(), "y": rect.y(), "w": rect.width(), "h": rect.height()}})
+            self.bridge.call_async("place_own_window", {"title": w.windowTitle(), "rect": {"x": rect.x(), "y": rect.y(), "w": rect.width(), "h": rect.height()}},
+                                   ok=(lambda _r: done()) if done else None, fail=(lambda _e: done()) if done else None)
             return
         # GNOME Shell 46 on Xorg (two monitors, Pop!_OS) maps a frameless
         # window whose requested position is on a monitor other than the

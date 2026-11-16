@@ -408,10 +408,12 @@ def cmd_panel_geom() -> dict:
     wins = panel_windows()
     grids = []
     for d in g:
-        w = next((w for w in wins if w.get("output_id") == d.get("output")), wins[0] if len(wins) == 1 else None)
+        # the UI names each panel after its monitor ("Fractile panel <output id>")
+        w = next((w for w in wins if w.get("title") == f"Fractile panel {d.get('output')}"), None) \
+            or next((w for w in wins if w.get("output_id") == d.get("output")), wins[0] if len(wins) == 1 else None)
         if w:
             grids.append(dict(d, x=w["frame"]["x"] + d["ox"], y=w["frame"]["y"] + d["oy"], panel=w["frame"], panel_id=w["id"]))
-    return {"grids": grids, "mtime": os.path.getmtime(GEOM)}
+    return {"grids": grids, "mtime": os.path.getmtime(GEOM), "windows": [(w.get("title"), w.get("frame"), w.get("output_id")) for w in wins]}
 
 
 def _gdbus(*args) -> str:
@@ -604,13 +606,22 @@ def cmd_cosmic_restore_again() -> dict:
     return {"restore": r, "editors": editors(), "procs": len(run("pgrep", "-u", str(UID), "-x", "gnome-text-edit").stdout.split())}
 
 
+def cmd_kscreen() -> dict:
+    """kscreen-doctor in the session (Plasma's own display settings tool),
+    e.g. `kscreen output.Virtual-2.rotation.left`."""
+    if not shutil.which("kscreen-doctor"):
+        return {"rc": 127, "stderr": "kscreen-doctor is not installed"}
+    p = run("kscreen-doctor", *sys.argv[2:], timeout=60)
+    return {"rc": p.returncode, "stdout": p.stdout[-1500:], "stderr": p.stderr[-800:]}
+
+
 def main() -> int:
     cmd = sys.argv[1]
     fn = {"session": cmd_session, "setup": cmd_setup, "open-apps": cmd_open_apps, "state": cmd_state, "logout": cmd_logout, "launch": cmd_launch,
           "call": cmd_call, "panel-prep": cmd_panel_prep, "panel-geom": cmd_panel_geom,
           "tray": cmd_tray, "x11-preview": cmd_x11_preview, "tray-activate": cmd_tray_activate, "settings-probe": cmd_settings_probe,
           "cosmic-before": cmd_cosmic_before, "cosmic-try": cmd_cosmic_try,
-          "cosmic-arrange": cmd_cosmic_arrange, "cosmic-after": cmd_cosmic_after, "cosmic-restore-again": cmd_cosmic_restore_again}[cmd]
+          "cosmic-arrange": cmd_cosmic_arrange, "cosmic-after": cmd_cosmic_after, "cosmic-restore-again": cmd_cosmic_restore_again, "kscreen": cmd_kscreen}[cmd]
     print(json.dumps(fn()))
     return 0
 

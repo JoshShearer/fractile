@@ -31,6 +31,7 @@ import shlex
 import shutil
 import hashlib
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -73,6 +74,7 @@ HOLD = 0
 HOLD_AT = "login"
 POWER_CUT = False
 PANEL = False  # --panel: a USB tablet for absolute pointer input
+HEADS = 1  # --heads 2: a second virtual monitor (virtio-vga max_outputs=2, forced on in the guest)
 DB = "~/.local/share/fractile/fractile.db"
 CLI_ENV = "XDG_RUNTIME_DIR=/run/user/$(id -u)"
 results: list[dict] = []
@@ -254,7 +256,7 @@ def qemu_cmd(disk: Path, seed_img: Path | None, serial: Path) -> list[str]:
     cmd = ["qemu-system-x86_64", "-enable-kvm", "-cpu", "host", "-smp", "4", "-m", "6144",
            "-drive", f"file={disk},if=virtio,cache=unsafe",
            "-netdev", f"user,id=n0,hostfwd=tcp:127.0.0.1:{SSH_PORT}-:22", "-device", "virtio-net-pci,netdev=n0",
-           "-device", "virtio-vga,edid=on,xres=1600,yres=1200", "-display", "none",
+           "-device", f"virtio-vga,id=vga0,edid=on,xres=1600,yres=1200{',max_outputs=2' if HEADS == 2 else ''}", "-display", "none",
            "-qmp", f"unix:{QMP},server,nowait", "-serial", f"file:{serial}"]
     if seed_img:
         cmd += ["-drive", f"file={seed_img},if=virtio,format=raw"]
@@ -420,7 +422,9 @@ class VM:
         except (ValueError, IndexError):
             return {"error": f"vmctl {cmd} -> {p.returncode}: {p.stderr.strip()[-800:]}"}
 
-    def screenshot(self, name: str) -> str:
+    def screenshot(self, name: str, head: int = 0) -> str:
+        if HEADS == 2 and name.startswith("panel-") and "-two-" not in name:
+            name = re.sub(r"-(\d)", r"-two-\1", name, count=1)  # panel-<session>-two-NN-...: keep the one-monitor run's files
         out = EVID / "vm" / f"{name}.png"
         out.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -428,7 +432,7 @@ class VM:
             s.connect(QMP)
             f = s.makefile("rw")
             f.readline()
-            for msg in ({"execute": "qmp_capabilities"}, {"execute": "screendump", "arguments": {"filename": "/tmp/shot.ppm"}}):
+            for msg in ({"execute": "qmp_capabilities"}, {"execute": "screendump", "arguments": {"filename": "/tmp/shot.ppm", **({"device": "vga0", "head": head} if head else {})}}):
                 f.write(json.dumps(msg) + "\n")
                 f.flush()
                 while True:
@@ -1259,6 +1263,13 @@ def run_panel(session: str, deb: str) -> None:
                       "sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; dpkg-query -W fractile", timeout=1800)
         if not check("P01", f"the .deb installs ({rel})", inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, inst.stdout.strip()[-200:]):
             return
+        if HEADS == 2:
+            # QEMU only reports its first output as connected when no host
+            # display is attached; the kernel's "e" suffix turns the second on.
+            # (KWin then picks the mode from QEMU's EDID, 5120x2160, and scales
+            # it 2.7x: a mixed-DPI pair, which the checks rely on.)
+            vm.ssh("echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"$GRUB_CMDLINE_LINUX_DEFAULT video=Virtual-2:1280x1024e\"' | sudo tee /etc/default/grub.d/99-fractile-heads.cfg >/dev/null; "
+                   "sudo update-grub > /tmp/grub.log 2>&1")
         vm.ssh("sudo systemctl reboot", timeout=20)
         vm.wait_down()
         vm.wait_ssh(600)
@@ -1287,11 +1298,41 @@ def run_panel(session: str, deb: str) -> None:
               "already running" in second.stdout and "rc=124" not in second.stdout and pid0 and pid0 == pid1,
               f"{second.stdout.strip()[-200:]}; service pid {pid0} -> {pid1}")
 
-        outs = (vm.call("list_outputs").get("result") or [])
-        out = outs[0]
-        screen = (out["rect"]["w"], out["rect"]["h"])
-        vm.vmctl("launch org.gnome.TextEditor.desktop")
-        ed = wait_for(lambda: next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.TextEditor.desktop"), None), 60, 2)
+        outs = wait_for(lambda: (lambda o: o if len(o) >= HEADS else None)(vm.call("list_outputs").get("result") or []), 60, 2) or (vm.call("list_outputs").get("result") or [])
+        # the tablet's range spans the whole desktop (every output)
+        geo = {"screen": (max(o["rect"]["x"] + o["rect"]["w"] for o in outs), max(o["rect"]["y"] + o["rect"]["h"] for o in outs))}
+        if HEADS == 2 and not check("P04b", "the desktop has two monitors", len(outs) == 2, f"{[(o['stable_id'], o['rect']) for o in outs]}"):
+            vm.screenshot(f"panel-{session}-two-00-one-output")
+            return
+        hold("two")
+        def find_editor():
+            return next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.TextEditor.desktop"), None)
+
+        def activate_monitor(o):
+            # A click on the empty desktop in the middle of the monitor makes
+            # it KWin's active output, where new windows open.
+            vm.pointer_to(o["rect"]["x"] + o["rect"]["w"] / 2, o["rect"]["y"] + o["rect"]["h"] / 2, geo["screen"])
+            time.sleep(0.3)
+            vm.button(True)
+            time.sleep(0.1)
+            vm.button(False)
+            time.sleep(0.5)
+
+        ed = None
+        for _try in range(3 if HEADS == 2 else 1):
+            if HEADS == 2:
+                # A GTK 4 window keeps the size bounds of the monitor it first
+                # opened on (tests/evidence/vm/gtk4-configure-bounds-trace.txt),
+                # so it must open on the larger first monitor.
+                activate_monitor(outs[0])
+            vm.vmctl("launch org.gnome.TextEditor.desktop")
+            ed = wait_for(find_editor, 60, 2)
+            if HEADS == 1 or not ed or ed.get("output_id") == outs[0]["stable_id"]:
+                break
+            say(f"the editor opened on {ed.get('output_id')}, not {outs[0]['stable_id']}: closing it and trying again")
+            vm.ssh("pkill -u tester -f '[g]nome-text-editor'; true")
+            wait_for(lambda: find_editor() is None, 15, 1)
+        geo["activate_monitor"] = activate_monitor
         if not check("P04", "the target app (Text Editor) is up and placeable", bool(ed), f"outputs {[(o['stable_id'], o['rect']) for o in outs]}"):
             return
         wid = ed["id"]
@@ -1320,10 +1361,31 @@ def run_panel(session: str, deb: str) -> None:
             vm.call("activate_window", {"window": w})
             time.sleep(0.8)
             vm.combo("ctrl+alt+g")
-            g = wait_for(lambda: (vm.vmctl("panel-geom").get("grids") or [None])[0], 15, 0.5)
-            if g:
+            home = next((x.get("output_id") for x in (vm.call("list_windows", {"all": True}).get("result") or []) if x["id"] == w), None)
+
+            def pick():
+                gs = vm.vmctl("panel-geom").get("grids") or []
+                # with two monitors there is a panel on each: use the one on the window's monitor
+                return next((x for x in gs if x.get("output") == home), gs[0] if gs else None)
+            t0 = time.time()
+            g = wait_for(pick, 15, 0.5)
+            if g and len(outs) > 1:
+                # On Wayland a new panel window maps where the compositor
+                # puts it; the KWin script then moves it onto its monitor.
+                # Until then a panel can sit over the other monitor's one.
+                def settled():
+                    gs = vm.vmctl("panel-geom").get("grids") or []
+                    return len(gs) == len(outs) and all(any(o["stable_id"] == x.get("output") and x["panel"]["x"] >= o["rect"]["x"] and x["panel"]["y"] >= o["rect"]["y"]
+                                                            and x["panel"]["x"] + x["panel"]["w"] <= o["rect"]["x"] + o["rect"]["w"]
+                                                            and x["panel"]["y"] + x["panel"]["h"] <= o["rect"]["y"] + o["rect"]["h"] for o in outs) for x in gs)
+                ok = wait_for(settled, 10, 0.2)
+                open_panel.settle_s = round(time.time() - t0, 1) if ok else None
+                open_panel.windows = vm.vmctl("panel-geom").get("windows")
+                time.sleep(0.5)
+                g = pick() or g
+            elif g:
                 time.sleep(1.0)  # let the compositor finish placing a new panel window
-                g = (vm.vmctl("panel-geom").get("grids") or [g])[0]
+                g = pick() or g
             return g
 
         def close_if_open():
@@ -1338,16 +1400,16 @@ def run_panel(session: str, deb: str) -> None:
         def drag(g, a, b, hold=None, shot=None):
             ax, ay = cell(g, *a)
             bx, by = cell(g, *b)
-            vm.pointer_to(ax, ay, screen)
+            vm.pointer_to(ax, ay, geo["screen"])
             time.sleep(0.3)
             if hold:
                 vm.keydown(hold)
                 time.sleep(0.4)
             vm.button(True)
             time.sleep(0.2)
-            vm.pointer_to((ax + bx) / 2, (ay + by) / 2, screen)
+            vm.pointer_to((ax + bx) / 2, (ay + by) / 2, geo["screen"])
             time.sleep(0.2)
-            vm.pointer_to(bx, by, screen)
+            vm.pointer_to(bx, by, geo["screen"])
             time.sleep(0.8)
             mid_frame = frame()
             drag.active = active()
@@ -1371,6 +1433,11 @@ def run_panel(session: str, deb: str) -> None:
             vm.screenshot(f"panel-{session}-05-no-panel")
             return
         vm.screenshot(f"panel-{session}-05-panel")
+        if HEADS == 2:
+            check("P05b", "with two monitors, both panels are on their own monitors after the panel shortcut (seconds until they were, from the key press)",
+                  getattr(open_panel, "settle_s", None) is not None, f"{getattr(open_panel, 'settle_s', None)} s; panels {getattr(open_panel, 'windows', None)}")
+            check("P05c", "keyboard focus is on the panel of the window's own monitor (not on the other monitor's panel, which maps later)",
+                  bool(wait_for(lambda: active() == g.get("panel_id"), 3, 0.3)), f"active {active()}; panel on the window's monitor {g.get('panel_id')} ({g.get('output')})")
 
         # DV-04 drag, DV-21 preview, DV-10 dismiss after applying
         want = rect(g["cols"], g["rows"], 0, 0, 2, g["rows"] - 1)
@@ -1470,6 +1537,60 @@ def run_panel(session: str, deb: str) -> None:
         close_if_open()
         cfg["appearance"]["reset_grid_on_open"] = False
         vm.call("set_config", {"config": cfg})
+        time.sleep(1)
+
+        # DV-06 the ends of the range (1x1, 10x10); DV-28 undo, from its
+        # global shortcut (it has no keys by default: give it some)
+        def set_default_grid(n):
+            c = vm.call("get_config")["result"]["config"]
+            c["appearance"]["default_grid"] = {"cols": n, "rows": n}
+            for x in c["shortcuts"]:
+                if x.get("id") == "global-undo":
+                    x["accelerator"] = "Ctrl+Alt+Shift+Z"
+            r = vm.call("set_config", {"config": c})
+            time.sleep(1.5)
+            return r
+
+        def reopened():
+            close_if_open()
+            g = open_panel()
+            return g and (g["cols"], g["rows"])
+
+        set_default_grid(1)
+        vm.call("snap", {"action": "center", "window": wid})
+        time.sleep(0.8)
+        g1 = open_panel()
+        vm.combo("alt+minus")
+        time.sleep(0.3)
+        vm.combo("alt+shift+minus")
+        time.sleep(0.3)
+        small = reopened()
+        before = frame()
+        want = rect(1, 1, 0, 0, 0, 0)
+        close_if_open()
+        g = open_panel()
+        if g:
+            drag(g, (0, 0), (0, 0))
+        got = placed(want)
+        set_default_grid(10)
+        g10 = open_panel()
+        vm.combo("alt+equal")
+        time.sleep(0.3)
+        vm.combo("alt+shift+equal")
+        time.sleep(0.3)
+        big = reopened()
+        close_if_open()
+        check("P25", "a 1x1 grid stays 1x1 when a column and a row are taken away, its one cell fills the work area exactly; a 10x10 grid stays 10x10 when one is added",
+              bool(g1) and (g1["cols"], g1["rows"]) == (1, 1) and small == (1, 1) and near(got, want) and bool(g10) and (g10["cols"], g10["rows"]) == (10, 10) and big == (10, 10),
+              f"1x1: opened {g1 and (g1['cols'], g1['rows'])}, after Alt+- and Alt+Shift+- {small}; cell {want} got {got}; 10x10: opened {g10 and (g10['cols'], g10['rows'])}, after Alt+= and Alt+Shift+= {big}")
+        vm.call("activate_window", {"window": wid})
+        time.sleep(0.8)
+        after = frame()
+        vm.combo("ctrl+alt+shift+z")
+        back = placed(before)
+        check("P26", "the Undo shortcut (keys set in the config) puts the window back exactly where it was before the last placement",
+              near(after, want) and near(back, before), f"before {before}; placed {after}; after undo {back}")
+        set_default_grid(6)
 
         # DV-27: the target closes while the panel is open
         vm.vmctl("launch org.gnome.Calculator.desktop")
@@ -1541,9 +1662,182 @@ def run_panel(session: str, deb: str) -> None:
             want = rect(2, 1, 0, 0, 0, 0)
             got = placed(want)
             check("P-S11", "pressing the shortcut created in Settings places the window (left half)", near(got, want), f"want {want} got {got}")
+        if HEADS == 2:
+            two_monitor_checks(vm, session, wid, outs, frame, open_panel, close_if_open, panel_open, drag, near, geo)
         hold("end")
     finally:
         vm.stop()
+
+
+def two_monitor_checks(vm: "VM", session: str, wid: str, outs: list, frame, open_panel, close_if_open, panel_open, drag, near, geo: dict) -> None:
+    """DV-12, DV-13, DV-17, DV-22 and DV-23 in the real login, with the VM's
+    second monitor: the same things tests/kwin/e2e_kwin_two.py and K20 check
+    under kwin_wayland --virtual, here with real keyboard and tablet input."""
+    by_id = {o["stable_id"]: o for o in outs}
+
+    def output_of(f):
+        cx, cy = f["x"] + f["w"] / 2, f["y"] + f["h"] / 2
+        return next((o["stable_id"] for o in outs if o["rect"]["x"] <= cx < o["rect"]["x"] + o["rect"]["w"] and o["rect"]["y"] <= cy < o["rect"]["y"] + o["rect"]["h"]), None)
+
+    def inside(r, o):
+        R = o["rect"]
+        return r["x"] >= R["x"] and r["y"] >= R["y"] and r["x"] + r["w"] <= R["x"] + R["w"] and r["y"] + r["h"] <= R["y"] + R["h"]
+
+    def frame_of(w):
+        return next((x["frame"] for x in (vm.call("list_windows", {"all": True}).get("result") or []) if x["id"] == w), None)
+
+    def settle(w, want, t=6):
+        return wait_for(lambda: (lambda f: f if near(f, want, 1) else None)(frame_of(w)), t, 0.4) or frame_of(w)
+
+    def grids(w):
+        open_panel(w)
+        gs = wait_for(lambda: (lambda g: g if len(g) >= 2 else None)(vm.vmctl("panel-geom").get("grids") or []), 10, 0.5) or []
+        # the KWin script moves each panel onto its monitor after it maps: wait until they stay put
+        last, since, end = None, time.time(), time.time() + 6
+        while time.time() < end and time.time() - since < 1.0:
+            gs = vm.vmctl("panel-geom").get("grids") or gs
+            cur = sorted((g.get("output"), g["x"], g["y"]) for g in gs)
+            if cur != last:
+                last, since = cur, time.time()
+            time.sleep(0.2)
+        return gs
+
+    def point_at(o):
+        vm.pointer_to(o["rect"]["x"] + o["rect"]["w"] / 2, o["rect"]["y"] + o["rect"]["h"] / 2, geo["screen"])
+
+    # start from the first monitor (the second is the scaled one)
+    a, b = outs[0]["stable_id"], outs[1]["stable_id"]
+    vm.call("place", {"window": wid, "output": a, "grid": {"cols": 2, "rows": 2}, "selection": {"col0": 0, "row0": 0, "col1": 0, "row1": 0}})
+    vm.call("snap", {"action": "center", "window": wid})
+    time.sleep(1)
+
+    # DV-12: a panel on each monitor
+    gs = grids(wid)
+    on = {g.get("output"): g for g in gs}
+    shot_a = vm.screenshot(f"panel-{session}-two-21-panel-a")
+    shot_b = vm.screenshot(f"panel-{session}-two-21-panel-b", head=1)
+    ok = set(on) == set(by_id) and len(gs) == 2 and all(g.get("panel") and inside(g["panel"], by_id[o]) for o, g in on.items())
+    check("P21", "the panel shortcut opens one panel per monitor, each on its own monitor",
+          ok, f"{[(g.get('output'), g.get('panel')) for g in gs]}; outputs {[(o['stable_id'], o['rect']) for o in outs]}; {shot_a}; {shot_b}")
+
+    # DV-13: a drag on the other monitor's panel moves the window there
+    if b in on:
+        g = on[b]
+        want = vm.call("compute_rect", {"grid": {"cols": g["cols"], "rows": g["rows"]}, "selection": {"col0": 0, "row0": 0, "col1": 2, "row1": g["rows"] - 1}, "output": b}).get("result")
+        _mid, prev, pshot = drag(g, (0, 0), (2, g["rows"] - 1), shot=None)
+        pv = prev[0]["frame"] if prev else None
+        got = settle(wid, want)
+        gone = wait_for(lambda: not panel_open(), 5, 0.5)
+        shot = vm.screenshot(f"panel-{session}-two-22-moved", head=1)
+        check("P22", "a drag on the second (scaled) monitor's panel places the window on that monitor exactly, the preview during the drag is at the exact target there, and the panels close",
+              near(got, want, 1) and output_of(got or want) == b and near(pv, want, 3) and bool(gone),
+              f"want {want} on {b}; preview {pv}; got {got} on {got and output_of(got)}; {shot}")
+    else:
+        check("P22", "a drag on the second monitor's panel places the window on that monitor exactly, and the panels close", False, f"no panel on {b}")
+    close_if_open()
+
+    # DV-17: the same shortcut pressed again moves the window to the next monitor, and back
+    cfg = vm.call("get_config")["result"]["config"]
+    cfg["general"]["cycle_timeout_ms"] = 5000  # the harness reads frames between presses
+    cfg["shortcuts"] = [x for x in cfg["shortcuts"] if x.get("id") != "s-vm-cycle"] + [{
+        "id": "s-vm-cycle", "name": "VM cycle left half", "accelerator": "Ctrl+Alt+Shift+F10", "scope": "global", "favorite": False, "cycle_monitors": True,
+        "action": {"type": "place", "grid": {"cols": 2, "rows": 1}, "selection": {"col0": 0, "row0": 0, "col1": 0, "row1": 0}, "output": {"kind": "current"}}}]
+    setr = vm.call("set_config", {"config": cfg})
+    time.sleep(2)
+    vm.call("snap", {"action": "center", "window": wid})
+    time.sleep(1)
+    start = output_of(frame_of(wid))
+    other = b if start == a else a
+    want = {o: vm.call("compute_rect", {"grid": {"cols": 2, "rows": 1}, "selection": {"col0": 0, "row0": 0, "col1": 0, "row1": 0}, "output": o}).get("result") for o in (a, b)}
+    seq = []
+    vm.call("activate_window", {"window": wid})
+    time.sleep(0.8)
+    for o in (start, other, start):
+        vm.combo("ctrl+alt+shift+f10")
+        seq.append(settle(wid, want[o], 3))
+    ok = all(near(f, want[o], 1) for f, o in zip(seq, (start, other, start)))
+    check("P23", "pressing the same placement shortcut three times puts the window on this monitor, the next one, then back (left half each time)",
+          ok, f"start {start}; frames {seq}; want {want[start]} / {want[other]}; set_config {json.dumps(setr)[:120]}")
+
+    # DV-22, DV-23: per-side margins (px and %) and different gaps, checked
+    # with arithmetic independent of the service, on real placements
+    vm.combo("ctrl+alt+shift+f10")  # back to monitor a if the cycle left it elsewhere
+    time.sleep(1)
+    cfg = vm.call("get_config")["result"]["config"]
+    px = lambda v: {"unit": "px", "value": v}
+    cfg["appearance"]["spacing"] = {"margins_enabled": True, "gaps_enabled": True,
+                                    "margins": {"left": px(20), "right": {"unit": "percent", "value": 2.0}, "top": px(15), "bottom": px(30)},
+                                    "gaps": {"horizontal": px(12), "vertical": px(8)}}
+    setr = vm.call("set_config", {"config": cfg})
+    time.sleep(1.5)
+    geo["activate_monitor"](outs[0])
+    vm.vmctl("launch org.gnome.Calculator.desktop")
+    calc = wait_for(lambda: next((w for w in (vm.call("list_windows").get("result") or []) if w.get("desktop_file_id") == "org.gnome.Calculator.desktop"), None), 60, 2)
+    oa = next((o for o in (vm.call("list_outputs").get("result") or outs) if o["stable_id"] == a), outs[0])  # the work area now
+    wa = oa.get("work_area") or oa["rect"]
+    r = round(wa["w"] * 0.02)
+    ia = {"x": wa["x"] + 20, "y": wa["y"] + 15, "w": wa["w"] - 20 - r, "h": wa["h"] - 45}
+    res = {}
+
+    def panel_place(w, c0, r0, c1, r1, key):
+        g = next((x for x in grids(w) if x.get("output") == a), None)
+        if not g:
+            close_if_open()
+            return
+        drag(g, (c0, r0), (c1, r1))
+        time.sleep(1.5)
+        wait_for(lambda: not panel_open(), 5, 0.5)
+        res[key] = (g["cols"], g["rows"], frame_of(w))
+
+    panel_place(wid, 0, 0, 2, 5, "editor_left")
+    if calc:
+        panel_place(calc["id"], 3, 0, 5, 3, "calc_top_right")
+    panel_place(wid, 3, 4, 5, 5, "editor_bottom_right")
+    e1, c, e2 = (res.get(k, (0, 0, None))[2] for k in ("editor_left", "calc_top_right", "editor_bottom_right"))
+    grid_ok = all(res.get(k, (0, 0))[:2] == (6, 6) for k in res) and len(res) == 3
+    t = 1
+    eq = lambda u, v: abs(u - v) <= t
+    ok = bool(grid_ok and e1 and c and e2) and (
+        eq(e1["x"], ia["x"]) and eq(e1["y"], ia["y"]) and eq(e1["y"] + e1["h"], ia["y"] + ia["h"])          # left, top, bottom margins
+        and eq(c["y"], ia["y"]) and eq(c["x"] + c["w"], ia["x"] + ia["w"])                                  # top and right (2 %) margins
+        and eq(c["x"] - (e1["x"] + e1["w"]), 12)                                                            # horizontal gap
+        and eq(e2["y"] - (c["y"] + c["h"]), 8) and eq(e2["x"], c["x"]) and eq(e2["x"] + e2["w"], ia["x"] + ia["w"])  # vertical gap
+        and eq(e2["y"] + e2["h"], ia["y"] + ia["h"]))
+    shot = vm.screenshot(f"panel-{session}-two-20-spacing")
+    check("P20", "margins left 20 px, right 2 %, top 15 px, bottom 30 px and gaps 12 px / 8 px: three windows placed through the panel sit exactly inside the work area with those gaps between them",
+          ok, f"work area {wa}; inner {ia}; editor {e1}; calculator {c}; editor again {e2}; grids {[(k, v[:2]) for k, v in res.items()]}; set_config {json.dumps(setr)[:120]}; {shot}")
+    cfg["appearance"]["spacing"]["margins_enabled"] = cfg["appearance"]["spacing"]["gaps_enabled"] = False
+    vm.call("set_config", {"config": cfg})
+
+    # a rotated (portrait) monitor: Plasma's own display tool turns the
+    # second output a quarter turn; the panel on it then places exactly
+    ob = next((o for o in outs if o["stable_id"] == b), None)
+    if ob:
+        rot = vm.vmctl(f"kscreen output.{ob['name']}.rotation.left")
+        def portrait():
+            o2 = next((o for o in (vm.call("list_outputs").get("result") or []) if o["name"] == ob["name"]), None)
+            return o2 if o2 and o2["rect"]["h"] > o2["rect"]["w"] else None
+        pb = wait_for(portrait, 30, 1)
+        now = vm.call("list_outputs").get("result") or []
+        if now:
+            geo["screen"] = (max(o["rect"]["x"] + o["rect"]["w"] for o in now), max(o["rect"]["y"] + o["rect"]["h"] for o in now))
+        got = want = None
+        if pb:
+            time.sleep(2)
+            open_panel(wid)
+            gs = wait_for(lambda: (lambda g: g if len(g) >= 2 else None)(vm.vmctl("panel-geom").get("grids") or []), 10, 0.5) or []
+            g = next((x for x in gs if x.get("output") == pb["stable_id"]), None)
+            if g:
+                want = vm.call("compute_rect", {"grid": {"cols": g["cols"], "rows": g["rows"]}, "selection": {"col0": 1, "row0": 1, "col1": 4, "row1": 3}, "output": pb["stable_id"]}).get("result")
+                drag(g, (1, 1), (4, 3))
+                got = settle(wid, want)
+            close_if_open()
+        shot = vm.screenshot(f"panel-{session}-two-24-portrait", head=1)
+        R = (pb or {}).get("rect") or {}
+        check("P24", "with the second monitor rotated to portrait (kscreen-doctor rotation left), a drag on its panel places the window exactly inside it",
+              bool(pb and want) and near(got, want, 1) and inside(got or {"x": -1, "y": -1, "w": 0, "h": 0}, pb),
+              f"rotate {json.dumps(rot)[:160]}; output now {R} work area {(pb or {}).get('work_area')}; want {want} got {got}; {shot}")
+        vm.vmctl(f"kscreen output.{ob['name']}.rotation.none")
 
 
 # After a power cut the service log can end in a block of NUL bytes (data
@@ -1777,13 +2071,15 @@ def main() -> int:
     ap.add_argument("--provision-only", action="store_true")
     ap.add_argument("--power-cut", action="store_true", help="RS-18/T15: power cuts during snapshot writes instead of the reboot/log-out tests")
     ap.add_argument("--panel", action="store_true", help="the panel driven with the VM's keyboard and tablet instead of the reboot/log-out tests")
+    ap.add_argument("--heads", type=int, choices=[1, 2], default=1, help="with --panel: 2 gives the VM a second monitor and adds the two-monitor checks")
     ap.add_argument("--upgrade-from", nargs="+", help="PK-06: earlier .debs (oldest first) installed before --deb")
     ap.add_argument("--hold", type=int, default=0, help="debug: keep the VM up this many seconds after the first login")
-    ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail", "tray"])
+    ap.add_argument("--hold-at", default="login", choices=["login", "after-reboot", "end", "fail", "tray", "two"])
     a = ap.parse_args()
-    global HOLD, HOLD_AT, POWER_CUT, PANEL
+    global HOLD, HOLD_AT, POWER_CUT, PANEL, HEADS
     POWER_CUT = a.power_cut
     PANEL = a.panel
+    HEADS = a.heads
     HOLD = min(a.hold, 2400)
     HOLD_AT = a.hold_at
     if a.soak_minutes:
@@ -1807,13 +2103,13 @@ def main() -> int:
         check("VXX", "run crashed", False, repr(ex))
     ver = RELEASES[SESSION_RELEASE[a.session]] if a.session else "24.04"
     distro = "vm-arch" if SESSION_RELEASE.get(a.session) == "arch" else f"vm-ubuntu{ver}"
-    suite = f"{distro}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "") + ("-upgrade" if a.upgrade_from else "")
+    suite = f"{distro}-{a.session}" + ("-power-cut" if POWER_CUT else "") + ("-panel" if PANEL else "") + ("-two-monitors" if HEADS == 2 else "") + ("-upgrade" if a.upgrade_from else "")
     ev = {"suite": suite, "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
           "environment": ((f"Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, COSMIC session "
                           f"(cosmic-session from the Arch repositories, auto-tiling on), Fractile {Path(a.deb).name} installed with pacman -U")
           if a.session == "cosmic" else ("Arch Linux VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering through llvmpipe), GDM timed login, "
                           f"hyprland session (hyprlock via hypridle, waybar), Fractile {Path(a.deb).name} installed with pacman -U"))
-          if SESSION_RELEASE.get(a.session) == "arch" else f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
+          if SESSION_RELEASE.get(a.session) == "arch" else f"Ubuntu {ver} desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering{', two outputs: 1600x1200 at scale 1 and 5120x2160 at scale 2.7, 1896x800 logical' if HEADS == 2 else ''}){' with kde-plasma-desktop (Plasma 5.27)' if a.session == 'plasma-x11' else ' with kde-plasma-desktop (Plasma 6)' if a.session == 'plasma-wayland' else ''}, GDM timed login, {a.session} session, Fractile {Path(a.deb).name} installed with apt",
           "results": results, "log": log_lines}
     out = EVID / f"{suite}.json"
     out.write_text(json.dumps(ev, indent=2) + "\n")

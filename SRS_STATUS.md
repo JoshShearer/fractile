@@ -21,7 +21,7 @@ reason it is accepted. Test ids refer to `tests/evidence/*.json`
 | 2.3-2.4 Layouts, rules, extras LR-01..08, UX-01..06 | VERIFIED | REQUIREMENTS.md, Layouts |
 | 3 Compositor strategy CA-01..08 | VERIFIED except CA-04 COSMIC: PARTIAL (placement BLOCKED BY PLATFORM) | REQUIREMENTS.md, Compositor capability |
 | 4 Architecture | VERIFIED (one recommendation replaced, see below) | ARCHITECTURE.md |
-| 5 Precision geometry | VERIFIED, with rotation NOT TESTED | below |
+| 5 Precision geometry | VERIFIED (rotation on KWin Wayland only) | below |
 | 6 Restore contract | VERIFIED; one status added | below |
 | 7 UI screens | VERIFIED | below |
 | 8 Shortcuts and CLI | VERIFIED; COSMIC shortcuts BLOCKED BY PLATFORM | below |
@@ -31,7 +31,7 @@ reason it is accepted. Test ids refer to `tests/evidence/*.json`
 | 12 Discovery, licensing | VERIFIED | below |
 | 13 Phases 0-7 | gates 0-6 met; phase 7 (tag and publish) left to the maintainer | below |
 | 14-15 Operating protocol, master prompt deliverables | VERIFIED | below |
-| 16 Definition of done | neither label claimed; reasons below | below |
+| 16 Definition of done | Divvy-equivalent on KDE Plasma 6.6.6 Wayland (Ubuntu 26.04) claimed; session restore supported not claimed | below |
 
 ## 0. Rules
 
@@ -84,14 +84,14 @@ All rows are in REQUIREMENTS.md. Cells that are not VERIFIED:
 
 | Item | Status | Evidence |
 |---|---|---|
-| Logical coordinates, no double scaling | VERIFIED | mixed scale 2 + 1 (D01-D03, GNOME Wayland); scale 1.5 next to 1 (S25 Sway, H25 Hyprland); Omarchy scale 1.5 by hand |
+| Logical coordinates, no double scaling | VERIFIED | mixed scale 2 + 1 (D01-D03, GNOME Wayland); scale 2.7 next to 1 in a real Plasma 6.6 Wayland login: panel, preview and placement on the scaled monitor (P21, P22; this found and fixed the UI dividing Wayland coordinates by the scale); scale 1.5 next to 1 (S25 Sway, H25 Hyprland); Omarchy scale 1.5 by hand |
 | Work area excludes panels and docks | VERIFIED where the desktop reports it (X11 `_NET_WORKAREA`, GNOME, KWin, Sway, Hyprland); on COSMIC the work area is the whole monitor because COSMIC does not report it (placement is blocked there anyway) | X04-X06, W04-W06, K04-K06 |
 | Inclusive cells to half-open rectangles; deterministic rounding, no drift | VERIFIED | `halves_are_seamless`, `thirds_on_odd_width_have_no_drift`, `portrait_monitor_at_negative_origin_tiles_exactly`, proptests; T02 |
 | Margins and gaps separate | VERIFIED | X25, `gaps_are_exact_between_neighbours`, `margins_shrink_from_each_side`; DV-22, DV-23 |
 | Frame vs client geometry; observed result verified | VERIFIED | placement verification on every adapter; `frame_includes_border_except_fullscreen` (Hyprland) |
 | Min/max/aspect constraints reported; fit/center/fail policy | VERIFIED | constraint policy tests; learned limits (`learned_minimum_sizes`), V09 on every VM desktop |
 | Negative coordinates, portrait monitors, mixed scales, changed EDIDs | VERIFIED (engine and mapping tests; mixed scales on real compositors) | `thirds_on_odd_width_have_no_drift` (x = -1000), `portrait_monitor_at_negative_origin_tiles_exactly`, `mapping_by_connector_and_size_when_edid_changed` |
-| Rotated monitors on a real compositor | NOT TESTED | Outputs are taken in the compositor's logical (already rotated) size; no suite rotated a monitor. |
+| Rotated monitors on a real compositor | VERIFIED on KWin Wayland (Plasma 6.6.6, E13); not run on other desktops | the second monitor (scale 2.7) turned to portrait with Plasma's kscreen-doctor; the outputs come back in KWin's logical, rotated size (800x1896) and a drag on that monitor's panel lands exactly (P24, two-monitor VM suite). Elsewhere outputs are also taken in the compositor's logical, already rotated size, but no suite rotated one there |
 | Dialogs, panels and system windows not moved by default | VERIFIED | `dialogs_and_own_windows_excluded`, T20 (X29-X31, W15) |
 | Pre-placement geometry kept for undo; maximized/fullscreen transitions | VERIFIED | X07, X14, LR-06 |
 
@@ -200,10 +200,31 @@ artifacts in `tests/evidence/`. Every claim names its environment and test.
 
 ## 16. Definition of done
 
-- **Divvy-equivalent on Platform X:** not claimed. DV-01..28 are VERIFIED on
-  GNOME X11, GNOME Wayland and KWin Wayland, but each of these combines
-  several versions and setups (nested, headless, container and real VM
-  logins), not one precise platform/version as SRS 16 requires.
+- **Divvy-equivalent on KDE Plasma 6.6.6 / KWin 6.6.6 Wayland, Ubuntu
+  26.04.1 LTS (E13):** claimed, on this measured evidence:
+  - DV-01..28 are each VERIFIED there in real logins with the `.deb`
+    installed by apt, keys and pointer from the VM's virtual keyboard and
+    USB tablet: the P suite (single monitor) and the PT suite (two monitors,
+    one scaled 2.7x; 49/49 in 2/2 runs on the final build). REQUIREMENTS.md
+    names the check for each item.
+  - Placement errors are visible and recoverable: a placement the window
+    does not take is reported with what it did instead (seen there with the
+    GTK 4 limit below), the target closing leaves the panel up with a
+    notice and moves nothing (P15), and the Undo shortcut puts the window
+    back exactly (P26).
+  - Install reliability: apt install in every run there (P01, V01), the
+    reboot and log-out runs (vm-ubuntu26.04-plasma-wayland), and the
+    upgrade run 0.8.0 -> 0.8.5 -> 0.9.0 with apt over a running session
+    (vm-ubuntu26.04-plasma-wayland-upgrade).
+  - Measured limit on this platform: a GTK 4 window first shown on a smaller
+    monitor cannot be made larger than that monitor's work area (GTK 4.22
+    keeps the size bounds KWin sends once); Fractile reports it as not
+    taken (CHANGELOG, Known issues). The VM's monitors are virtual (QEMU
+    virtio-vga); no physical-monitor run on this platform.
+- **Divvy-equivalent elsewhere:** not claimed. On GNOME X11 and GNOME
+  Wayland DV-01..28 are VERIFIED, but each column combines several versions
+  and setups (nested, headless, container and real VM logins), not one
+  precise platform/version as SRS 16 requires.
 - **Session restore supported on Platform X:** not claimed. No single
   platform has passed all five tests SRS 16 names (clean reboot, unexpected
   interruption, duplicate avoidance, monitor remapping, mixed apps); the

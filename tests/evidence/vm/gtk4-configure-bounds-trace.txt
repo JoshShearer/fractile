@@ -1,0 +1,25 @@
+# GTK 4 Text Editor 50.1 (libgtk-4-1 4.22.4) under KWin 6.6.6 Wayland, Ubuntu 26.04 VM with two monitors:
+# Virtual-1 1600x1200 scale 1 (work area 1600x1154) and Virtual-2 5120x2160 scale 2.7 (1896x800 logical).
+# The window first opened on Virtual-2. KWin sends configure_bounds once (1896x800); later configures ask for 800x1154 on Virtual-1;
+# the window answers with 800x800 (fractile place: observed h 800, 'did not take the requested geometry'). Konsole 25.12.3 (Qt) takes 800x1154.
+# WAYLAND_DEBUG=client, xdg_toplevel and surface enter/leave lines only:
+[1485313.759] xdg_toplevel#82.configure_bounds(1896, 800)
+[1485313.761] xdg_toplevel#82.configure(0, 0, array[0])
+[1485333.790]  -> xdg_toplevel#82.set_min_size(410, 250)
+[1485333.811]  -> xdg_toplevel#82.set_max_size(0, 0)
+[1485341.943]  -> xdg_toplevel#82.set_min_size(360, 200)
+[1485341.968]  -> xdg_toplevel#82.set_max_size(0, 0)
+[1486224.454] wl_surface#46.enter(wl_output#33)
+[1486232.200] xdg_toplevel#82.configure(700, 520, array[4])
+[1496939.021] xdg_toplevel#82.configure(800, 1154, array[4])
+[1497054.137] wl_surface#46.leave(wl_output#33)
+[1497054.671] wl_surface#46.enter(wl_output#30)
+[1497144.693] xdg_toplevel#82.configure(800, 1154, array[4])
+[1497338.170] xdg_toplevel#82.configure(800, 1154, array[4])
+[1497487.067] xdg_toplevel#82.configure(800, 1154, array[4])
+[1497922.810] xdg_toplevel#82.configure(800, 1154, array[4])
+[1498074.812] xdg_toplevel#82.configure(800, 1154, array[4])
+[1498758.436] xdg_toplevel#82.configure(800, 1154, array[4])
+[1498908.930] xdg_toplevel#82.configure(800, 1154, array[4])
+[1500094.208] xdg_toplevel#82.configure(800, 1154, array[4])
+[1500245.124] xdg_toplevel#82.configure(800, 1154, array[4])

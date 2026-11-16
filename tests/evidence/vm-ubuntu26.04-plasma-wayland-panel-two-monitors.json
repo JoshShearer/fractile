@@ -1,0 +1,302 @@
+{
+  "suite": "vm-ubuntu26.04-plasma-wayland-panel-two-monitors",
+  "when": "2026-11-16T01:54:43+0000",
+  "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering, two outputs: 1600x1200 at scale 1 and 5120x2160 at scale 2.7, 1896x800 logical) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "results": [
+    {
+      "id": "P00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P01",
+      "name": "the .deb installs (Ubuntu 26.04.1 LTS; kwin-wayland 4:6.6.6-0ubuntu0.1; kwin-x11 ; plasma-workspace 4:6.6.6-0ubuntu0.1;)",
+      "ok": true,
+      "detail": "fractile\t0.9.0-1"
+    },
+    {
+      "id": "P02",
+      "name": "real plasma-wayland login: the service runs from the systemd unit and controls windows",
+      "ok": true,
+      "detail": "adapter kwin session wayland; setup {\"extension\": 0, \"extension_info\": [\"kwriteconfig6 0\", \"reconfigure 0 \", \"script loaded True\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.con; prep {\"set_env\": 0, \"restart\": 0, \"service_up\": true, \"shortcut\": 0, \"first_run\": 0, \"status\": {\"adapter\": \"kwin\", \"session_type\": \"wayland\", \"window_control\": true, \"global_shortcuts\": true, \"hotkey_errors\": {}, \"ui_attached\": true}}"
+    },
+    {
+      "id": "P03",
+      "name": "a second service started by hand says it is already running and leaves the running one alone (one instance)",
+      "ok": true,
+      "detail": "fractiled: already running\nrc=0; service pid 5807 -> 5807"
+    },
+    {
+      "id": "P04b",
+      "name": "the desktop has two monitors",
+      "ok": true,
+      "detail": "[('conn-Virtual-1-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}), ('conn-Virtual-2-1896x800', {'h': 800, 'w': 1896, 'x': 1600, 'y': 0})]"
+    },
+    {
+      "id": "P04",
+      "name": "the target app (Text Editor) is up and placeable",
+      "ok": true,
+      "detail": "outputs [('conn-Virtual-1-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}), ('conn-Virtual-2-1896x800', {'h': 800, 'w': 1896, 'x': 1600, 'y': 0})]"
+    },
+    {
+      "id": "P05",
+      "name": "the panel shortcut opens the panel for the focused window",
+      "ok": true,
+      "detail": "{\"grids\": [{\"output\": \"conn-Virtual-1-1600x1200\", \"x\": 679, \"y\": 448, \"w\": 241, \"h\": 241, \"ox\": 154, \"oy\": 62, \"cols\": 6, \"rows\": 6, \"active\": false, \"panel\": {\"h\": 381, \"w\": 550, \"x\": 525, \"y\": 386},"
+    },
+    {
+      "id": "P05b",
+      "name": "with two monitors, both panels are on their own monitors after the panel shortcut (seconds until they were, from the key press)",
+      "ok": true,
+      "detail": "0.8 s; panels [['Fractile panel conn-Virtual-2-1896x800', {'h': 381, 'w': 550, 'x': 2273, 'y': 209}, 'conn-Virtual-2-1896x800'], ['Fractile panel conn-Virtual-1-1600x1200', {'h': 381, 'w': 550, 'x': 525, 'y': 386}, 'conn-Virtual-1-1600x1200']]"
+    },
+    {
+      "id": "P05c",
+      "name": "keyboard focus is on the panel of the window's own monitor (not on the other monitor's panel, which maps later)",
+      "ok": true,
+      "detail": "active kwin:c31d51b6-d21c-456e-bfd1-8a8f1fac6130; panel on the window's monitor kwin:c31d51b6-d21c-456e-bfd1-8a8f1fac6130 (conn-Virtual-1-1600x1200)"
+    },
+    {
+      "id": "P06",
+      "name": "dragging across the grid places the window exactly",
+      "ok": true,
+      "detail": "want {'h': 1154, 'w': 800, 'x': 0, 'y': 0} got {'h': 1154, 'w': 800, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "P07",
+      "name": "during the drag a preview window shows the exact target, the panel keeps keyboard focus, and the window has not moved yet",
+      "ok": true,
+      "detail": "preview {'h': 1154, 'w': 800, 'x': 0, 'y': 0} want {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:c31d51b6-d21c-456e-bfd1-8a8f1fac6130 (panel kwin:c31d51b6-d21c-456e-bfd1-8a8f1fac6130); window then {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-two-06-drag-preview.png"
+    },
+    {
+      "id": "P08",
+      "name": "the panel closes after placing and focus returns to the window",
+      "ok": true,
+      "detail": "active kwin:e2902852-571e-4713-86f7-3b7cc7107880"
+    },
+    {
+      "id": "P09",
+      "name": "Esc closes the panel without moving the window and focus returns to it",
+      "ok": true,
+      "detail": "{'h': 1154, 'w': 800, 'x': 0, 'y': 0} -> {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; active kwin:e2902852-571e-4713-86f7-3b7cc7107880"
+    },
+    {
+      "id": "P10",
+      "name": "Alt+= / Alt+Shift+= add a column / row, and the size is kept the next time the panel opens",
+      "ok": true,
+      "detail": "(6, 6) -> (7, 7)"
+    },
+    {
+      "id": "P11",
+      "name": "Shift+drag places the window and keeps the panel open",
+      "ok": true,
+      "detail": "want {'h': 384, 'w': 534, 'x': 1066, 'y': 0} got {'h': 384, 'w': 534, 'x': 1066, 'y': 0} open True"
+    },
+    {
+      "id": "P12",
+      "name": "holding Alt subdivides 10x10 to 20x20 and a half-cell selection lands exactly",
+      "ok": true,
+      "detail": "want {'h': 808, 'w': 960, 'x': 80, 'y': 57} got {'h': 808, 'w': 960, 'x': 80, 'y': 57}"
+    },
+    {
+      "id": "P13",
+      "name": "panel-local shortcut (Ctrl+Left) snaps while the panel is open and does nothing once it is closed",
+      "ok": true,
+      "detail": "in panel {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; after close {'h': 577, 'w': 800, 'x': 400, 'y': 288} (centered {'h': 577, 'w': 800, 'x': 400, 'y': 288})"
+    },
+    {
+      "id": "P14",
+      "name": "with reset on open, a grid changed with Alt+= is back to the default 6x6 next time",
+      "ok": true,
+      "detail": "(6, 6) -> (6, 6)"
+    },
+    {
+      "id": "P25",
+      "name": "a 1x1 grid stays 1x1 when a column and a row are taken away, its one cell fills the work area exactly; a 10x10 grid stays 10x10 when one is added",
+      "ok": true,
+      "detail": "1x1: opened (1, 1), after Alt+- and Alt+Shift+- (1, 1); cell {'h': 1154, 'w': 1600, 'x': 0, 'y': 0} got {'h': 1154, 'w': 1600, 'x': 0, 'y': 0}; 10x10: opened (10, 10), after Alt+= and Alt+Shift+= (10, 10)"
+    },
+    {
+      "id": "P26",
+      "name": "the Undo shortcut (keys set in the config) puts the window back exactly where it was before the last placement",
+      "ok": true,
+      "detail": "before {'h': 577, 'w': 800, 'x': 400, 'y': 288}; placed {'h': 1154, 'w': 1600, 'x': 0, 'y': 0}; after undo {'h': 577, 'w': 800, 'x': 400, 'y': 288}"
+    },
+    {
+      "id": "P15",
+      "name": "when the target closes with the panel open, the panel stays (with a notice), a drag places nothing and no other window moves",
+      "ok": true,
+      "detail": "panel True gone True open True; editor {'h': 577, 'w': 800, 'x': 400, 'y': 288} -> {'h': 577, 'w': 800, 'x': 400, 'y': 288}; tests/evidence/vm/panel-plasma-wayland-two-15-target-closed.png"
+    },
+    {
+      "id": "P16",
+      "name": "starting Fractile again from the app menu opens the panel for the focused window",
+      "ok": true,
+      "detail": "panel True target kwin:e2902852-571e-4713-86f7-3b7cc7107880 (editor kwin:e2902852-571e-4713-86f7-3b7cc7107880)"
+    },
+    {
+      "id": "P17",
+      "name": "no Python errors in the UI's output",
+      "ok": true,
+      "detail": "['0']"
+    },
+    {
+      "id": "P18",
+      "name": "with the tray icon on, Fractile's icon is registered in the desktop's tray (StatusNotifierWatcher) and active",
+      "ok": true,
+      "detail": "{\"registered\": true, \"service\": \":1.148\", \"path\": \"/StatusNotifierItem\", \"title\": \"(<'Fractile'>,)\", \"id\": \"(<'Fractile'>,)\", \"status\": \"(<'Active'>,)\"}; tests/evidence/vm/panel-plasma-wayland-two-18-tray.png"
+    },
+    {
+      "id": "P19",
+      "name": "a left click on the tray icon (StatusNotifierItem.Activate, what the tray sends) shows the panel for the focused window",
+      "ok": true,
+      "detail": "{'activated': True, 'stderr': ''}; panel True target kwin:e2902852-571e-4713-86f7-3b7cc7107880 (editor kwin:e2902852-571e-4713-86f7-3b7cc7107880)"
+    },
+    {
+      "id": "P-S01",
+      "name": "Settings opens from the service request with all eight pages",
+      "ok": true,
+      "detail": "['General', 'Appearance', 'Shortcuts', 'Session Restore', 'Rules', 'Monitors', 'Diagnostics', 'About']"
+    },
+    {
+      "id": "P-S02",
+      "name": "every page renders (screenshots in tests/evidence/gui/)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P-S08",
+      "name": "a General change is only pending until Apply, then the service has it",
+      "ok": true,
+      "detail": "before=True pending_dirty=True service_before=True service_after=False"
+    },
+    {
+      "id": "P-S03",
+      "name": "a global shortcut without a modifier is refused and the editor keeps listening",
+      "ok": true,
+      "detail": "\u26a0 Global shortcuts need at least one modifier (Ctrl, Alt, Shift or Super). Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "P-S14",
+      "name": "while the editor listens, global shortcuts are paused so the desktop passes their keys to it",
+      "ok": true,
+      "detail": "hotkeys_paused=True"
+    },
+    {
+      "id": "P-S04",
+      "name": "a combination Fractile already uses is reported by name (the panel shortcut)",
+      "ok": true,
+      "detail": "\u26a0 already used by Fractile shortcut 'Show/hide panel'"
+    },
+    {
+      "id": "P-S05b",
+      "name": "a window manager keybinding (Super+Up) reaches the editor while it listens and is reported as taken",
+      "ok": true,
+      "detail": "\u26a0 conflict: Super+Up is already used by the KDE shortcut \u201cQuick Tile Window to the Top\u201d (KWin), set in System Settings > Keyboard > Shortcuts (value Super+Up)"
+    },
+    {
+      "id": "P-S05",
+      "name": "a combination the desktop's own settings assign (log out) is reported as taken, with where it is set",
+      "ok": true,
+      "detail": "\u26a0 conflict: Ctrl+Alt+Delete is already used by the KDE shortcut \u201cShow Logout Screen\u201d (Session Management), set in System Settings > Keyboard > Shortcuts (value Ctrl+Alt+Delete)"
+    },
+    {
+      "id": "P-S06",
+      "name": "a free combination is reported as available",
+      "ok": true,
+      "detail": "\u2713 Available. Note: some desktop shortcuts cannot be detected until they are pressed."
+    },
+    {
+      "id": "P-S07",
+      "name": "a panel shortcut on a navigation key is refused (reserved by the panel)",
+      "ok": true,
+      "detail": "\u26a0 The panel uses this key for keyboard navigation. Try another combination, or Esc to keep the current one."
+    },
+    {
+      "id": "P-S09",
+      "name": "the new shortcut appears in the table, pending until Apply",
+      "ok": true,
+      "detail": "dialog=True modal=None add_button=True rows=14"
+    },
+    {
+      "id": "P-S15",
+      "name": "the pause ends when the editor closes",
+      "ok": true,
+      "detail": "hotkeys_paused=False"
+    },
+    {
+      "id": "P-S10",
+      "name": "after Apply the service saved and registered it; the table says active",
+      "ok": true,
+      "detail": "service=[{'accelerator': 'Ctrl+Alt+Shift+F9', 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-dc621e3a', 'name': 'Probe left half', 'scope': 'global'}] status=active"
+    },
+    {
+      "id": "P-S13",
+      "name": "the shortcut list shows the panel shortcut with its real keys; Edit\u2026 on it opens General",
+      "ok": true,
+      "detail": "keys=Ctrl+Alt+G status=active page after Edit=general"
+    },
+    {
+      "id": "P-S18",
+      "name": "Duplicate adds a copy with the same action and no keys (so it cannot clash)",
+      "ok": true,
+      "detail": "copy={'accelerator': None, 'action': {'grid': {'cols': 6, 'rows': 6}, 'output': {'kind': 'current'}, 'selection': {'col0': 0, 'col1': 2, 'row0': 0, 'row1': 5}, 'type': 'place'}, 'cycle_monitors': False, 'favorite': False, 'id': 's-07bff65c', 'name': 'Probe left half (copy)', 'scope': 'global'}"
+    },
+    {
+      "id": "P-S19",
+      "name": "Export writes every shortcut (including pending ones) to the chosen file",
+      "ok": true,
+      "detail": "14 exported, names ['Left half', 'Right half', 'Top half', 'Bottom half']..."
+    },
+    {
+      "id": "P-S20",
+      "name": "Remove takes the copy out; after Apply the service has the original and not the copy",
+      "ok": true,
+      "detail": "service shortcuts ['Left half', 'Right half', 'Top half', 'Bottom half', 'Maximize (fill work area)', 'Center', 'Show/hide panel', 'Undo last placement', 'Move window to next monitor', 'Save current workspace', 'Restore latest snapshot', 'Command palette', 'Probe left half']"
+    },
+    {
+      "id": "P-S21",
+      "name": "Import of an exported file skips what is already there; a shortcut whose keys are taken comes in without keys, and the message says so",
+      "ok": true,
+      "detail": "messages ['Imported 1 shortcut. 13 were already here and left as is. Press Apply to check and save them.', 'Imported 1 shortcut. 1 came in without keys because those keys are already used; set new ones with Edit\u2026. Press Apply to check and save them.']; added 2"
+    },
+    {
+      "id": "P-S11",
+      "name": "pressing the shortcut created in Settings places the window (left half)",
+      "ok": true,
+      "detail": "want {'h': 1154, 'w': 800, 'x': 0, 'y': 0} got {'h': 1154, 'w': 800, 'x': 0, 'y': 0}"
+    },
+    {
+      "id": "P21",
+      "name": "the panel shortcut opens one panel per monitor, each on its own monitor",
+      "ok": true,
+      "detail": "[('conn-Virtual-1-1600x1200', {'h': 354, 'w': 550, 'x': 525, 'y': 400}), ('conn-Virtual-2-1896x800', {'h': 354, 'w': 550, 'x': 2273, 'y': 223})]; outputs [('conn-Virtual-1-1600x1200', {'h': 1200, 'w': 1600, 'x': 0, 'y': 0}), ('conn-Virtual-2-1896x800', {'h': 800, 'w': 1896, 'x': 1600, 'y': 0})]; tests/evidence/vm/panel-plasma-wayland-two-21-panel-a.png; tests/evidence/vm/panel-plasma-wayland-two-21-panel-b.png"
+    },
+    {
+      "id": "P22",
+      "name": "a drag on the second (scaled) monitor's panel places the window on that monitor exactly, the preview during the drag is at the exact target there, and the panels close",
+      "ok": true,
+      "detail": "want {'h': 800, 'w': 948, 'x': 1600, 'y': 0} on conn-Virtual-2-1896x800; preview {'h': 800, 'w': 948, 'x': 1600, 'y': 0}; got {'h': 800, 'w': 948, 'x': 1600, 'y': 0} on conn-Virtual-2-1896x800; tests/evidence/vm/panel-plasma-wayland-two-22-moved.png"
+    },
+    {
+      "id": "P23",
+      "name": "pressing the same placement shortcut three times puts the window on this monitor, the next one, then back (left half each time)",
+      "ok": true,
+      "detail": "start conn-Virtual-2-1896x800; frames [{'h': 800, 'w': 948, 'x': 1600, 'y': 0}, {'h': 1154, 'w': 800, 'x': 0, 'y': 0}, {'h': 800, 'w': 948, 'x': 1600, 'y': 0}]; want {'h': 800, 'w': 948, 'x': 1600, 'y': 0} / {'h': 1154, 'w': 800, 'x': 0, 'y': 0}; set_config {\"result\": {\"hotkey_errors\": {}, \"ok\": true}}"
+    },
+    {
+      "id": "P20",
+      "name": "margins left 20 px, right 2 %, top 15 px, bottom 30 px and gaps 12 px / 8 px: three windows placed through the panel sit exactly inside the work area with those gaps between them",
+      "ok": true,
+      "detail": "work area {'h': 1154, 'w': 1600, 'x': 0, 'y': 0}; inner {'x': 20, 'y': 15, 'w': 1548, 'h': 1109}; editor {'h': 1109, 'w': 768, 'x': 20, 'y': 15}; calculator {'h': 735, 'w': 768, 'x': 800, 'y': 15}; editor again {'h': 366, 'w': 768, 'x': 800, 'y': 758}; grids [('editor_left', (6, 6)), ('calc_top_right', (6, 6)), ('editor_bottom_right', (6, 6))]; set_config {\"result\": {\"hotkey_errors\": {}, \"ok\": true}}; tests/evidence/vm/panel-plasma-wayland-two-20-spacing.png"
+    },
+    {
+      "id": "P24",
+      "name": "with the second monitor rotated to portrait (kscreen-doctor rotation left), a drag on its panel places the window exactly inside it",
+      "ok": true,
+      "detail": "rotate {\"rc\": 0, \"stdout\": \"\", \"stderr\": \"\"}; output now {'h': 1896, 'w': 800, 'x': 1600, 'y': 0} work area {'h': 1896, 'w': 800, 'x': 1600, 'y': 0}; want {'h': 948, 'w': 533, 'x': 1733, 'y': 316} got {'h': 948, 'w': 533, 'x': 1733, 'y': 316}; tests/evidence/vm/panel-plasma-wayland-two-24-portrait.png"
+    }
+  ],
+  "log": []
+}

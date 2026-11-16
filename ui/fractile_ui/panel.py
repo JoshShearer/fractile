@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 
+from PyQt6 import sip
 from PyQt6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QGuiApplication, QIcon, QKeyEvent, QLinearGradient, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout
@@ -41,30 +42,43 @@ def output_of_frame(outputs: list[dict], frame: dict | None) -> dict | None:
     return next((o for o in outputs if o.get("primary")), outputs[0])
 
 
-def screen_for_output(o: dict):
-    """QScreen showing this output (device pixels -> logical)."""
+def service_coords_are_logical() -> bool:
+    """Wayland compositors (KWin, Mutter, Hyprland, sway) report window and
+    monitor rectangles in the same logical coordinates Qt uses on Wayland, so
+    nothing is converted there. On X11 the service reports device pixels and
+    Qt's coordinates are those divided by the screen's scale. (Converting on
+    Wayland put the panel for a 2.7x monitor onto the monitor beside it.)"""
+    return QGuiApplication.platformName().startswith("wayland")
+
+
+def screen_for_output(o: dict, logical: bool | None = None):
+    """QScreen showing this output."""
+    logical = service_coords_are_logical() if logical is None else logical
     r = o["rect"]
-    for s in QGuiApplication.screens():
+    from PyQt6.QtCore import QPoint
+    screens = QGuiApplication.screens()
+    for s in screens:
         g, dpr = s.geometry(), s.devicePixelRatio()
-        if round(g.x() * dpr) == r["x"] and round(g.y() * dpr) == r["y"]:
+        if g.x() == r["x"] and g.y() == r["y"] and (logical or dpr == 1.0):
             return s
-        if g.x() == r["x"] and g.y() == r["y"]:
+        if not logical and round(g.x() * dpr) == r["x"] and round(g.y() * dpr) == r["y"]:
             return s
     cx, cy = output_center(o)
-    for s in QGuiApplication.screens():
-        dpr = s.devicePixelRatio()
-        from PyQt6.QtCore import QPoint
+    for s in screens:
+        dpr = 1.0 if logical else s.devicePixelRatio()
         if s.geometry().contains(QPoint(int(cx / dpr), int(cy / dpr))):
             return s
     return QGuiApplication.primaryScreen()
 
 
-def to_logical(rect: dict, screen) -> QRect:
+def to_logical(rect: dict, screen, logical: bool | None = None) -> QRect:
+    """A service rectangle in Qt's coordinates (see service_coords_are_logical)."""
+    logical = service_coords_are_logical() if logical is None else logical
     dpr = screen.devicePixelRatio() if screen else 1.0
     g = screen.geometry() if screen else QRect()
-    # Device-pixel rect on this screen -> logical coordinates.
-    if dpr == 1.0:
+    if logical or dpr == 1.0:
         return QRect(rect["x"], rect["y"], rect["w"], rect["h"])
+    # Device-pixel rect on this screen -> logical coordinates.
     ox = round(g.x() * dpr)
     oy = round(g.y() * dpr)
     return QRect(g.x() + round((rect["x"] - ox) / dpr), g.y() + round((rect["y"] - oy) / dpr), round(rect["w"] / dpr), round(rect["h"] / dpr))
@@ -379,12 +393,25 @@ class PanelController:
             p.refresh(payload, self.cfg)
             self.panels.append(p)
         focus_panel = next((p for p in self.panels if home and p.output["stable_id"] == home["stable_id"]), self.panels[0] if self.panels else None)
+        # Wayland: the compositor gives focus to each panel as it maps, and
+        # the panels are placed one by one in the background, so the last
+        # one to map (often the other monitor's) would keep the keyboard.
+        # Once every panel is in place, focus the one on the window's monitor
+        # again.
+        placing = {"left": len(self.panels)}
+        shown = list(self.panels)
+
+        def placed():
+            placing["left"] -= 1
+            if placing["left"] == 0 and focus_panel is not None and self.visible and self.panels == shown and not sip.isdeleted(focus_panel):
+                self.app.focus_own(focus_panel)
+
         for p in self.panels:
             rect, _ = p.place_on_output()
             if p is not focus_panel:
                 p.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
             p.show()
-            self.app.position_own(p, rect)
+            self.app.position_own(p, rect, done=placed if len(self.panels) > 1 else None)
         self.visible = True
         self.app.register_own_windows()
         if focus_panel:

@@ -24,9 +24,13 @@ launches apps you approved.
 - **Does not restore window contents.** Unsaved documents, tabs and terminal
   sessions come back only if the application restores them itself.
 
-Status: 0.9.0. Tested in nested, headless and container desktops, not yet on
-real logins or reboots. Read [PLATFORM_MATRIX.md](PLATFORM_MATRIX.md) before
-relying on it.
+Status: 0.9.0. Tested in nested, headless and container desktops, and in real
+logins, log-outs and reboots in VMs (GNOME 46, Plasma 6.6 and 5.27, Sway,
+Hyprland, COSMIC) on virtual displays; checked by hand on two desktops with
+physical monitors. Every Divvy item (SRS DV-01..28) passed on one precise
+platform, KDE Plasma 6.6.6 Wayland on Ubuntu 26.04, so that is the one platform
+called Divvy-equivalent ([SRS_STATUS.md](SRS_STATUS.md), section 16). Read
+[PLATFORM_MATRIX.md](PLATFORM_MATRIX.md) before relying on it.
 
 ## Install
 

@@ -188,6 +188,22 @@ laptop. See PLATFORM_MATRIX.md.
 
 ### Fixed during validation
 
+- **With two monitors on KWin Wayland, the keyboard went to the other
+  monitor's panel.** The panels are placed on their monitors in the
+  background, and KWin focuses each one as it maps, so the last to map kept
+  the keyboard: arrow keys, Enter and the panel shortcuts then worked on the
+  other monitor's panel, and the first drag in the Plasma 6.6 VM was taken
+  by it. Once every panel is in place, the UI now focuses the panel on the
+  window's monitor again (P05c, P07 in the two-monitor VM suite).
+- **On Wayland, the panel for a scaled monitor opened on the monitor beside
+  it.** The UI divided the service's coordinates by the monitor's scale, as
+  it must on X11, but Wayland compositors already report logical
+  coordinates. In a Plasma 6.6 Wayland VM with a 1600x1200 monitor at scale
+  1 and a 5120x2160 one at scale 2.7, the second monitor's panel sat at
+  (574, -57) on the first. The preview on such a monitor would also have
+  been drawn at 1/2.7 of its size. Wayland coordinates are now used as they
+  are (`ui/tests/test_coords.py`; P21, P22 in the two-monitor VM suite).
+
 - **A tray click on a desktop where windows cannot be placed showed
   nothing.** On COSMIC the panel had no monitors to open on and the UI
   opened no window. Opening the panel there now shows "Fractile can't place
@@ -538,6 +554,17 @@ laptop. See PLATFORM_MATRIX.md.
   and FUSE mounts, and `xdotool --sync` could hang forever. Both are fixed.
 
 ### Known issues and limits
+
+- **KWin Wayland with monitors of different sizes: a GTK 4 window cannot be
+  made larger than the monitor it first opened on.** KWin sends a window's
+  size bounds once, when it first maps; GTK 4 (seen with Text Editor 50.1 on
+  GTK 4.22.4, KWin 6.6.6) keeps clamping to them. A Text Editor window first
+  shown on an 800 px tall monitor stays at most 800 px tall on a 1200 px
+  one, even though KWin asks for 1154 px
+  (`tests/evidence/vm/gtk4-configure-bounds-trace.txt`). Qt apps (Konsole)
+  are not affected, and KWin's own maximize still fills the monitor.
+  Fractile reports such a placement as not taken ("the window did not take
+  the requested geometry") and does not learn it as a size limit.
 
 - With Qt 6.4 (Ubuntu 24.04 and Pop!_OS 24.04), Orca does not read the
   placement grid's selection as it changes. That Qt sends the AT-SPI name

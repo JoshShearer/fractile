@@ -11,6 +11,7 @@
 |---|---|---|
 | KWin 6.8.2, `kwin_wayland --virtual` (no Xwayland), in an `archlinux:latest` container with the host's NVIDIA render node passed in | all checks pass | `tests/evidence/e2e-kwin-wayland.json` (`tests/kwin/e2e-kwin-in-container.sh`) |
 | Ubuntu 26.04 with kde-plasma-desktop (Plasma and KWin 6.6.6) in a QEMU/KVM VM, the Plasma Wayland session started by GDM: `apt install`, script enabled as the wizard does, start from the app menu, real log-out (Plasma's own) and log-in, real reboot, restore of 10 apps / 15 windows | 7/7 | `tests/evidence/vm-ubuntu26.04-plasma-wayland.json` (`tests/vm/vm-e2e.sh plasma-wayland`) |
+| The same Ubuntu 26.04 VM with two monitors (1600x1200 at scale 1, 5120x2160 at scale 2.7): the whole panel suite plus a panel per monitor, drag and preview on the scaled monitor, shortcut cycling, margins and gaps, the scaled monitor turned to portrait, grid range ends, Undo shortcut | 49/49 in 2/2 runs | `tests/evidence/vm-ubuntu26.04-plasma-wayland-panel-two-monitors.json` (`FRACTILE_VM_PANEL=1 FRACTILE_VM_HEADS=2 tests/vm/vm-e2e.sh plasma-wayland`) |
 | kwin_x11 5.27.11 on Xvfb (no plasmashell), Ubuntu 24.04 container: the X11 suite | 44/44 | `tests/evidence/e2e-x11-kwin.json` (`tests/kwin-x11/e2e-kwin-x11-in-container.sh`) |
 | Ubuntu 24.04.5 with kde-plasma-desktop (plasma-workspace 5.27.12, kwin-x11 5.27.11) in a QEMU/KVM VM, the Plasma X11 session started by GDM: `apt install`, start from the app menu, real log-out (Plasma's own) and log-in, real reboot, restore of 10 apps / 15 windows | 7/7 | `tests/evidence/vm-ubuntu24.04-plasma-x11.json` (`tests/vm/vm-e2e.sh plasma-x11`) |
 
@@ -37,10 +38,21 @@ own session restore reopens some apps at the next login, unplaced; Fractile
 places those and launches only what is missing (VM V06: 9 windows already
 open, 6 launched).
 
+**Divvy-equivalent (SRS 16)** is claimed for Plasma 6.6.6 / KWin 6.6.6
+Wayland on Ubuntu 26.04 only: every DV item passed there in real logins
+(SRS_STATUS.md, section 16).
+
+**GTK 4 apps and monitors of different sizes.** KWin sends a window's size
+bounds once, when it first maps, and GTK 4 (4.22.4, Text Editor 50.1) keeps
+clamping to them. A GTK 4 window first shown on an 800 px tall monitor stays
+at most 800 px tall on a 1200 px monitor, though KWin asks for more; Fractile
+reports the placement as not taken. Qt apps are not affected, and KWin's own
+maximize still fills the monitor
+(`tests/evidence/vm/gtk4-configure-bounds-trace.txt`).
+
 **Not tested:** Plasma 6 on physical monitors or real hardware; KWin
-versions other than 6.8.2, 6.6.6 and 5.27.11; multiple monitors on
-KWin; System Settings' KWin Scripts page (the instructions below are from
-KDE's documentation, not from a run).
+versions other than 6.8.2, 6.6.6 and 5.27.11; System Settings' KWin Scripts
+page (the instructions below are from KDE's documentation, not from a run).
 
 ## Setting it up
 

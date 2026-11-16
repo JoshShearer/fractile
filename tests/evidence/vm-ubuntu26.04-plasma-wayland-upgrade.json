@@ -1,0 +1,92 @@
+{
+  "suite": "vm-ubuntu26.04-plasma-wayland-upgrade",
+  "when": "2026-11-16T02:01:09+0000",
+  "environment": "Ubuntu 26.04 desktop VM (QEMU/KVM, 4 vCPU, 6 GiB, virtio-vga 1600x1200, software rendering) with kde-plasma-desktop (Plasma 6), GDM timed login, plasma-wayland session, Fractile fractile_0.9.0-1_amd64.deb installed with apt",
+  "results": [
+    {
+      "id": "U00",
+      "name": "the VM boots and answers over ssh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "U01",
+      "name": "the old build installs (0.8.0-1)",
+      "ok": true,
+      "detail": "fractile\t0.8.0-1"
+    },
+    {
+      "id": "U02",
+      "name": "the old build runs in a real plasma-wayland login and controls windows",
+      "ok": true,
+      "detail": "version 0.8.0; setup {\"extension\": 0, \"extension_info\": [\"kwriteconfig6 0\", \"reconfigure 0 \", \"script loaded True\"], \"autostart\": {\"enabled\": true, \"mode\": \"systemd\", \"unit_installed\": true, \"xdg_path\": \"/home/tester/.con"
+    },
+    {
+      "id": "U03",
+      "name": "settings, a shortcut and a window to snapshot are set up on the old build",
+      "ok": true,
+      "detail": "editor True"
+    },
+    {
+      "id": "U11a",
+      "name": "0.8.0 -> 0.8.5: the package upgrades over the running install",
+      "ok": true,
+      "detail": "rc=0 fractile: upgraded. Running sessions keep the old service until it is restarted: fractile 0.8.5-1"
+    },
+    {
+      "id": "U11b",
+      "name": "0.8.0 -> 0.8.5: the new service runs, once, and controls windows",
+      "ok": true,
+      "detail": "after a log-out and log-in (this build has no self-restart; the package said to restart the service); fractiled processes 1"
+    },
+    {
+      "id": "U11c",
+      "name": "0.8.0 -> 0.8.5: settings, the user's shortcut and the snapshot are kept",
+      "ok": true,
+      "detail": "0.8.5: grid {'cols': 8, 'rows': 5} panel Ctrl+Alt+P snapshots ['before upgrade']"
+    },
+    {
+      "id": "U12a",
+      "name": "0.8.5 -> 0.9.0: the package upgrades over the running install",
+      "ok": true,
+      "detail": "rc=0 fractile: upgraded. A running Fractile service switches to the new version by itself fractile 0.9.0-1"
+    },
+    {
+      "id": "U12b",
+      "name": "0.8.5 -> 0.9.0: the new service runs, once, and controls windows",
+      "ok": true,
+      "detail": "restarted itself in place (pid 10068 -> 10068); fractiled processes 1"
+    },
+    {
+      "id": "U12c",
+      "name": "0.8.5 -> 0.9.0: settings, the user's shortcut and the snapshot are kept",
+      "ok": true,
+      "detail": "0.9.0: grid {'cols': 8, 'rows': 5} panel Ctrl+Alt+P snapshots ['before upgrade']"
+    },
+    {
+      "id": "U20",
+      "name": "the snapshot saved by the oldest build restores with the new build",
+      "ok": true,
+      "detail": "saved {'h': 577, 'w': 1067, 'x': 533, 'y': 0} got {'h': 577, 'w': 1067, 'x': 533, 'y': 0}; run {\"report\": {\"cancelled\": false, \"duration_ms\": 1696, \"items\": [{\"excluded\": false, \"label\": \"org.gnome.TextEditor\", \"launched\": false, \"message\": null, \"observed\": {\"h\": 577, \"w\": 1067, \"x\": 533, \"y\":"
+    },
+    {
+      "id": "U21",
+      "name": "the user's global shortcuts are registered by the new build",
+      "ok": true,
+      "detail": "{}"
+    },
+    {
+      "id": "U30",
+      "name": "after a reboot one new service starts from the unit, with the settings and snapshot kept",
+      "ok": true,
+      "detail": "after reboot: grid {'cols': 8, 'rows': 5} panel Ctrl+Alt+P snapshots ['before upgrade']; processes 1"
+    },
+    {
+      "id": "U31",
+      "name": "no duplicate autostart entries after the upgrades",
+      "ok": true,
+      "detail": "0 autostart entries"
+    }
+  ],
+  "log": []
+}
