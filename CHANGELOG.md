@@ -8,6 +8,8 @@ by hand on the developer's GNOME Xorg desktop and an Omarchy (Hyprland)
 laptop. See PLATFORM_MATRIX.md.
 
 ### Added
+- Debug packages: `fractile-dbgsym` (.deb) and `fractile-debug` (Arch) carry the binaries' debug info; the main packages stay stripped.
+- Signed distribution, ready for a maintainer key: `packaging/debian/make-apt-repo.sh` (debsigs-signed `.deb`s and a signed apt repository) and `packaging/arch/make-pacman-repo.sh` (signed packages and database). Checked end to end with a throwaway key; nothing is published.
 
 - **COSMIC adapter (partial).** On COSMIC (cosmic-comp 1.11.0 tested) Fractile
   now lists windows, moves them between workspaces and sets maximized,

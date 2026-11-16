@@ -68,6 +68,8 @@ bash tests/sway/e2e-sway-in-container.sh                # Sway, nested in a head
 FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py   # SLOs + soak
 bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb
 bash packaging/test/arch-in-container.sh
+FRACTILE_GPG_KEY=<fingerprint> bash packaging/debian/make-apt-repo.sh   # signed apt repo in packaging/build/apt
+bash tests/packaging/apt-repo-in-container.sh && bash tests/packaging/pacman-repo-in-container.sh
 ```
 
 Every suite runs isolated (its own display, D-Bus, runtime and data

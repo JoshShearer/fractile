@@ -14,7 +14,7 @@ useradd -m builder
 mkdir /build && cp /in/* /build/ && chown -R builder /build
 su builder -s /bin/bash -c "cd /build && makepkg --noconfirm >/tmp/makepkg.log 2>&1" || { tail -40 /tmp/makepkg.log; exit 1; }
 grep -E "^test result|Finished" /tmp/makepkg.log | tail -4
-pkg=$(ls /build/fractile-*.pkg.tar.zst | head -1); echo "== built $(basename "$pkg")"
+pkg=$(ls /build/fractile-[0-9]*.pkg.tar.zst | head -1); echo "== built $(basename "$pkg")"
 [ -d /out ] && { cp "$pkg" /out/; chown --reference=/out /out/"$(basename "$pkg")"; }
 pacman -U --noconfirm "$pkg" >/dev/null
 echo "== integrations shipped:"; pacman -Ql fractile | grep -E "extensions/fractile@fractile.io/metadata.json|kwin/scripts/fractile/metadata.json"

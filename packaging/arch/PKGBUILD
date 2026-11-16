@@ -28,15 +28,22 @@ prepare() {
   cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
 }
 
+# Built with debug info: makepkg strips the package and, with its default
+# "debug" option, puts the debug info in fractile-debug.
+_cargo_env() {
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  export CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=limited
+}
+
 build() {
   cd "$pkgname-$pkgver"
-  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  _cargo_env
   cargo build --frozen --release
 }
 
 check() {
   cd "$pkgname-$pkgver"
-  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  _cargo_env
   cargo test --frozen --release --workspace
 }
 

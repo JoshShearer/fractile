@@ -4,6 +4,9 @@
 # Output: packaging/build/fractile_<version>-1_<arch>.deb
 # Set DEB_MAINTAINER="Name <email>" to put a real maintainer in the control file.
 # Honours CARGO_TARGET_DIR (default: target).
+# Also builds fractile-dbgsym_<version>-1_<arch>.deb with the binaries' debug
+# info (/usr/lib/debug/.build-id/..., found by gdb and debuginfod clients);
+# FRACTILE_DBGSYM=0 skips it.
 # FRACTILE_TARGET=aarch64-unknown-linux-gnu cross-builds an arm64 package
 # (needs that Rust target and aarch64-linux-gnu-gcc; see
 # tests/cross/aarch64-in-container.sh).
@@ -17,14 +20,39 @@ case "$target" in
   aarch64-unknown-linux-gnu) arch=arm64; bindir="${CARGO_TARGET_DIR:-target}/$target/release"; strip=aarch64-linux-gnu-strip ;;
   *) echo "unsupported FRACTILE_TARGET $target" >&2; exit 2 ;;
 esac
+dbgsym=${FRACTILE_DBGSYM:-1}
+objcopy=objcopy
+[[ $target == aarch64-unknown-linux-gnu ]] && objcopy=aarch64-linux-gnu-objcopy
 maint=${DEB_MAINTAINER:-"Fractile maintainers <maintainers@fractile.invalid>"}
 if [[ ${1:-} != --no-build ]]; then
-  cargo build --release --locked ${target:+--target "$target"}
+  if [[ $dbgsym == 1 ]]; then
+    # keep debug info in the build; it is split off into the dbgsym package below
+    CARGO_PROFILE_RELEASE_STRIP=none CARGO_PROFILE_RELEASE_DEBUG=limited cargo build --release --locked ${target:+--target "$target"}
+  else
+    cargo build --release --locked ${target:+--target "$target"}
+  fi
 fi
 out="$root/packaging/build"
 stage="$out/deb/fractile_${version}-1_${arch}"
 rm -rf "$stage"; mkdir -p "$stage/DEBIAN"
 packaging/install.sh "$stage" /usr "$bindir" >/dev/null
+dbgstage="$out/deb/fractile-dbgsym_${version}-1_${arch}"
+rm -rf "$dbgstage"
+if [[ $dbgsym == 1 ]]; then
+  for b in fractiled fractile; do
+    f="$stage/usr/bin/$b"
+    if ! readelf -S "$f" | grep -q '\.debug_info'; then
+      echo "build-deb: $b has no debug info (built without it?); no dbgsym package" >&2; dbgsym=0; break
+    fi
+    id=$(readelf -n "$f" | sed -n 's/.*Build ID: \([0-9a-f]*\).*/\1/p')
+    dbg="$dbgstage/usr/lib/debug/.build-id/${id:0:2}/${id:2}.debug"
+    mkdir -p "$(dirname "$dbg")"
+    "$objcopy" --only-keep-debug --compress-debug-sections "$f" "$dbg"
+    chmod 644 "$dbg"
+    "$strip" --strip-unneeded "$f"
+    "$objcopy" --add-gnu-debuglink="$dbg" "$f"
+  done
+fi
 "$strip" --strip-unneeded "$stage/usr/bin/fractiled" "$stage/usr/bin/fractile" 2>/dev/null || true
 # Debian keeps the licence in the copyright file, not /usr/share/licenses.
 rm -rf "$stage/usr/share/licenses"
@@ -82,3 +110,27 @@ find "$stage" -type d -exec chmod 755 {} +
 deb="$out/fractile_${version}-1_${arch}.deb"
 dpkg-deb --root-owner-group -Zxz --build "$stage" "$deb" >/dev/null
 echo "$deb"
+if [[ $dbgsym == 1 ]]; then
+  mkdir -p "$dbgstage/DEBIAN" "$dbgstage/usr/share/doc"
+  ln -s fractile "$dbgstage/usr/share/doc/fractile-dbgsym"
+  ids=$(cd "$dbgstage/usr/lib/debug/.build-id" && find . -name '*.debug' | sed 's|^\./||; s|/||; s|\.debug$||' | sort | tr '\n' ' ')
+  cat >"$dbgstage/DEBIAN/control" <<CTRL
+Package: fractile-dbgsym
+Source: fractile
+Version: ${version}-1
+Architecture: ${arch}
+Maintainer: ${maint}
+Installed-Size: $(du -sk --exclude=DEBIAN "$dbgstage" | cut -f1)
+Depends: fractile (= ${version}-1)
+Section: debug
+Priority: optional
+Build-Ids: ${ids% }
+Description: debug symbols for fractile
+ Debug information for the fractiled service and the fractile command, for
+ debuggers and crash reports. Not needed to run Fractile.
+CTRL
+  find "$dbgstage" -type d -exec chmod 755 {} +
+  ddeb="$out/fractile-dbgsym_${version}-1_${arch}.deb"
+  dpkg-deb --root-owner-group -Zxz --build "$dbgstage" "$ddeb" >/dev/null
+  echo "$ddeb"
+fi

@@ -1,0 +1,44 @@
+{
+  "suite": "apt-repo",
+  "when": "2026-11-16T06:00:10+00:00",
+  "environment": "ubuntu:24.04 container; throwaway ed25519 key generated for the run; file:// repository",
+  "results": [
+    {
+      "id": "R1",
+      "name": "the repository Release file is signed (InRelease and Release.gpg) and verifies against the exported archive key",
+      "ok": true,
+      "detail": "gpgv:                using EDDSA key 3CCE6BEB140481EE90ACFE2500D3F37E5B46A14C gpgv: Good signature from \"Fractile test archive (throwaway) <test@fractile.invalid>\" "
+    },
+    {
+      "id": "R2",
+      "name": "apt update accepts the signed repository (signed-by keyring) and apt installs fractile and fractile-dbgsym from it",
+      "ok": true,
+      "detail": "update rc 0, install rc 0; installed 0.9.0-1; fractile: Installed: 0.9.0-1 Candidate: 0.9.0-1 Version table: *** 0.9.0-1 500 500 file:/repo stable/main amd64 Packages 100 /var/lib/dpkg/status "
+    },
+    {
+      "id": "R3",
+      "name": "each .deb is signed (debsigs origin signature) and debsig-verify accepts it under a policy for the archive key; a tampered copy is rejected",
+      "ok": true,
+      "detail": " fractile-dbgsym_0.9.0-1_amd64.deb: verified; fractile_0.9.0-1_amd64.deb: verified; tampered copy rejected (debsig: Failed verification for /tmp/tampered.deb.)"
+    },
+    {
+      "id": "R4",
+      "name": "the installed binaries are stripped and fractile-dbgsym provides their debug info by build id (gdb maps fractiled::main to a source line only with it)",
+      "ok": true,
+      "detail": "stripped 1; with dbgsym: Line 151 of \"crates/fractile-daemon/src/main.rs\" starts at address 0x616fd0 <_RNvCs2zh7y3fE2Wd_9fractiled4main> and ends; without: warning: Missing auto-load script at offset 0 in section .debug_gdb_scripts"
+    },
+    {
+      "id": "R5",
+      "name": "a repository whose signed Release was altered is refused by apt",
+      "ok": true,
+      "detail": "  The following signatures were invalid: BADSIG 00D3F37E5B46A14C Fractile test archive (throwaway) <test@fractile.invalid> W: GPG error: file:/repo2 stable InRelease: The following signatures were invalid: BADSIG 00D3F37E5B46A14C Fractile test archive (throwaw"
+    },
+    {
+      "id": "R6",
+      "name": "the repository with its signatures removed is refused by apt (not signed)",
+      "ok": true,
+      "detail": "E: The repository 'file:/repo2 stable Release' is not signed."
+    }
+  ],
+  "ok": true
+}

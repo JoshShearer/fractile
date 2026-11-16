@@ -1,0 +1,44 @@
+{
+  "suite": "pacman-repo",
+  "when": "2026-11-16T06:08:26+00:00",
+  "environment": "archlinux:latest container; makepkg as an unprivileged user; throwaway ed25519 key generated for the run; file:// repository",
+  "results": [
+    {
+      "id": "P0",
+      "name": "makepkg builds fractile and, from the debug info, fractile-debug",
+      "ok": true,
+      "detail": "fractile-0.9.0-1-x86_64.pkg.tar.zst; fractile-debug-0.9.0-1-x86_64.pkg.tar.zst with 2 .debug files"
+    },
+    {
+      "id": "P1",
+      "name": "each package has a detached signature and the repository database is signed (repo-add --sign --verify)",
+      "ok": true,
+      "detail": "6 signatures: fractile-0.9.0-1-x86_64.pkg.tar.zst.sig fractile-debug-0.9.0-1-x86_64.pkg.tar.zst.sig fractile.db.sig fractile.db.tar.zst.sig fractile.files.sig fractile.files.tar.zst.sig ; database signature: Good signature from \"Fractile test archive (throwaway) <test@fractile.invalid>\" [ultimate]"
+    },
+    {
+      "id": "P2",
+      "name": "with SigLevel = Required and the key locally signed, pacman syncs the repository and installs fractile and fractile-debug from it",
+      "ok": true,
+      "detail": "sync rc 0, install rc 0; fractile 0.9.0-1; fractile-debug 0.9.0-1"
+    },
+    {
+      "id": "P3",
+      "name": "the installed binary has no debug info of its own and fractile-debug gives gdb its source lines",
+      "ok": true,
+      "detail": "debug_info sections in /usr/bin/fractiled: 0; warning: Missing auto-load script at offset 0 in section .debug_gdb_scripts"
+    },
+    {
+      "id": "P4",
+      "name": "a package altered after signing is refused by pacman",
+      "ok": true,
+      "detail": "install rc 1; :: File /var/cache/pacman/pkg/fractile-0.9.0-1-x86_64.pkg.tar.zst is corrupted (invalid or corrupted package (checksum)). Do you want to delete it? [Y/n] error: failed to commit transaction (invalid or corrupted package (checksum)) "
+    },
+    {
+      "id": "P5",
+      "name": "with the signing key not trusted, pacman refuses the repository database",
+      "ok": true,
+      "detail": "sync rc 1; error: fractile: key \"48C0D789C6C0DA6BE33F4E43943808058C989DA6\" is unknown :: Import PGP key 48C0D789C6C0DA6BE33F4E43943808058C989DA6? [Y/n] error: key \"48C0D789C6C0DA6BE33F4E43943808058C989DA6\" could not be looked up remotely "
+    }
+  ],
+  "ok": true
+}
