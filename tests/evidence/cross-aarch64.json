@@ -1,0 +1,32 @@
+{
+  "suite": "cross-aarch64",
+  "when": "2026-11-16T05:45:39+00:00",
+  "environment": "amd64 ubuntu:24.04 container, gcc-aarch64-linux-gnu, qemu-aarch64 (user mode) as cargo runner; emulation, not aarch64 hardware",
+  "results": [
+    {
+      "id": "AA01",
+      "name": "the workspace builds for aarch64-unknown-linux-gnu and every Rust test passes on aarch64 (user-mode QEMU)",
+      "ok": true,
+      "detail": "125 passed, 0 failed; rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+    },
+    {
+      "id": "AA02",
+      "name": "the release binaries are aarch64 ELF and report their version",
+      "ok": true,
+      "detail": "target/aarch64-unknown-linux-gnu/release/fractiled: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=083a5af44a9fa46d257b2d57189f2435a807be38, for GNU/Linux 3.7.0, not stripped; target/aarch64-unknown-linux-gnu/release/fractile:  ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=06830b258387934377215cb0a05a29b69006dc64, for GNU/Linux 3.7.0, not stripped; fractiled 0.9.0; fractile 0.9.0"
+    },
+    {
+      "id": "AA03",
+      "name": "the aarch64 service, run as a plain user with no desktop, answers the aarch64 CLI on a 0600 socket and reports no window control; run as root it refuses",
+      "ok": true,
+      "detail": "socket mode 600; status {\n  \"adapter\": \"none\",\n  \"config_error\": null,\n  \"desktop\": \"\",\n  \"global_shortcuts\": false,\n  \"hotkey_errors\": {\n    \"*\": \"global shortcuts are not available with this adapter\"\n  },\n  \"hotkeys_paused\": false,\n  \"integration\": null,\n  \"locked\": false,\n  \"pid\": 10909,\n  \"restore\": null,\n  \"restore_po; config {\n  \"cols\": 6,\n  \"rows\": 6\n}; as root: fractiled: refusing to run as root. Fractile is a per-user service. rc=2"
+    },
+    {
+      "id": "AA04",
+      "name": "an arm64 .deb is built from the cross build",
+      "ok": true,
+      "detail": "Version: 0.9.0-1;  Architecture: arm64;  Depends: libc6 (>= 2.35), libgcc-s1, python3 (>= 3.10), python3-pyqt6; /tmp/fd: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=083a5af44a9fa46d257b2d57189f2435a807be38, for GNU/Linux 3.7.0, stripped"
+    }
+  ],
+  "ok": true
+}

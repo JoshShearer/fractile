@@ -4,20 +4,28 @@
 # Output: packaging/build/fractile_<version>-1_<arch>.deb
 # Set DEB_MAINTAINER="Name <email>" to put a real maintainer in the control file.
 # Honours CARGO_TARGET_DIR (default: target).
+# FRACTILE_TARGET=aarch64-unknown-linux-gnu cross-builds an arm64 package
+# (needs that Rust target and aarch64-linux-gnu-gcc; see
+# tests/cross/aarch64-in-container.sh).
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$root"
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-arch=$(dpkg --print-architecture)
+target=${FRACTILE_TARGET:-}
+case "$target" in
+  "") arch=$(dpkg --print-architecture); bindir="${CARGO_TARGET_DIR:-target}/release"; strip=strip ;;
+  aarch64-unknown-linux-gnu) arch=arm64; bindir="${CARGO_TARGET_DIR:-target}/$target/release"; strip=aarch64-linux-gnu-strip ;;
+  *) echo "unsupported FRACTILE_TARGET $target" >&2; exit 2 ;;
+esac
 maint=${DEB_MAINTAINER:-"Fractile maintainers <maintainers@fractile.invalid>"}
 if [[ ${1:-} != --no-build ]]; then
-  cargo build --release --locked
+  cargo build --release --locked ${target:+--target "$target"}
 fi
 out="$root/packaging/build"
 stage="$out/deb/fractile_${version}-1_${arch}"
 rm -rf "$stage"; mkdir -p "$stage/DEBIAN"
-packaging/install.sh "$stage" /usr "${CARGO_TARGET_DIR:-target}/release" >/dev/null
-strip --strip-unneeded "$stage/usr/bin/fractiled" "$stage/usr/bin/fractile" 2>/dev/null || true
+packaging/install.sh "$stage" /usr "$bindir" >/dev/null
+"$strip" --strip-unneeded "$stage/usr/bin/fractiled" "$stage/usr/bin/fractile" 2>/dev/null || true
 # Debian keeps the licence in the copyright file, not /usr/share/licenses.
 rm -rf "$stage/usr/share/licenses"
 install -Dm644 /dev/stdin "$stage/usr/share/doc/fractile/copyright" <<COPY

@@ -25,7 +25,7 @@ reason it is accepted. Test ids refer to `tests/evidence/*.json`
 | 6 Restore contract | VERIFIED; one status added | below |
 | 7 UI screens | VERIFIED | below |
 | 8 Shortcuts and CLI | VERIFIED; COSMIC shortcuts BLOCKED BY PLATFORM | below |
-| 9 Installation and distribution | VERIFIED for x86_64 packages; signing, repositories, aarch64 and debug packages not done | below |
+| 9 Installation and distribution | VERIFIED for x86_64 packages; aarch64 built, unit-tested and packaged under emulation only; signing, repositories and debug packages not done | below |
 | 10 Test matrix T01-T28, quality targets | T01-T28 VERIFIED; latency targets measured on X11 only | REQUIREMENTS.md, Test matrix |
 | 11 Data model | VERIFIED | below |
 | 12 Discovery, licensing | VERIFIED | below |
@@ -144,7 +144,7 @@ the SRS forbids raw keyboard hooks.
 | Upgrade keeps settings and snapshots; uninstall leaves nothing running; purge only on request | VERIFIED | PK-05, PK-06, T28 |
 | Installation acceptance (wizard, login once, reboot, upgrade, uninstall) | VERIFIED | VM suites V00-V09, U suite |
 | Signed `.deb`, apt repository, signed pacman repository, AUR submission | NOT IMPLEMENTED | Signing and publishing need the maintainer's keys and accounts and are outward-facing; this build does not publish anything (the SRS makes the apt repository optional and the pacman repository "if offering"). |
-| aarch64 | NOT TESTED | The SRS orders "x86_64 first, aarch64 next". The PKGBUILD declares aarch64, but nothing was built or run on aarch64. |
+| aarch64 | PARTIAL: VERIFIED under emulation, not on aarch64 hardware | The SRS orders "x86_64 first, aarch64 next". `tests/cross/aarch64-in-container.sh` cross-builds for aarch64-unknown-linux-gnu in an amd64 container and runs on aarch64 through user-mode QEMU: all 125 Rust tests pass, the release binaries are aarch64 ELF, the aarch64 service started as a plain user answers the aarch64 CLI on a 0600 socket and refuses to run as root, and an arm64 `.deb` is built (its binaries need only libc, libm, libgcc_s; 4/4, `tests/evidence/cross-aarch64.json`). Not run: on aarch64 hardware, in an aarch64 desktop session (no window control was exercised), the arm64 `.deb` installed with apt, or the Arch package built on aarch64. |
 | Separate debug packages | NOT IMPLEMENTED | Release builds only; the `.deb` is stripped. No debug package is built or tested. |
 
 ## 10. Test matrix and quality targets
