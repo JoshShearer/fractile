@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 (unreleased)
+## 0.9.0 (2026-11-19)
 
 First feature-complete pre-release. Validated on nested, headless and container
 desktops, in real logins in VMs (GNOME, Plasma, Sway, Hyprland, COSMIC), and
