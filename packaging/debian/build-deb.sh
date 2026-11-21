@@ -59,7 +59,7 @@ rm -rf "$stage/usr/share/licenses"
 install -Dm644 /dev/stdin "$stage/usr/share/doc/fractile/copyright" <<COPY
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: fractile
-Source: (local build)
+Source: https://github.com/JoshShearer/fractile
 
 Files: *
 Copyright: Fractile contributors
