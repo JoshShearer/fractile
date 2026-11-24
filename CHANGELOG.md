@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Restore no longer reports a window as placed when the desktop refused to move it to its saved workspace or to set its saved state; only the position and size were checked before. The item fails with what was not done ("not done: workspace 3: ... does not exist"), a launched window stays LAUNCHED_UNPLACED instead of being promoted once its size settles, and retrying the run moves the window once the workspace exists (#1). Workspace and state are only asked for where the adapter supports them, as the restore without geometry already did.
+- A failed monitor query during a restore is no longer treated as "no monitors": it is asked again for each window, and if it keeps failing the item says the monitors could not be read, with the desktop's error, and that a retry may help; the run's warnings carry the error. A desktop that reports no monitors says so in its own words (#2).
+- KWin and GNOME number workspaces from 1 in their "does not exist" errors, as the rest of Fractile does.
+
 ## 0.9.0 (2026-11-19)
 
 First feature-complete pre-release. Validated on nested, headless and container

@@ -471,6 +471,10 @@ struct Live {
     /// not in view); checked again at the end of the run. Holds the wanted
     /// state and what was done.
     state_pending: Option<(WindowState, Vec<String>)>,
+    /// The desktop refused the workspace or the state (with geometry). The
+    /// item is not placed even when its position and size are right, so
+    /// stabilization must not promote it.
+    refused: bool,
 }
 
 fn target_rect(t: &Target, outputs: &[Output], mapping: &[OutputMapping], w: &WindowInfo) -> Option<Rect> {
@@ -581,7 +585,7 @@ where
             if moved {
                 let mut l = std::mem::replace(
                     &mut live[i],
-                    Live { status: ItemStatus::Pending, window: None, launched: false, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None },
+                    Live { status: ItemStatus::Pending, window: None, launched: false, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None, refused: false },
                 );
                 l.window = Some(new_w.clone());
                 l.reapplied = 0;
@@ -629,6 +633,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 placed_at: None,
                 no_geometry: false,
                 state_pending: None,
+                refused: false,
             }
         })
         .collect();
@@ -664,7 +669,13 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
         }
     }
 
-    let outputs = host.outputs().unwrap_or_default();
+    // An output query that fails is not "no monitors": keep the adapter's
+    // error, ask again for each window (it may be temporary), and report it
+    // as a retryable discovery failure if it keeps failing (issue #2).
+    let outputs = host.outputs();
+    if let Err(e) = &outputs {
+        warnings.push(format!("could not read the monitors from the desktop: {e}"));
+    }
     let mapping = p.output_mapping.clone();
 
     // Place one target onto one window (workspace → geometry → state).
@@ -728,13 +739,46 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
             l.placed_at = Some(Instant::now());
             return true;
         }
+        // Workspace, geometry and state are recorded separately; the item is
+        // placed only when every part that was asked for succeeded, as in the
+        // no-geometry branch above (issue #1).
+        let mut failed: Vec<String> = vec![];
         if let Some(ws) = t.workspace {
-            if w.workspace != Some(ws) {
-                let _ = host.move_to_workspace(wid, ws);
+            if w.workspace != Some(ws) && caps.supports(Operation::MoveToWorkspace) {
+                if let Err(e) = host.move_to_workspace(wid, ws) {
+                    failed.push(format!("workspace {}: {e}", ws + 1));
+                }
             }
         }
-        let Some(rect) = target_rect(t, &outputs, &mapping, &w) else {
-            l.message = Some("no output available".into());
+        let refused = |l: &mut Live, failed: &[String]| {
+            if !failed.is_empty() {
+                l.refused = true;
+                let before = l.message.take().map(|m| format!("{m}; ")).unwrap_or_default();
+                l.message = Some(format!("{before}not done: {}", failed.join("; ")));
+            }
+        };
+        let fresh;
+        let outs: &[Output] = match &outputs {
+            Ok(o) => o,
+            Err(_) => match host.outputs() {
+                Ok(o) => {
+                    fresh = o;
+                    &fresh
+                }
+                Err(e) => {
+                    l.message = Some(format!("could not read the monitors from the desktop ({e}); this can be temporary: retry the run"));
+                    refused(l, &failed);
+                    return false;
+                }
+            },
+        };
+        let Some(rect) = target_rect(t, outs, &mapping, &w) else {
+            l.message = Some(if outs.is_empty() {
+                "no usable display: the desktop reports no monitors".into()
+            } else {
+                format!("no usable display for this window among the {} monitors the desktop reports", outs.len())
+            });
+            refused(l, &failed);
             return false;
         };
         l.requested = Some(rect);
@@ -753,13 +797,16 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
             }
         };
         if let Some(st) = &t.state {
-            if st.maximized || st.fullscreen || st.above || st.sticky {
+            if (st.maximized || st.fullscreen || st.above || st.sticky) && caps.supports(Operation::SetState) {
                 let s = WindowState { minimized: false, ..*st };
-                let _ = host.set_state(wid, &s);
+                if let Err(e) = host.set_state(wid, &s) {
+                    failed.push(format!("state: {e}"));
+                }
             }
         }
         l.placed_at = Some(Instant::now());
-        ok
+        refused(l, &failed);
+        ok && failed.is_empty()
     };
 
     // Phase A: windows already present.
@@ -774,7 +821,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
             let i = pending[k];
             if let Some(wid) = win {
                 claimed.insert(wid.clone());
-                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched: false, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None });
+                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched: false, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None, refused: false });
                 l.window = Some(wid.clone());
                 let ok = place(&p.targets[i], &wid, &mut l);
                 l.status = if !ok {
@@ -987,7 +1034,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
                 }
                 claimed.insert(wid.clone());
                 let launched = live[i].launched;
-                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None });
+                let mut l = std::mem::replace(&mut live[i], Live { status: ItemStatus::Pending, window: None, launched, message: None, requested: None, observed: None, reapplied: 0, placed_at: None, no_geometry: false, state_pending: None, refused: false });
                 l.window = Some(wid.clone());
                 let ok = place(&p.targets[i], &wid, &mut l);
                 if ok && amb {
@@ -1059,7 +1106,7 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
             // A launched window that had not taken its geometry yet (the app
             // was still sizing it) gets the same bounded re-tries, and counts
             // as placed once it is where it was asked to be.
-            let unsettled = l.status == ItemStatus::LaunchedUnplaced;
+            let unsettled = l.status == ItemStatus::LaunchedUnplaced && !l.refused;
             if !(l.status.is_success() || unsettled) || l.requested.is_none() {
                 continue;
             }

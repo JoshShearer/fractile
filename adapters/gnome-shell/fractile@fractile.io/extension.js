@@ -621,7 +621,7 @@ export default class FractileExtension extends Extension {
         const w = this._find(id);
         const n = global.workspace_manager.get_n_workspaces();
         if (workspace < 0 || workspace >= n)
-            throw new BridgeError('rejected', `workspace ${workspace} does not exist (there are ${n})`);
+            throw new BridgeError('rejected', `workspace ${workspace + 1} does not exist (there are ${n})`);
         w.change_workspace_by_index(workspace, false);
         return null;
     }
