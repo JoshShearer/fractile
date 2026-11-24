@@ -266,7 +266,7 @@ const ops = {
         const w = find(a.id);
         const all = workspace.desktops;
         if (a.workspace < 0 || a.workspace >= all.length)
-            throw {kind: "rejected", message: "workspace " + a.workspace + " does not exist (there are " + all.length + ")"};
+            throw {kind: "rejected", message: "workspace " + (a.workspace + 1) + " does not exist (there are " + all.length + ")"};
         w.desktops = [all[a.workspace]];
         return null;
     },

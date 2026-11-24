@@ -51,6 +51,11 @@ struct Sim {
     no_control: bool,
     /// The desktop refuses every state change.
     reject_state: bool,
+    /// The desktop refuses every move to another workspace (one that no
+    /// longer exists: GNOME and KWin reject it).
+    reject_workspace: bool,
+    /// The next this many output queries fail (u32::MAX: all of them).
+    outputs_fail: std::cell::Cell<u32>,
     /// The desktop applies a state change but does not confirm it in time
     /// (COSMIC, window on a workspace not in view).
     late_state: bool,
@@ -79,6 +84,8 @@ impl Sim {
             can_move: true,
             no_control: false,
             reject_state: false,
+            reject_workspace: false,
+            outputs_fail: std::cell::Cell::new(0),
             late_state: false,
         }
     }
@@ -181,6 +188,13 @@ impl RestoreHost for Sim {
         self.windows.borrow().iter().find(|w| w.id == id).cloned().ok_or_else(|| "gone".into())
     }
     fn outputs(&self) -> Result<Vec<Output>, String> {
+        let n = self.outputs_fail.get();
+        if n > 0 {
+            if n != u32::MAX {
+                self.outputs_fail.set(n - 1);
+            }
+            return Err("compositor did not answer the output query".into());
+        }
         Ok(self.outputs.clone())
     }
     fn place(&self, id: &str, rect: Rect) -> Result<PlacementOutcome, String> {
@@ -208,6 +222,9 @@ impl RestoreHost for Sim {
         Ok(())
     }
     fn move_to_workspace(&self, id: &str, n: u32) -> Result<(), String> {
+        if self.reject_workspace {
+            return Err(format!("workspace {} does not exist (there are 2)", n + 1));
+        }
         let mut ws = self.windows.borrow_mut();
         ws.iter_mut().find(|w| w.id == id).ok_or("gone")?.workspace = Some(n);
         Ok(())
@@ -771,4 +788,121 @@ fn window_still_being_sized_is_placed_again_and_reported_placed() {
     let it = &rep.items[0];
     assert_eq!(it.status, ItemStatus::LaunchedAndPlaced, "{:#?}", rep.items);
     assert_eq!(sim.window(it.window_id.as_ref().unwrap()).unwrap().frame, ra);
+}
+
+/// Issue #1: with geometry, a workspace the desktop refuses makes the item
+/// fail even though the position and size were applied; a retry once the
+/// workspace exists again moves the window and then reports it placed.
+#[test]
+fn refused_workspace_is_not_reported_placed_and_a_retry_finishes_it() {
+    let outs = vec![out("A", 0, 2560)];
+    let mut sim = Sim::new(outs.clone()).app("y.desktop", 1, 10, false, &[]);
+    sim.reject_workspace = true;
+    let y = sim.open("y.desktop", "y");
+    let cfg = Config::default();
+    let want = Rect::new(1280, 32, 1280, 1408);
+    let mut ry = rec("r1", "y.desktop", "y", 0, "A", want, WA_A);
+    ry.workspace_id = Some("ws-2".into());
+    let s = snapshot(outs, vec![ry]);
+    let o = opts(&cfg);
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    let it = &rep.items[0];
+    assert_eq!(it.status, ItemStatus::Failed, "{it:?}");
+    let m = it.message.as_deref().unwrap_or("");
+    assert!(m.contains("not done: workspace 3") && m.contains("does not exist"), "{m}");
+    let w = sim.windows.borrow().iter().find(|w| w.id == y).unwrap().clone();
+    assert_eq!(w.frame, want, "the geometry part was still applied");
+    assert_ne!(w.workspace, Some(2));
+
+    sim.reject_workspace = false;
+    let mut o2 = o.clone();
+    o2.previous = rep.items.iter().map(|i| (i.record_id.clone(), (i.status, i.window_id.clone(), i.launched))).collect();
+    let p2 = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o2, &cfg).unwrap();
+    let rep2 = execute(&p2, &sim, &o2, &AtomicBool::new(false));
+    assert_eq!(rep2.items[0].status, ItemStatus::AlreadyPresent, "{:?}", rep2.items[0]);
+    let w = sim.windows.borrow().iter().find(|w| w.id == y).unwrap().clone();
+    assert_eq!(w.workspace, Some(2));
+    assert_eq!(w.frame, want);
+}
+
+/// Issue #1: a window Fractile launched whose workspace was refused stays
+/// LAUNCHED_UNPLACED; stabilization must not promote it to placed just
+/// because its size and position are right.
+#[test]
+fn launched_window_with_a_refused_workspace_stays_unplaced() {
+    let outs = vec![out("A", 0, 2560)];
+    let mut sim = Sim::new(outs.clone()).app("x.desktop", 1, 10, false, &[]);
+    sim.reject_workspace = true;
+    let cfg = Config::default();
+    let mut rx = rec("r0", "x.desktop", "x", 0, "A", Rect::new(0, 32, 1280, 1408), WA_A);
+    rx.workspace_id = Some("ws-2".into());
+    let s = snapshot(outs, vec![rx]);
+    let mut o = opts(&cfg);
+    o.approve_all = true;
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    let it = &rep.items[0];
+    assert_eq!(it.status, ItemStatus::LaunchedUnplaced, "{it:?}");
+    assert!(it.message.as_deref().unwrap_or("").contains("not done: workspace 3"), "{it:?}");
+    assert_eq!(sim.launches.borrow().len(), 1);
+}
+
+/// Issue #1: with geometry, a state the desktop refuses makes the item fail
+/// too, as it already did without geometry.
+#[test]
+fn refused_state_with_geometry_is_not_reported_placed() {
+    let outs = vec![out("A", 0, 2560)];
+    let mut sim = Sim::new(outs.clone()).app("y.desktop", 1, 10, false, &[]);
+    sim.reject_state = true;
+    sim.open("y.desktop", "y");
+    let cfg = Config::default();
+    let mut ry = rec("r1", "y.desktop", "y", 0, "A", Rect::new(1280, 32, 1280, 1408), WA_A);
+    ry.state.maximized = true;
+    let s = snapshot(outs, vec![ry]);
+    let o = opts(&cfg);
+    let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+    let rep = execute(&p, &sim, &o, &AtomicBool::new(false));
+    let it = &rep.items[0];
+    assert_eq!(it.status, ItemStatus::Failed, "{it:?}");
+    assert!(it.message.as_deref().unwrap_or("").contains("not done: state"), "{it:?}");
+}
+
+/// Issue #2: an output query that fails during the run is reported with the
+/// adapter's error as a retryable discovery failure, in the item and in the
+/// run's warnings; a desktop that reports no monitors gets its own message.
+#[test]
+fn failed_output_query_and_no_monitors_are_reported_differently() {
+    let cfg = Config::default();
+    let outs = vec![out("A", 0, 2560)];
+    let run = |fail: u32, empty: bool| {
+        let mut sim = Sim::new(outs.clone()).app("y.desktop", 1, 10, false, &[]);
+        sim.open("y.desktop", "y");
+        let s = snapshot(outs.clone(), vec![rec("r1", "y.desktop", "y", 0, "A", Rect::new(1280, 32, 1280, 1408), WA_A)]);
+        let o = opts(&cfg);
+        let p = plan(targets_from_snapshot(&s, &cfg), &s.outputs, &sim, &o, &cfg).unwrap();
+        // the desktop changes between the dry run and the run
+        sim.outputs_fail.set(fail);
+        if empty {
+            sim.outputs.clear();
+        }
+        execute(&p, &sim, &o, &AtomicBool::new(false))
+    };
+    let failed = run(u32::MAX, false);
+    let it = &failed.items[0];
+    assert_eq!(it.status, ItemStatus::Failed, "{it:?}");
+    let m = it.message.as_deref().unwrap_or("");
+    assert!(m.contains("could not read the monitors") && m.contains("compositor did not answer the output query") && m.contains("retry"), "{m}");
+    assert!(failed.warnings.iter().any(|w| w.contains("compositor did not answer the output query")), "{:?}", failed.warnings);
+
+    let none = run(0, true);
+    let it = &none.items[0];
+    assert_eq!(it.status, ItemStatus::Failed, "{it:?}");
+    let m2 = it.message.as_deref().unwrap_or("");
+    assert!(m2.contains("reports no monitors") && !m2.contains("could not read"), "{m2}");
+    assert_ne!(m, m2);
+
+    // a query that fails once is asked again before giving up on the window
+    let once = run(1, false);
+    assert_eq!(once.items[0].status, ItemStatus::AlreadyPresent, "{:?}", once.items[0]);
 }
