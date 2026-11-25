@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.9.1 (2026-11-25)
+
+Restore fixes. Not rerun for this release: the Hyprland, COSMIC and VM login
+suites (last run on 0.9.0).
 
 ### Fixed
 - Restore no longer reports a window as placed when the desktop refused to move it to its saved workspace or to set its saved state; only the position and size were checked before. The item fails with what was not done ("not done: workspace 3: ... does not exist"), a launched window stays LAUNCHED_UNPLACED instead of being promoted once its size settles, and retrying the run moves the window once the workspace exists (#1). Workspace and state are only asked for where the adapter supports them, as the restore without geometry already did.

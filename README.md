@@ -24,7 +24,7 @@ launches apps you approved.
 - **Does not restore window contents.** Unsaved documents, tabs and terminal
   sessions come back only if the application restores them itself.
 
-Status: 0.9.0. Tested in nested, headless and container desktops, and in real
+Status: 0.9.1. Tested in nested, headless and container desktops, and in real
 logins, log-outs and reboots in VMs (GNOME 46, Plasma 6.6 and 5.27, Sway,
 Hyprland, COSMIC) on virtual displays; checked by hand on two desktops with
 physical monitors. Every Divvy item (SRS DV-01..28) passed on one precise
@@ -38,7 +38,7 @@ is called supported there ([SRS_STATUS.md](SRS_STATUS.md), section 16). Read
 ## Install
 
 ```
-sudo apt install ./fractile_0.9.0-1_amd64.deb      # Ubuntu / Pop!_OS 24.04
+sudo apt install ./fractile_0.9.1-1_amd64.deb      # Ubuntu / Pop!_OS 24.04
 cd packaging/arch && makepkg -si                    # Arch
 ```
 
@@ -66,7 +66,7 @@ bash tests/kwin/e2e-kwin-in-container.sh                # KWin Wayland in a cont
 bash tests/hyprland/e2e-hyprland-in-container.sh        # Hyprland, nested in a headless KWin
 bash tests/sway/e2e-sway-in-container.sh                # Sway, nested in a headless KWin
 FRACTILE_BIN_DIR=target/release python3 tests/perf/soak_x11.py   # SLOs + soak
-bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.0-1_amd64.deb
+bash packaging/debian/build-deb.sh && bash packaging/test/deb-in-container.sh ubuntu:24.04 packaging/build/fractile_0.9.1-1_amd64.deb
 bash packaging/test/arch-in-container.sh
 FRACTILE_GPG_KEY=<fingerprint> bash packaging/debian/make-apt-repo.sh   # signed apt repo in packaging/build/apt  (key setup and publishing: packaging/SIGNING.md)
 bash tests/packaging/apt-repo-in-container.sh && bash tests/packaging/pacman-repo-in-container.sh

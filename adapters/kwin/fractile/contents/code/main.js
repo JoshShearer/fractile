@@ -336,7 +336,7 @@ function attachInfo() {
     return {
         kind: "kwin",
         api: ADAPTER_API,
-        version: "0.9.0",
+        version: "0.9.1",
         session_type: "wayland",
         compositor_version: "KWin " + (typeof KWin.version !== "undefined" ? KWin.version : "6"),
         tiling_manager: null,
