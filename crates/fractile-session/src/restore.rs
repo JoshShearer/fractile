@@ -504,7 +504,7 @@ const TITLE_SETTLE: Duration = Duration::from_secs(5);
 /// whether no other pairing reaches that total.
 fn best_pairing(scores: &[Vec<u32>]) -> Option<(Vec<usize>, u32, bool)> {
     let n = scores.len();
-    if n < 2 || n > 7 {
+    if !(2..=7).contains(&n) {
         return None;
     }
     let mut perm: Vec<usize> = (0..n).collect();
@@ -550,8 +550,7 @@ where
 {
     let hint = |i: usize| p.targets[i].record.title_hint.clone().filter(|h| !h.is_empty() && h != "[redacted]");
     let mut groups: Vec<(String, Vec<usize>)> = vec![];
-    for i in 0..live.len() {
-        let l = &live[i];
+    for (i, l) in live.iter().enumerate() {
         if !l.status.is_success() || l.window.is_none() || l.no_geometry || hint(i).is_none() {
             continue;
         }
@@ -1167,11 +1166,11 @@ pub fn execute(p: &Plan, host: &dyn RestoreHost, opts: &RunOptions, cancel: &Ato
     }
 
     // Phase D: minimized state last (so geometry applied first), then focus.
-    for i in 0..total {
-        if !live[i].status.is_success() {
+    for (t, l) in p.targets.iter().zip(&live) {
+        if !l.status.is_success() {
             continue;
         }
-        if let (Some(st), Some(wid)) = (&p.targets[i].state, &live[i].window) {
+        if let (Some(st), Some(wid)) = (&t.state, &l.window) {
             if st.minimized {
                 let _ = host.set_state(wid, st);
             }

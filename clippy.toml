@@ -1,0 +1,2 @@
+# Keep in step with rust-version in Cargo.toml: lints must not suggest newer APIs.
+msrv = "1.80"

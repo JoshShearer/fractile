@@ -325,10 +325,10 @@ fn restore_many_apps_without_duplicates() {
         let titles: Vec<String> = (0..n).map(|i| format!("doc{i} - app{a}")).collect();
         let tref: Vec<&str> = titles.iter().map(|s| s.as_str()).collect();
         sim = sim.app(&d, 1, 50, a == 3, &tref);
-        for i in 0..n {
+        for (i, title) in titles.iter().enumerate() {
             let (o, wa) = if k % 2 == 0 { ("A", WA_A) } else { ("B", WA_B) };
             let abs = Rect::new(wa.x + 10 * k, wa.y + 5 * k, 900, 700);
-            recs.push(rec(&format!("r{k}"), &d, &titles[i], i as u32, o, abs, wa));
+            recs.push(rec(&format!("r{k}"), &d, title, i as u32, o, abs, wa));
             k += 1;
         }
     }

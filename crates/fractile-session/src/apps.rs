@@ -326,7 +326,7 @@ mod tests {
         std::fs::write(d.join("org.example.Editor.desktop"), "[Desktop Entry]\nType=Application\nName=Editor\nExec=example-editor %F\nStartupWMClass=ExEdit\n").unwrap();
         std::fs::write(d.join("sub/tool.desktop"), "[Desktop Entry]\nType=Application\nName=Tool\nExec=/opt/tool/bin/tool\n").unwrap();
         std::fs::write(d.join("hidden.desktop"), "[Desktop Entry]\nType=Application\nName=H\nExec=h\nHidden=true\n").unwrap();
-        let idx = AppIndex::build(&[d.clone()]);
+        let idx = AppIndex::build(std::slice::from_ref(&d));
         assert!(idx.get("sub-tool.desktop").is_some());
         assert!(idx.get("hidden.desktop").is_none());
         let mut w = WindowInfo { wm_class: Some("ExEdit".into()), ..Default::default() };
@@ -402,7 +402,7 @@ mod tests {
         let d = std::env::temp_dir().join(format!("fractile-apps-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&d).unwrap();
         std::fs::write(d.join("python3.12.desktop"), "[Desktop Entry]\nType=Application\nName=Python\nExec=/usr/bin/python3.12\nTerminal=true\n").unwrap();
-        let idx = AppIndex::build(&[d.clone()]);
+        let idx = AppIndex::build(std::slice::from_ref(&d));
         let mut w = WindowInfo { app_id: Some("org.example.Unknown".into()), wm_class: Some("org.example.Unknown".into()), executable: Some("/usr/bin/python3.12".into()), ..Default::default() };
         idx.enrich(&mut w);
         assert_eq!(w.desktop_file_id, None, "python must not claim a python GUI app's window");

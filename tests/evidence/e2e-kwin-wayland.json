@@ -1,6 +1,6 @@
 {
   "suite": "e2e-kwin-wayland",
-  "when": "2026-11-24T02:14:54+0000",
+  "when": "2026-11-25T01:49:10+0000",
   "environment": "kwin 6.8.3 --virtual (Wayland, no Xwayland) in an archlinux container (render device: nvidia); Fractile KWin script",
   "results": [
     {
@@ -127,7 +127,7 @@
       "id": "K17",
       "name": "on exit Fractile unregisters its KDE global shortcuts",
       "ok": true,
-      "detail": "after exit: method return time=1795486494.078363 sender=:1.0 -> destination=:1.51 serial=668 reply_serial=2 array [ ]"
+      "detail": "after exit: method return time=1795571349.954722 sender=:1.0 -> destination=:1.51 serial=666 reply_serial=2 array [ ]"
     }
   ]
 }

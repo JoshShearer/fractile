@@ -1,6 +1,6 @@
 {
   "suite": "e2e-sway",
-  "when": "2026-11-24T02:16:02+0000",
+  "when": "2026-11-25T01:49:47+0000",
   "environment": "sway version 1.12 nested in kwin_wayland --virtual (wlroots Wayland backend, pixman renderer), archlinux container; keys pressed with wtype",
   "results": [
     {
@@ -169,7 +169,7 @@
       "id": "S21",
       "name": "when Sway exits the service saves the last seen layout and exits",
       "ok": true,
-      "detail": "ing | 2026-11-24T02:16:01.876 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Sway IPC socket: No such file or directory (os error 2) | 2026-11-24T02:16:01.996 Info fractiled stopped"
+      "detail": "ing | 2026-11-25T01:49:46.839 Warn shortcut 'Left third' failed: adapter: adapter disconnected: Sway IPC socket: No such file or directory (os error 2) | 2026-11-25T01:49:46.876 Info fractiled stopped"
     }
   ]
 }
