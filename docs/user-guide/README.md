@@ -4,7 +4,7 @@ Fractile puts windows on a grid. You open the panel, drag across the cells you
 want, and the window moves and resizes to exactly that rectangle. It also saves
 your window layout and can put it back after you log in again.
 
-Fractile 0.9.0. Where your desktop is supported is in
+Fractile 0.9.1. Where your desktop is supported is in
 [PLATFORM_MATRIX.md](../../PLATFORM_MATRIX.md). In short: GNOME (X11 and Wayland),
 KDE Plasma on Wayland, Hyprland 0.56 or later (with its Lua configuration) and Sway 1.8 or later work. On COSMIC only session restore works, without
 positions or sizes, because COSMIC has no API for moving or resizing other
@@ -12,7 +12,7 @@ programs' windows (see [compatibility/cosmic.md](../compatibility/cosmic.md)).
 
 ## Install
 
-- **Ubuntu / Pop!_OS 24.04:** `sudo apt install ./fractile_0.9.0-1_amd64.deb`
+- **Ubuntu / Pop!_OS 24.04:** `sudo apt install ./fractile_0.9.1-1_amd64.deb`
 - **Arch:** `makepkg -si` in `packaging/arch/` (the PKGBUILD builds from the
   release tarball)
 - **From source:** `packaging/debian/build-deb.sh` builds the .deb, and

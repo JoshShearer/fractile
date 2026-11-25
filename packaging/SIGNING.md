@@ -107,7 +107,7 @@ sudo pacman -Sy fractile
 The AUR does not use this key. It needs an account on aur.archlinux.org with an
 SSH public key added. Before submitting, replace the PKGBUILD's local `source`
 with the release tarball URL and run `updpkgsums`. Optionally sign the tarball
-(`gpg --detach-sign --armor -u "$FPR" fractile-0.9.0.tar.gz`), publish the
+(`gpg --detach-sign --armor -u "$FPR" fractile-0.9.1.tar.gz`), publish the
 `.asc` next to it, and add it to `source` with `validpgpkeys=('<FPR>')`.
 
 ## 7. Renew before it expires

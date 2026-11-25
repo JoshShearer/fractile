@@ -692,7 +692,7 @@ def run(session: str, deb: str) -> None:
             inst = vm.ssh("for i in 1 2 3; do sudo pacman -U --noconfirm /tmp/fractile.pkg.tar.zst > /tmp/pacman.log 2>&1 && break; "
                           "echo \"attempt $i failed\"; sleep 30; sudo pacman -Sy --noconfirm > /dev/null 2>&1; done; tail -4 /tmp/pacman.log; pacman -Q fractile", timeout=1800)
             check("V01", "pacman installs the Arch package (dependencies from the Arch repositories)",
-                  inst.returncode == 0 and "fractile 0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
+                  inst.returncode == 0 and "fractile 0.9.1" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
         else:
           inst = vm.ssh(
             # The VM's user-mode network has no IPv6, and archive.ubuntu.com
@@ -703,7 +703,7 @@ def run(session: str, deb: str) -> None:
             "echo \"attempt $i failed\"; sleep 30; sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; "
             "tail -4 /tmp/apt.log; dpkg-query -W fractile", timeout=1800)
           check("V01", f"apt installs the .deb on Ubuntu {ver} desktop (dependencies from the Ubuntu archive)",
-                inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
+                inst.returncode == 0 and "fractile\t0.9.1" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
 
         # First automatic login with the configured session type.
         vm.ssh("sudo systemctl reboot", timeout=20)
@@ -953,7 +953,7 @@ def run_cosmic(deb: str) -> None:
         inst = vm.ssh("for i in 1 2 3; do sudo pacman -U --noconfirm /tmp/fractile.pkg.tar.zst > /tmp/pacman.log 2>&1 && break; "
                       "echo \"attempt $i failed\"; sleep 30; sudo pacman -Sy --noconfirm > /dev/null 2>&1; done; tail -4 /tmp/pacman.log; pacman -Q fractile", timeout=1800)
         check("V01", "pacman installs the Arch package (dependencies from the Arch repositories)",
-              inst.returncode == 0 and "fractile 0.9.0" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
+              inst.returncode == 0 and "fractile 0.9.1" in inst.stdout, f"{rel} :: {inst.stdout.strip()[-300:]}")
 
         vm.ssh("sudo systemctl reboot", timeout=20)
         vm.wait_down()
@@ -1262,7 +1262,7 @@ def run_panel(session: str, deb: str) -> None:
         inst = vm.ssh("for i in 1 2 3; do sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 "
                       "-o Acquire::http::Timeout=60 install -y /tmp/fractile.deb python3-evdev x11-utils > /tmp/apt.log 2>&1 && break; sleep 30; "
                       "sudo apt-get -o Acquire::ForceIPv4=true update -q > /dev/null 2>&1; done; dpkg-query -W fractile", timeout=1800)
-        if not check("P01", f"the .deb installs ({rel})", inst.returncode == 0 and "fractile\t0.9.0" in inst.stdout, inst.stdout.strip()[-200:]):
+        if not check("P01", f"the .deb installs ({rel})", inst.returncode == 0 and "fractile\t0.9.1" in inst.stdout, inst.stdout.strip()[-200:]):
             return
         if HEADS == 2:
             # QEMU only reports its first output as connected when no host

@@ -4,7 +4,7 @@
 # For the AUR, replace the local source with the release tarball URL and run
 # updpkgsums.
 pkgname=fractile
-pkgver=0.9.0
+pkgver=0.9.1
 pkgrel=1
 pkgdesc="Grid window placement (Divvy-style) and workspace session restore"
 backup=('etc/sway/config.d/60-fractile.conf')
