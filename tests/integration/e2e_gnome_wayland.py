@@ -362,6 +362,53 @@ def run_all(e: Env) -> None:
     check("W11", "snapshot restore puts Wayland windows back exactly", rep["state"] == "completed" and rect_eq(e.frame(g), want_g, 2) and rect_eq(e.frame(q), want_q, 2),
           f"{rep['report']['duration_ms']} ms")
 
+    # GitHub issue #1: the saved workspace no longer exists. GNOME refuses the
+    # move but accepts the size and position; that is not a restored window.
+    def mutter_ws(n):
+        ge = {**e.env, "GSETTINGS_BACKEND": "keyfile", "XDG_CONFIG_HOME": str(e.shell_state / "config")}
+        subprocess.run(["gsettings", "set", "org.gnome.mutter", "dynamic-workspaces", "false"], env=ge, check=True)
+        subprocess.run(["gsettings", "set", "org.gnome.desktop.wm.preferences", "num-workspaces", str(n)], env=ge, check=True)
+
+        def count():
+            cl = e.client()
+            k = len(cl.call("list_workspaces"))
+            cl.close()
+            return k == n
+        return e.wait_for(count, 5.0)
+
+    def q_ws():
+        return next((w.get("workspace") for w in e.windows(True) if w["id"] == q), None)
+
+    def q_item(rep):
+        return next((i for i in rep["report"]["items"] if i["window_id"] == q), {})
+
+    three = mutter_ws(3)
+    c = e.client()
+    c.call("move_to_workspace", {"window": q, "workspace": 2})
+    c.close()
+    saved_on3 = e.wait_for(lambda: q_ws() == 2, 3.0)
+    want_q3 = e.frame(q)
+    e.cli_json("save", "--name", "wl3")
+    two = mutter_ws(2)
+    e.cli_json("snap", "center", "--window", q)
+    pr = e.run("--json", "restore", "--snapshot", "wl3")  # exits non-zero: an item failed
+    rep = json.loads(pr.stdout)
+    it = q_item(rep)
+    check("W31", "a workspace GNOME refuses is not reported as restored, and the message names it as users count it",
+          three and saved_on3 and two and it.get("status") == "FAILED" and "workspace 3 does not exist (there are 2)" in (it.get("message") or "") and rect_eq(e.frame(q), want_q3, 2),
+          f"3 workspaces {bool(three)}, saved there {bool(saved_on3)}, then 2 {bool(two)}; status {it.get('status')}; message {it.get('message')!r}; exit {pr.returncode}")
+    three = mutter_ws(3)
+    pr = e.run("--json", "retry", rep["run_id"])
+    it = q_item(json.loads(pr.stdout)) if pr.returncode == 0 else {}
+    back = e.wait_for(lambda: q_ws() == 2, 3.0)
+    check("W32", "once the workspace exists again, retrying the run moves the window there", three and it.get("status") == "ALREADY_PRESENT" and back and rect_eq(e.frame(q), want_q3, 2),
+          f"retry exit {pr.returncode} {pr.stderr.strip()[:160]}; status {it.get('status')}; message {it.get('message')!r}; workspace {q_ws()}")
+    c = e.client()
+    c.call("move_to_workspace", {"window": q, "workspace": 0})
+    c.close()
+    e.wait_for(lambda: q_ws() == 0, 3.0)
+    mutter_ws(2)
+
     # margins and gaps (DV-22, DV-23), checked with independent arithmetic as in X25
     c = e.client()
     c.call("set_config", {"patch": {"appearance": {"spacing": {"margins_enabled": True, "gaps_enabled": True}}}})

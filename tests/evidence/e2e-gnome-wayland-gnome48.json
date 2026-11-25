@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-15T19:09:48+0000",
+  "when": "2026-11-25T01:27:56+0000",
   "environment": "headless GNOME Shell 48.8 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:1074492352 gnome:1074492351"
+      "detail": "gnome:1515323037 gnome:1515323036"
     },
     {
       "id": "W03",
@@ -67,7 +67,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "1020 ms incl. key injection"
+      "detail": "1227 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -79,7 +79,19 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1733 ms"
+      "detail": "1791 ms"
+    },
+    {
+      "id": "W31",
+      "name": "a workspace GNOME refuses is not reported as restored, and the message names it as users count it",
+      "ok": true,
+      "detail": "3 workspaces True, saved there True, then 2 True; status FAILED; message 'not done: workspace 3: rejected by compositor: workspace 3 does not exist (there are 2)'; exit 6"
+    },
+    {
+      "id": "W32",
+      "name": "once the workspace exists again, retrying the run moves the window there",
+      "ok": true,
+      "detail": "retry exit 0 ; status ALREADY_PRESENT; message None; workspace 2"
     },
     {
       "id": "W30",
@@ -91,7 +103,7 @@
       "id": "W12",
       "name": "shortcut starts the Wayland UI; the panel is shown, focused and inside the work area",
       "ok": true,
-      "detail": "1.0s incl. UI start; panel {'h': 388, 'w': 531, 'x': 534, 'y': 422} own=True"
+      "detail": "1.3s incl. UI start; panel {'h': 388, 'w': 531, 'x': 534, 'y': 422} own=True"
     },
     {
       "id": "W13",
@@ -103,7 +115,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:1074492352"
+      "detail": "active gnome:1515323037"
     },
     {
       "id": "W15",
@@ -139,7 +151,7 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot 5cf8dbca-64de-445d-b5fa-bdf13081b06d (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot 9ff5ad3c-0544-4a31-8841-19efca2cf992 (4 windows)"
     },
     {
       "id": "W23",
@@ -151,7 +163,7 @@
       "id": "W24",
       "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
       "ok": true,
-      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:1074492357 closed while being placed']"
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:1515323042 closed while being placed']"
     },
     {
       "id": "W18",

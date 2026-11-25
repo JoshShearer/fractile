@@ -7,6 +7,9 @@
 - A failed monitor query during a restore is no longer treated as "no monitors": it is asked again for each window, and if it keeps failing the item says the monitors could not be read, with the desktop's error, and that a retry may help; the run's warnings carry the error. A desktop that reports no monitors says so in its own words (#2).
 - KWin and GNOME number workspaces from 1 in their "does not exist" errors, as the rest of Fractile does.
 
+### Changed
+- `cargo clippy --workspace --all-targets -- -D warnings` passes. Stored restore runs and items are read and written as named types; `clippy.toml` keeps lints to the declared minimum Rust version. No change in behaviour.
+
 ## 0.9.0 (2026-11-19)
 
 First feature-complete pre-release. Validated on nested, headless and container

@@ -1,6 +1,6 @@
 {
   "suite": "e2e-gnome-wayland",
-  "when": "2026-11-14T19:49:53+0000",
+  "when": "2026-11-25T01:34:32+0000",
   "environment": "headless GNOME Shell 47.10 --wayland --no-x11, virtual 1600x1200 monitor, Fractile extension fractile@fractile.io",
   "results": [
     {
@@ -19,7 +19,7 @@
       "id": "W02",
       "name": "native Wayland GTK4 and Qt windows are listed with app id and pid",
       "ok": true,
-      "detail": "gnome:2075319288 gnome:2075319287"
+      "detail": "gnome:1855375341 gnome:1855375340"
     },
     {
       "id": "W03",
@@ -31,7 +31,7 @@
       "id": "W04",
       "name": "grid placements land on the requested rectangle (GTK4, client-side decorations)",
       "ok": true,
-      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px"
+      "detail": "6x6:0,0,2,5 err=0px; 4x4:1,1,2,3 err=0px; 3x2:2,0,2,1 err=0px; 10x10:0,0,9,9 err=0px; 20x20:7,3,12,15 err=0px; 20x20:17,17,19,19 err=0px"
     },
     {
       "id": "W05",
@@ -52,6 +52,12 @@
       "detail": ""
     },
     {
+      "id": "W06b",
+      "name": "alternating 20x20 placements return to exactly the same rectangle every time (no drift)",
+      "ok": true,
+      "detail": "[{'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}, {'h': 759, 'w': 480, 'x': 560, 'y': 207}]"
+    },
+    {
       "id": "W08",
       "name": "placing a maximized window unmaximizes it and lands exactly",
       "ok": true,
@@ -61,7 +67,7 @@
       "id": "W09",
       "name": "global shortcut (grabbed by GNOME Shell) places the focused window",
       "ok": true,
-      "detail": "1020 ms incl. key injection"
+      "detail": "1126 ms incl. key injection"
     },
     {
       "id": "W10",
@@ -73,7 +79,19 @@
       "id": "W11",
       "name": "snapshot restore puts Wayland windows back exactly",
       "ok": true,
-      "detail": "1747 ms"
+      "detail": "1789 ms"
+    },
+    {
+      "id": "W31",
+      "name": "a workspace GNOME refuses is not reported as restored, and the message names it as users count it",
+      "ok": true,
+      "detail": "3 workspaces True, saved there True, then 2 True; status FAILED; message 'not done: workspace 3: rejected by compositor: workspace 3 does not exist (there are 2)'; exit 6"
+    },
+    {
+      "id": "W32",
+      "name": "once the workspace exists again, retrying the run moves the window there",
+      "ok": true,
+      "detail": "retry exit 0 ; status ALREADY_PRESENT; message None; workspace 2"
     },
     {
       "id": "W30",
@@ -85,7 +103,7 @@
       "id": "W12",
       "name": "shortcut starts the Wayland UI; the panel is shown, focused and inside the work area",
       "ok": true,
-      "detail": "1.0s incl. UI start; panel {'h': 378, 'w': 498, 'x': 551, 'y': 427} own=True"
+      "detail": "1.1s incl. UI start; panel {'h': 378, 'w': 498, 'x': 551, 'y': 427} own=True"
     },
     {
       "id": "W13",
@@ -97,7 +115,7 @@
       "id": "W14",
       "name": "panel closes after placing and focus returns to the window",
       "ok": true,
-      "detail": "active gnome:2075319288"
+      "detail": "active gnome:1855375341"
     },
     {
       "id": "W15",
@@ -133,7 +151,7 @@
       "id": "W22",
       "name": "logind PrepareForShutdown: a shutdown snapshot is written and the delay inhibitor released",
       "ok": true,
-      "detail": "inhibitors before (uint32 1,); snapshot f5445906-9ee9-49d1-a01e-59d51b35270d (4 windows)"
+      "detail": "inhibitors before (uint32 1,); snapshot 6650cc3b-35d2-421c-b62e-0b625572305f (4 windows)"
     },
     {
       "id": "W23",
@@ -145,7 +163,7 @@
       "id": "W24",
       "name": "closing windows while they are being placed: GNOME Shell keeps running and the integration stays attached",
       "ok": true,
-      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:2075319293 closed while being placed']"
+      "detail": "shell alive=True attached=True; errors reported: ['0: no such window: gnome:1855375346 closed while being placed']"
     },
     {
       "id": "W18",

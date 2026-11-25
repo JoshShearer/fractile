@@ -13,6 +13,7 @@ use fractile_core::window::{WindowInfo, WindowState};
 use fractile_session::capture::{capture, CaptureInput};
 use fractile_session::launch::{plan_launch, spawn, systemd_user_available, which};
 use fractile_session::restore::*;
+use fractile_session::store::{ItemRow, RunRow};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -34,10 +35,6 @@ pub fn capture_now(d: &Daemon, mode: SnapshotMode, name: Option<String>) -> R<Sn
     Ok(capture(&input, &cfg, mode, name))
 }
 
-/// Store an automatic snapshot (periodic, logout, shutdown, pre-restore) and
-/// apply rolling retention right away, so frequent restores or logouts cannot
-/// grow the store between periodic ticks. Manual saves are never pruned.
-
 /// Whether apps whose desktop entry is DBusActivatable are started with a
 /// D-Bus Activate call (the Desktop Entry spec's way) or with their Exec line.
 /// Sway and Hyprland run their apps from the Exec line, and in their sessions
@@ -51,6 +48,9 @@ fn dbus_activation_usable(d: &Daemon) -> bool {
     which("gdbus") && !matches!(d.env.choose(None), crate::backend::Backend::Sway | crate::backend::Backend::Hyprland)
 }
 
+/// Store an automatic snapshot (periodic, logout, shutdown, pre-restore) and
+/// apply rolling retention right away, so frequent restores or logouts cannot
+/// grow the store between periodic ticks. Manual saves are never pruned.
 fn save_automatic(d: &Daemon, s: &fractile_core::snapshot::Snapshot) -> Result<(), String> {
     let cfg = d.config();
     let mut st = d.store.lock().unwrap();
@@ -130,7 +130,7 @@ impl RestoreHost for DaemonHost {
         let _ = self.d.store.lock().unwrap().record_launch(desktop_id, Some(run_id), Some(pid));
     }
     fn persist(&self, run_id: &str, item: &ItemResult) {
-        let _ = self.d.store.lock().unwrap().item_upsert(run_id, &item.record_id, &item.label, item.status.as_str(), item.window_id.as_deref(), item.launched, item.message.as_deref());
+        let _ = self.d.store.lock().unwrap().item_upsert(run_id, item);
     }
     fn progress(&self, p: &Progress) {
         let v = json!(p);
@@ -178,7 +178,7 @@ fn build(d: &Arc<Daemon>, src: &Source, req: &RestoreRequest, run_id: &str) -> R
     opts.launch_enabled = req.launch;
     opts.selected = req.selected.as_ref().map(|v| v.iter().cloned().collect());
     // previous attempts of this run (idempotent retry)
-    for (rid, status, wid, launched, _, _) in d.store.lock().unwrap().items(run_id).unwrap_or_default() {
+    for ItemRow { record_id: rid, status, window_id: wid, launched_at: launched, .. } in d.store.lock().unwrap().items(run_id).unwrap_or_default() {
         opts.previous.insert(rid, (ItemStatus::parse(&status), wid, launched.is_some()));
     }
     let outputs = d.outputs()?;
@@ -304,7 +304,7 @@ pub fn start_layout(d: &Arc<Daemon>, name: &str, mode: ApplyMode, req: &RestoreR
 
 /// Retry only incomplete items of an earlier run (same run id → idempotent).
 pub fn retry_run(d: &Arc<Daemon>, run_id: &str, req: &RestoreRequest, wait: bool) -> R<Value> {
-    let (source, source_id, _state, _) = d.store.lock().unwrap().run_get(run_id).map_err(|e| err("store", e))?.ok_or_else(|| err("not_found", "no such run"))?;
+    let RunRow { source, source_id, .. } = d.store.lock().unwrap().run_get(run_id).map_err(|e| err("store", e))?.ok_or_else(|| err("not_found", "no such run"))?;
     let mut r = req.clone();
     r.run_id = Some(run_id.to_string());
     let sid = source_id.ok_or_else(|| err("invalid", "run has no source"))?;
@@ -799,13 +799,13 @@ fn capture_interrupted(d: &Daemon, mode: SnapshotMode, run_id: &str) -> R<Snapsh
     let cfg = d.config();
     let run = d.store.lock().unwrap().run_get(run_id).ok().flatten();
     let mut extra = vec![];
-    if let Some((source, Some(sid), _, _)) = run {
+    if let Some(RunRow { source, source_id: Some(sid), .. }) = run {
         if source != "layout" {
             let src = d.store.lock().unwrap().get_snapshot(&sid);
             match src {
                 Ok(src) => {
                     let items = d.store.lock().unwrap().items(run_id).unwrap_or_default();
-                    let journal: Vec<(String, ItemStatus, Option<String>)> = items.into_iter().map(|(r, st, w, ..)| (r, ItemStatus::parse(&st), w)).collect();
+                    let journal: Vec<(String, ItemStatus, Option<String>)> = items.into_iter().map(|it| (it.record_id, ItemStatus::parse(&it.status), it.window_id)).collect();
                     let before: Vec<Rect> = windows.iter().map(|w| w.frame).collect();
                     extra = fractile_session::restore::interrupted_overlay(&src, &cfg, &journal, &mut windows);
                     let moved: Vec<&str> = windows.iter().zip(before).filter(|(w, b)| w.frame != *b).map(|(w, _)| w.id.as_str()).collect();

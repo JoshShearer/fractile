@@ -1,6 +1,7 @@
 //! SQLite persistence (WAL, synchronous=FULL). Snapshots are checksummed;
 //! a snapshot whose checksum fails is never returned as "latest good".
 
+use crate::restore::ItemResult;
 use fractile_core::layout::Layout;
 use fractile_core::snapshot::{Snapshot, SnapshotMode};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -29,6 +30,26 @@ pub struct SessionRecord {
     pub ended_at: Option<String>,
     pub clean: bool,
     pub restored: bool,
+}
+
+/// A restore run as stored.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunRow {
+    pub source: String,
+    pub source_id: Option<String>,
+    pub state: String,
+    pub summary: Option<String>,
+}
+
+/// One item of a restore run as stored.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ItemRow {
+    pub record_id: String,
+    pub status: String,
+    pub window_id: Option<String>,
+    pub launched_at: Option<String>,
+    pub label: String,
+    pub message: Option<String>,
 }
 
 pub struct Store {
@@ -288,9 +309,11 @@ impl Store {
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
-    pub fn run_get(&self, run_id: &str) -> Result<Option<(String, Option<String>, String, Option<String>)>, String> {
+    pub fn run_get(&self, run_id: &str) -> Result<Option<RunRow>, String> {
         self.conn
-            .query_row("SELECT source, source_id, state, summary FROM restore_runs WHERE run_id=?1", [run_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .query_row("SELECT source, source_id, state, summary FROM restore_runs WHERE run_id=?1", [run_id], |r| {
+                Ok(RunRow { source: r.get(0)?, source_id: r.get(1)?, state: r.get(2)?, summary: r.get(3)? })
+            })
             .optional()
             .map_err(|e| e.to_string())
     }
@@ -315,7 +338,7 @@ impl Store {
             .collect();
         Ok(v)
     }
-    pub fn item_upsert(&self, run_id: &str, record_id: &str, label: &str, status: &str, window_id: Option<&str>, launched: bool, message: Option<&str>) -> Result<(), String> {
+    pub fn item_upsert(&self, run_id: &str, item: &ItemResult) -> Result<(), String> {
         let now = chrono::Local::now().to_rfc3339();
         self.conn
             .execute(
@@ -323,15 +346,17 @@ impl Store {
                  VALUES(?1,?2,?3,?4,?5,CASE WHEN ?6 THEN ?8 ELSE NULL END,1,?7,?8)
                  ON CONFLICT(run_id,record_id) DO UPDATE SET status=excluded.status, window_id=COALESCE(excluded.window_id, window_id),
                    launched_at=COALESCE(launched_at, excluded.launched_at), attempts=attempts+1, message=excluded.message, updated_at=excluded.updated_at",
-                params![run_id, record_id, label, status, window_id, launched, message, now],
+                params![run_id, item.record_id, item.label, item.status.as_str(), item.window_id, item.launched, item.message, now],
             )
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
-    /// (record_id, status, window_id, launched_at)
-    pub fn items(&self, run_id: &str) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>)>, String> {
+    pub fn items(&self, run_id: &str) -> Result<Vec<ItemRow>, String> {
         let mut st = self.conn.prepare("SELECT record_id, status, window_id, launched_at, label, message FROM restore_items WHERE run_id=?1 ORDER BY rowid").map_err(|e| e.to_string())?;
-        let v = st.query_map([run_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?))).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
+        let v = st.query_map([run_id], |r| {
+            Ok(ItemRow { record_id: r.get(0)?, status: r.get(1)?, window_id: r.get(2)?, launched_at: r.get(3)?, label: r.get(4)?, message: r.get(5)? })
+        });
+        let v = v.map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
         Ok(v)
     }
 
@@ -398,6 +423,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::restore::ItemStatus;
     use fractile_core::geometry::Rect;
     use fractile_core::snapshot::WindowRecord;
 
@@ -464,7 +490,7 @@ mod tests {
         assert!(left.iter().any(|x| x.name.as_deref() == Some("keep me")));
         // 10 recent + at most one per day for 7 days beyond those
         let auto = left.iter().filter(|x| x.mode == SnapshotMode::Periodic).count();
-        assert!(auto >= 10 && auto <= 10 + 8, "auto={auto}");
+        assert!((10..=10 + 8).contains(&auto), "auto={auto}");
         std::fs::remove_dir_all(d).unwrap();
     }
 
@@ -493,11 +519,15 @@ mod tests {
     fn transaction_log_and_ledger() {
         let (st, d) = tmpdb();
         st.run_begin("run1", "manual", Some("s")).unwrap();
-        st.item_upsert("run1", "r1", "xterm", "LAUNCHING", None, true, None).unwrap();
-        st.item_upsert("run1", "r1", "xterm", "LAUNCHED_AND_PLACED", Some("x11:0x1"), false, None).unwrap();
+        let mut item = ItemResult { record_id: "r1".into(), label: "xterm".into(), status: ItemStatus::Launching, window_id: None, message: None, requested: None, observed: None, launched: true, excluded: false };
+        st.item_upsert("run1", &item).unwrap();
+        item.status = ItemStatus::LaunchedAndPlaced;
+        item.window_id = Some("x11:0x1".into());
+        item.launched = false;
+        st.item_upsert("run1", &item).unwrap();
         let items = st.items("run1").unwrap();
-        assert_eq!(items[0].1, "LAUNCHED_AND_PLACED");
-        assert!(items[0].3.is_some(), "launched_at preserved");
+        assert_eq!(items[0].status, "LAUNCHED_AND_PLACED");
+        assert!(items[0].launched_at.is_some(), "launched_at preserved");
         assert_eq!(st.interrupted_runs().unwrap(), vec!["run1"]);
         st.run_finish("run1", "completed", "ok").unwrap();
         assert!(st.interrupted_runs().unwrap().is_empty());

@@ -590,9 +590,9 @@ fn dispatch(d: &Arc<Daemon>, c: &mut Conn, method: &str, p: &Value) -> R<Value> 
                 .items(id)
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(rid, status, wid, launched, label, msg)| json!({"record_id": rid, "status": status, "window_id": wid, "launched_at": launched, "label": label, "message": msg}))
+                .map(|it| json!({"record_id": it.record_id, "status": it.status, "window_id": it.window_id, "launched_at": it.launched_at, "label": it.label, "message": it.message}))
                 .collect();
-            Ok(json!({"source": run.0, "source_id": run.1, "state": run.2, "summary": run.3, "items": items}))
+            Ok(json!({"source": run.source, "source_id": run.source_id, "state": run.state, "summary": run.summary, "items": items}))
         }
         "restore_cancel" => session::cancel(d),
         "restore_retry" => session::retry_run(d, req_s(p, "run_id")?, &restore_req(p)?, b(p, "wait", false)),
